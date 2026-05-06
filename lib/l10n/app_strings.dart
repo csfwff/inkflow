@@ -8,6 +8,11 @@ class AppStrings {
   final String editorTitle;
   final String articleSaved;
   final String editorHint;
+  final String titleHint;
+  final String date;
+  final String publish;
+  final String publishing;
+  final String githubNotConfigured;
   final String settingsTitle;
   final String notConfigured;
   final String publishSuccess;
@@ -18,6 +23,11 @@ class AppStrings {
   final String sectionGithub;
   final String sectionImageHost;
   final String sectionApp;
+
+  // Settings tabs
+  final String tabGeneral;
+  final String tabGithub;
+  final String tabImageHost;
 
   // GitHub config
   final String githubToken;
@@ -55,6 +65,11 @@ class AppStrings {
     required this.editorTitle,
     required this.articleSaved,
     required this.editorHint,
+    required this.titleHint,
+    required this.date,
+    required this.publish,
+    required this.publishing,
+    required this.githubNotConfigured,
     required this.settingsTitle,
     required this.notConfigured,
     required this.publishSuccess,
@@ -63,6 +78,9 @@ class AppStrings {
     required this.sectionGithub,
     required this.sectionImageHost,
     required this.sectionApp,
+    required this.tabGeneral,
+    required this.tabGithub,
+    required this.tabImageHost,
     required this.githubToken,
     required this.githubOwner,
     required this.githubRepo,
@@ -95,6 +113,11 @@ class AppStrings {
     editorTitle: 'Edit Article',
     articleSaved: 'Article Saved',
     editorHint: 'Enter Markdown content...',
+    titleHint: 'Enter title...',
+    date: 'Date',
+    publish: 'Publish',
+    publishing: 'Publishing...',
+    githubNotConfigured: 'GitHub is not configured',
     settingsTitle: 'Settings',
     notConfigured: 'Not Configured',
     publishSuccess: 'Article published successfully',
@@ -103,6 +126,9 @@ class AppStrings {
     sectionGithub: 'GitHub Configuration',
     sectionImageHost: 'Image Hosting',
     sectionApp: 'App Settings',
+    tabGeneral: 'General',
+    tabGithub: 'GitHub',
+    tabImageHost: 'Image Hosting',
     githubToken: 'Token',
     githubOwner: 'Owner',
     githubRepo: 'Repository',
@@ -135,6 +161,11 @@ class AppStrings {
     editorTitle: '编辑文章',
     articleSaved: '文章已保存',
     editorHint: '输入 Markdown 内容...',
+    titleHint: '输入标题...',
+    date: '日期',
+    publish: '发布',
+    publishing: '发布中...',
+    githubNotConfigured: 'GitHub 未配置',
     settingsTitle: '设置',
     notConfigured: '未配置',
     publishSuccess: '文章发布成功',
@@ -143,6 +174,9 @@ class AppStrings {
     sectionGithub: 'GitHub 配置',
     sectionImageHost: '图床配置',
     sectionApp: '应用设置',
+    tabGeneral: '通用',
+    tabGithub: 'GitHub',
+    tabImageHost: '图床',
     githubToken: 'Token',
     githubOwner: 'Owner',
     githubRepo: '仓库',
