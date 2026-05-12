@@ -3,12 +3,15 @@ import 'l10n/app_strings.dart';
 import 'models/settings.dart';
 import 'pages/home_page.dart';
 import 'services/settings_service.dart';
+import 'services/article_service.dart';
 
 final settingsService = SettingsService();
+final articleService = ArticleService();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await settingsService.init();
+  await articleService.init();
   runApp(const MyApp());
 }
 

@@ -57,6 +57,21 @@ class AppStrings {
   final String langZh;
   final String langEn;
 
+  // Article list
+  final String saveDraft;
+  final String synced;
+  final String draftStatus;
+  final String syncFromGitHub;
+  final String syncSuccess;
+  final String syncFailed;
+  final String noArticles;
+  final String deleteArticle;
+  final String deleteConfirm;
+  final String cancel;
+  final String pushToDraft;
+  final String repoDraft;
+  final String remoteDeleted;
+
   const AppStrings._({
     required this.appTitle,
     required this.homeTitle,
@@ -103,6 +118,19 @@ class AppStrings {
     required this.langSystem,
     required this.langZh,
     required this.langEn,
+    required this.saveDraft,
+    required this.synced,
+    required this.draftStatus,
+    required this.syncFromGitHub,
+    required this.syncSuccess,
+    required this.syncFailed,
+    required this.noArticles,
+    required this.deleteArticle,
+    required this.deleteConfirm,
+    required this.cancel,
+    required this.pushToDraft,
+    required this.repoDraft,
+    required this.remoteDeleted,
   });
 
   static const en = AppStrings._(
@@ -151,6 +179,19 @@ class AppStrings {
     langSystem: 'System',
     langZh: 'Chinese',
     langEn: 'English',
+    saveDraft: 'Save Draft',
+    synced: 'Synced',
+    draftStatus: 'Draft',
+    syncFromGitHub: 'Sync from GitHub',
+    syncSuccess: 'Sync complete',
+    syncFailed: 'Sync failed',
+    noArticles: 'No articles yet',
+    deleteArticle: 'Delete',
+    deleteConfirm: 'Are you sure you want to delete this article?',
+    cancel: 'Cancel',
+    pushToDraft: 'Save as Draft',
+    repoDraft: 'Repo Draft',
+    remoteDeleted: 'Remote Deleted',
   );
 
   static const zh = AppStrings._(
@@ -199,6 +240,19 @@ class AppStrings {
     langSystem: '跟随系统',
     langZh: '中文',
     langEn: '英文',
+    saveDraft: '保存草稿',
+    synced: '已同步',
+    draftStatus: '草稿',
+    syncFromGitHub: '从 GitHub 同步',
+    syncSuccess: '同步完成',
+    syncFailed: '同步失败',
+    noArticles: '暂无文章',
+    deleteArticle: '删除',
+    deleteConfirm: '确认删除这篇文章？',
+    cancel: '取消',
+    pushToDraft: '存为草稿',
+    repoDraft: '仓库草稿',
+    remoteDeleted: '远程已删除',
   );
 
   static AppStrings get current => forLocale(

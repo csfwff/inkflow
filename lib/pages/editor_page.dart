@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_strings.dart';
 import '../main.dart';
+import '../models/article.dart';
 import '../services/github_service.dart';
 import '../widgets/responsive.dart';
 
 class EditorPage extends StatefulWidget {
-  const EditorPage({super.key});
+  final int? articleId;
+
+  const EditorPage({super.key, this.articleId});
 
   @override
   State<EditorPage> createState() => _EditorPageState();
@@ -17,6 +20,7 @@ class _EditorPageState extends State<EditorPage> {
   DateTime _selectedDate = DateTime.now();
   bool _publishing = false;
   String _previewText = '';
+  Article? _editingArticle;
 
   @override
   void initState() {
@@ -24,6 +28,9 @@ class _EditorPageState extends State<EditorPage> {
     _contentCtrl.addListener(() {
       setState(() => _previewText = _contentCtrl.text);
     });
+    if (widget.articleId != null) {
+      _loadArticle(widget.articleId!);
+    }
   }
 
   @override
@@ -31,6 +38,19 @@ class _EditorPageState extends State<EditorPage> {
     _titleCtrl.dispose();
     _contentCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadArticle(int id) async {
+    final article = await articleService.getById(id);
+    if (article != null && mounted) {
+      setState(() {
+        _editingArticle = article;
+        _titleCtrl.text = article.title;
+        _contentCtrl.text = article.content;
+        _selectedDate = article.date;
+        _previewText = article.content;
+      });
+    }
   }
 
   String _slugify(String text) {
@@ -68,7 +88,49 @@ class _EditorPageState extends State<EditorPage> {
     }
   }
 
-  Future<void> _publish() async {
+  Future<void> _saveDraft() async {
+    final s = AppStrings.current;
+    final title = _titleCtrl.text.trim();
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(s.titleHint)),
+      );
+      return;
+    }
+
+    final slug = _slugify(title);
+    final filePath =
+        '${_selectedDate.year}/${_selectedDate.month.toString().padLeft(2, '0')}/$slug.md';
+
+    if (_editingArticle != null) {
+      _editingArticle!
+        ..title = title
+        ..content = _contentCtrl.text
+        ..date = _selectedDate
+        ..slug = slug
+        ..filePath = filePath
+        ..updatedAt = DateTime.now();
+      await articleService.update(_editingArticle!);
+    } else {
+      final article = Article(
+        title: title,
+        content: _contentCtrl.text,
+        date: _selectedDate,
+        slug: slug,
+        status: ArticleStatus.draft,
+        filePath: filePath,
+      );
+      final id = await articleService.insert(article);
+      _editingArticle = await articleService.getById(id);
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(s.articleSaved)),
+    );
+  }
+
+  Future<void> _publish({bool drafts = false}) async {
     final s = AppStrings.current;
     final settings = settingsService.settings;
 
@@ -105,15 +167,63 @@ class _EditorPageState extends State<EditorPage> {
       repo: settings.githubRepo,
     );
 
-    final result = await service.createPost(
-      fileName: fileName,
-      content: fullContent,
-      commitMessage: 'post: $title',
-    );
+    final targetStatus = drafts ? ArticleStatus.repoDraft : ArticleStatus.synced;
+    final commitPrefix = drafts ? 'draft' : 'post';
+
+    GitHubResult result;
+
+    if (_editingArticle?.githubSha != null &&
+        _editingArticle!.githubSha!.isNotEmpty) {
+      result = await service.updatePost(
+        filePath: fileName,
+        content: fullContent,
+        sha: _editingArticle!.githubSha!,
+        commitMessage: '$commitPrefix: update $title',
+        drafts: drafts,
+      );
+    } else {
+      result = await service.createPost(
+        fileName: fileName,
+        content: fullContent,
+        commitMessage: '$commitPrefix: $title',
+        drafts: drafts,
+      );
+    }
 
     if (!mounted) return;
     setState(() => _publishing = false);
 
+    if (result.success) {
+      if (_editingArticle != null) {
+        if (drafts) {
+          await articleService.markAsRepoDraft(
+            _editingArticle!.id!,
+            result.sha ?? '',
+          );
+        } else {
+          await articleService.markAsSynced(
+            _editingArticle!.id!,
+            result.sha ?? '',
+          );
+        }
+        _editingArticle!.status = targetStatus;
+        _editingArticle!.githubSha = result.sha;
+      } else {
+        final article = Article(
+          title: title,
+          content: _contentCtrl.text,
+          date: _selectedDate,
+          slug: slug,
+          status: targetStatus,
+          filePath: fileName,
+          githubSha: result.sha,
+        );
+        final id = await articleService.insert(article);
+        _editingArticle = await articleService.getById(id);
+      }
+    }
+
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(result.message),
@@ -140,12 +250,23 @@ class _EditorPageState extends State<EditorPage> {
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
             )
-          else
+          else ...[
             TextButton.icon(
-              onPressed: _publish,
+              onPressed: _saveDraft,
+              icon: const Icon(Icons.save),
+              label: Text(s.saveDraft),
+            ),
+            TextButton.icon(
+              onPressed: () => _publish(drafts: true),
+              icon: const Icon(Icons.edit_note),
+              label: Text(s.pushToDraft),
+            ),
+            TextButton.icon(
+              onPressed: () => _publish(),
               icon: const Icon(Icons.cloud_upload),
               label: Text(s.publish),
             ),
+          ],
         ],
       ),
       body: wide ? _buildWide() : _buildNarrow(),
