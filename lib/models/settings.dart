@@ -39,7 +39,7 @@ class Settings {
     this.upyunOperator = '',
     this.upyunPassword = '',
     this.upyunDomain = '',
-    this.upyunPath = 'images/',
+    this.upyunPath = '/',
     this.themeMode = AppThemeMode.system,
     this.locale = AppLocale.system,
   });

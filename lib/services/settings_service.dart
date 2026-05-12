@@ -40,7 +40,7 @@ class SettingsService {
       upyunOperator: _prefs.getString(_keyUpyunOperator) ?? '',
       upyunPassword: _prefs.getString(_keyUpyunPassword) ?? '',
       upyunDomain: _prefs.getString(_keyUpyunDomain) ?? '',
-      upyunPath: _prefs.getString(_keyUpyunPath) ?? 'images/',
+      upyunPath: _prefs.getString(_keyUpyunPath) ?? '/',
       themeMode: AppThemeMode.values[_prefs.getInt(_keyThemeMode) ?? 0],
       locale: AppLocale.values[_prefs.getInt(_keyLocale) ?? 0],
     );
