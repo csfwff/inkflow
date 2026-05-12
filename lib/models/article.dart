@@ -12,6 +12,19 @@ class Article {
   DateTime createdAt;
   DateTime updatedAt;
 
+  // Hexo 元数据
+  List<String> tags;
+  List<String> categories;
+  String? permalink;
+  String? topImg;
+  String? cover;
+  String? layout;
+  bool? comments;
+  bool? published;
+  String? excerpt;
+  String? description;
+  String? author;
+
   Article({
     this.id,
     required this.title,
@@ -23,8 +36,21 @@ class Article {
     this.githubSha,
     DateTime? createdAt,
     DateTime? updatedAt,
+    List<String>? tags,
+    List<String>? categories,
+    this.permalink,
+    this.topImg,
+    this.cover,
+    this.layout,
+    this.comments,
+    this.published,
+    this.excerpt,
+    this.description,
+    this.author,
   })  : createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now();
+        updatedAt = updatedAt ?? DateTime.now(),
+        tags = tags ?? [],
+        categories = categories ?? [];
 
   Map<String, dynamic> toMap() {
     return {
@@ -38,6 +64,17 @@ class Article {
       'githubSha': githubSha,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
+      'tags': tags.join(','),
+      'categories': categories.join(','),
+      'permalink': permalink,
+      'topImg': topImg,
+      'cover': cover,
+      'layout': layout,
+      'comments': comments == true ? 1 : 0,
+      'published': published == true ? 1 : 0,
+      'excerpt': excerpt,
+      'description': description,
+      'author': author,
     };
   }
 
@@ -53,11 +90,74 @@ class Article {
       githubSha: map['githubSha'] as String?,
       createdAt: DateTime.parse(map['createdAt'] as String),
       updatedAt: DateTime.parse(map['updatedAt'] as String),
+      tags: (map['tags'] as String?)?.split(',').where((t) => t.isNotEmpty).toList() ?? [],
+      categories: (map['categories'] as String?)?.split(',').where((c) => c.isNotEmpty).toList() ?? [],
+      permalink: map['permalink'] as String?,
+      topImg: map['topImg'] as String?,
+      cover: map['cover'] as String?,
+      layout: map['layout'] as String?,
+      comments: map['comments'] == 1,
+      published: map['published'] == 1,
+      excerpt: map['excerpt'] as String?,
+      description: map['description'] as String?,
+      author: map['author'] as String?,
     );
   }
 
   String buildFrontmatter() {
-    return '---\ntitle: $title\ndate: ${_formatDateTime(date)}\n---\n';
+    final buffer = StringBuffer('---\n');
+    buffer.writeln('title: $title');
+    buffer.writeln('date: ${_formatDateTime(date)}');
+
+    if (tags.isNotEmpty) {
+      buffer.writeln('tags: [${tags.join(', ')}]');
+    }
+
+    if (categories.isNotEmpty) {
+      buffer.writeln('categories:');
+      for (final cat in categories) {
+        buffer.writeln('  - $cat');
+      }
+    }
+
+    if (permalink != null && permalink!.isNotEmpty) {
+      buffer.writeln('permalink: $permalink');
+    }
+
+    if (topImg != null && topImg!.isNotEmpty) {
+      buffer.writeln('top_img: $topImg');
+    }
+
+    if (cover != null && cover!.isNotEmpty) {
+      buffer.writeln('cover: $cover');
+    }
+
+    if (layout != null && layout!.isNotEmpty) {
+      buffer.writeln('layout: $layout');
+    }
+
+    if (comments == false) {
+      buffer.writeln('comments: false');
+    }
+
+    if (published == false) {
+      buffer.writeln('published: false');
+    }
+
+    if (excerpt != null && excerpt!.isNotEmpty) {
+      buffer.writeln('excerpt: $excerpt');
+    }
+
+    if (description != null && description!.isNotEmpty) {
+      buffer.writeln('description: $description');
+    }
+
+    if (author != null && author!.isNotEmpty) {
+      buffer.writeln('author: $author');
+    }
+
+    buffer.write('---\n');
+    return buffer.toString();
   }
 
   String get fullContent => buildFrontmatter() + content;

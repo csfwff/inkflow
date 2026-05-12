@@ -1,4 +1,4 @@
-enum ImageHostType { github, smms, imgur }
+enum ImageHostType { github, upyun }
 
 enum AppThemeMode { system, light, dark }
 
@@ -16,8 +16,11 @@ class Settings {
   String imageGithubRepo;
   String imageGithubPath;
   String imageGithubDomain;
-  String smmsToken;
-  String imgurClientId;
+  String upyunBucket;
+  String upyunOperator;
+  String upyunPassword;
+  String upyunDomain;
+  String upyunPath;
 
   // App
   AppThemeMode themeMode;
@@ -32,8 +35,11 @@ class Settings {
     this.imageGithubRepo = '',
     this.imageGithubPath = 'images',
     this.imageGithubDomain = '',
-    this.smmsToken = '',
-    this.imgurClientId = '',
+    this.upyunBucket = '',
+    this.upyunOperator = '',
+    this.upyunPassword = '',
+    this.upyunDomain = '',
+    this.upyunPath = 'images/',
     this.themeMode = AppThemeMode.system,
     this.locale = AppLocale.system,
   });

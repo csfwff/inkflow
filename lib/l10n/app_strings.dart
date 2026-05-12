@@ -38,13 +38,20 @@ class AppStrings {
   // Image host
   final String imageHostType;
   final String imageHostGithub;
-  final String imageHostSmms;
-  final String imageHostImgur;
+  final String imageHostUpyun;
   final String imageGithubRepo;
   final String imageGithubPath;
   final String imageGithubDomain;
-  final String smmsToken;
-  final String imgurClientId;
+  final String upyunBucket;
+  final String upyunBucketHint;
+  final String upyunOperator;
+  final String upyunOperatorHint;
+  final String upyunPassword;
+  final String upyunPasswordHint;
+  final String upyunDomain;
+  final String upyunDomainHint;
+  final String upyunPath;
+  final String upyunPathHint;
 
   // App settings
   final String language;
@@ -71,6 +78,32 @@ class AppStrings {
   final String pushToDraft;
   final String repoDraft;
   final String remoteDeleted;
+
+  // Metadata
+  final String metadata;
+  final String done;
+  final String tags;
+  final String tagsHint;
+  final String categories;
+  final String categoriesHint;
+  final String permalink;
+  final String permalinkHint;
+  final String topImg;
+  final String topImgHint;
+  final String cover;
+  final String coverHint;
+  final String layout;
+  final String layoutPost;
+  final String layoutDraft;
+  final String layoutPage;
+  final String comments;
+  final String published;
+  final String excerpt;
+  final String excerptHint;
+  final String description;
+  final String descriptionHint;
+  final String author;
+  final String authorHint;
 
   const AppStrings._({
     required this.appTitle,
@@ -102,13 +135,20 @@ class AppStrings {
     required this.githubBranch,
     required this.imageHostType,
     required this.imageHostGithub,
-    required this.imageHostSmms,
-    required this.imageHostImgur,
+    required this.imageHostUpyun,
     required this.imageGithubRepo,
     required this.imageGithubPath,
     required this.imageGithubDomain,
-    required this.smmsToken,
-    required this.imgurClientId,
+    required this.upyunBucket,
+    required this.upyunBucketHint,
+    required this.upyunOperator,
+    required this.upyunOperatorHint,
+    required this.upyunPassword,
+    required this.upyunPasswordHint,
+    required this.upyunDomain,
+    required this.upyunDomainHint,
+    required this.upyunPath,
+    required this.upyunPathHint,
     required this.language,
     required this.theme,
     required this.version,
@@ -131,6 +171,30 @@ class AppStrings {
     required this.pushToDraft,
     required this.repoDraft,
     required this.remoteDeleted,
+    required this.metadata,
+    required this.done,
+    required this.tags,
+    required this.tagsHint,
+    required this.categories,
+    required this.categoriesHint,
+    required this.permalink,
+    required this.permalinkHint,
+    required this.topImg,
+    required this.topImgHint,
+    required this.cover,
+    required this.coverHint,
+    required this.layout,
+    required this.layoutPost,
+    required this.layoutDraft,
+    required this.layoutPage,
+    required this.comments,
+    required this.published,
+    required this.excerpt,
+    required this.excerptHint,
+    required this.description,
+    required this.descriptionHint,
+    required this.author,
+    required this.authorHint,
   });
 
   static const en = AppStrings._(
@@ -163,13 +227,20 @@ class AppStrings {
     githubBranch: 'Branch',
     imageHostType: 'Hosting Provider',
     imageHostGithub: 'GitHub',
-    imageHostSmms: 'SM.MS',
-    imageHostImgur: 'Imgur',
+    imageHostUpyun: 'Upyun',
     imageGithubRepo: 'Image Repository',
     imageGithubPath: 'Path',
     imageGithubDomain: 'Custom Domain',
-    smmsToken: 'Token',
-    imgurClientId: 'Client ID',
+    upyunBucket: 'Bucket',
+    upyunBucketHint: 'Service name',
+    upyunOperator: 'Operator',
+    upyunOperatorHint: 'Operator name',
+    upyunPassword: 'Password',
+    upyunPasswordHint: 'Operator password',
+    upyunDomain: 'Domain',
+    upyunDomainHint: 'https://example.upaiyun.com',
+    upyunPath: 'Path',
+    upyunPathHint: 'images/',
     language: 'Language',
     theme: 'Theme',
     version: 'Version',
@@ -192,6 +263,30 @@ class AppStrings {
     pushToDraft: 'Save as Draft',
     repoDraft: 'Repo Draft',
     remoteDeleted: 'Remote Deleted',
+    metadata: 'Metadata',
+    done: 'Done',
+    tags: 'Tags',
+    tagsHint: 'Comma separated, e.g: Flutter, Dart',
+    categories: 'Categories',
+    categoriesHint: 'One per line',
+    permalink: 'Permalink',
+    permalinkHint: '/articles/2024/01/01/hello.html',
+    topImg: 'Top Image',
+    topImgHint: 'Header image URL',
+    cover: 'Cover',
+    coverHint: 'Cover image URL',
+    layout: 'Layout',
+    layoutPost: 'Post',
+    layoutDraft: 'Draft',
+    layoutPage: 'Page',
+    comments: 'Comments',
+    published: 'Published',
+    excerpt: 'Excerpt',
+    excerptHint: 'Article summary...',
+    description: 'Description',
+    descriptionHint: 'Article description...',
+    author: 'Author',
+    authorHint: 'Author name',
   );
 
   static const zh = AppStrings._(
@@ -224,13 +319,20 @@ class AppStrings {
     githubBranch: '分支',
     imageHostType: '图床提供商',
     imageHostGithub: 'GitHub',
-    imageHostSmms: 'SM.MS',
-    imageHostImgur: 'Imgur',
+    imageHostUpyun: '又拍云',
     imageGithubRepo: '图片仓库',
     imageGithubPath: '路径',
     imageGithubDomain: '自定义域名',
-    smmsToken: 'Token',
-    imgurClientId: 'Client ID',
+    upyunBucket: '空间名称',
+    upyunBucketHint: '服务名称',
+    upyunOperator: '操作员',
+    upyunOperatorHint: '操作员名称',
+    upyunPassword: '操作员密码',
+    upyunPasswordHint: '操作员密码',
+    upyunDomain: '域名',
+    upyunDomainHint: 'https://example.upaiyun.com',
+    upyunPath: '路径',
+    upyunPathHint: 'images/',
     language: '语言',
     theme: '主题',
     version: '版本',
@@ -253,6 +355,30 @@ class AppStrings {
     pushToDraft: '存为草稿',
     repoDraft: '仓库草稿',
     remoteDeleted: '远程已删除',
+    metadata: '元数据',
+    done: '完成',
+    tags: '标签',
+    tagsHint: '逗号分隔，如: Flutter, Dart',
+    categories: '分类',
+    categoriesHint: '每行一个',
+    permalink: '永久链接',
+    permalinkHint: '/articles/2024/01/01/hello.html',
+    topImg: '头图',
+    topImgHint: '头图 URL',
+    cover: '封面',
+    coverHint: '封面图片 URL',
+    layout: '布局',
+    layoutPost: '文章',
+    layoutDraft: '草稿',
+    layoutPage: '页面',
+    comments: '评论',
+    published: '发布',
+    excerpt: '摘要',
+    excerptHint: '文章摘要...',
+    description: '描述',
+    descriptionHint: '文章描述...',
+    author: '作者',
+    authorHint: '作者名称',
   );
 
   static AppStrings get current => forLocale(

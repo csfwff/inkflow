@@ -10,8 +10,11 @@ class SettingsService {
   static const _keyImageGithubRepo = 'image_github_repo';
   static const _keyImageGithubPath = 'image_github_path';
   static const _keyImageGithubDomain = 'image_github_domain';
-  static const _keySmmsToken = 'smms_token';
-  static const _keyImgurClientId = 'imgur_client_id';
+  static const _keyUpyunBucket = 'upyun_bucket';
+  static const _keyUpyunOperator = 'upyun_operator';
+  static const _keyUpyunPassword = 'upyun_password';
+  static const _keyUpyunDomain = 'upyun_domain';
+  static const _keyUpyunPath = 'upyun_path';
   static const _keyThemeMode = 'theme_mode';
   static const _keyLocale = 'locale';
 
@@ -33,8 +36,11 @@ class SettingsService {
       imageGithubRepo: _prefs.getString(_keyImageGithubRepo) ?? '',
       imageGithubPath: _prefs.getString(_keyImageGithubPath) ?? 'images',
       imageGithubDomain: _prefs.getString(_keyImageGithubDomain) ?? '',
-      smmsToken: _prefs.getString(_keySmmsToken) ?? '',
-      imgurClientId: _prefs.getString(_keyImgurClientId) ?? '',
+      upyunBucket: _prefs.getString(_keyUpyunBucket) ?? '',
+      upyunOperator: _prefs.getString(_keyUpyunOperator) ?? '',
+      upyunPassword: _prefs.getString(_keyUpyunPassword) ?? '',
+      upyunDomain: _prefs.getString(_keyUpyunDomain) ?? '',
+      upyunPath: _prefs.getString(_keyUpyunPath) ?? 'images/',
       themeMode: AppThemeMode.values[_prefs.getInt(_keyThemeMode) ?? 0],
       locale: AppLocale.values[_prefs.getInt(_keyLocale) ?? 0],
     );
@@ -50,8 +56,11 @@ class SettingsService {
       _prefs.setString(_keyImageGithubRepo, settings.imageGithubRepo),
       _prefs.setString(_keyImageGithubPath, settings.imageGithubPath),
       _prefs.setString(_keyImageGithubDomain, settings.imageGithubDomain),
-      _prefs.setString(_keySmmsToken, settings.smmsToken),
-      _prefs.setString(_keyImgurClientId, settings.imgurClientId),
+      _prefs.setString(_keyUpyunBucket, settings.upyunBucket),
+      _prefs.setString(_keyUpyunOperator, settings.upyunOperator),
+      _prefs.setString(_keyUpyunPassword, settings.upyunPassword),
+      _prefs.setString(_keyUpyunDomain, settings.upyunDomain),
+      _prefs.setString(_keyUpyunPath, settings.upyunPath),
       _prefs.setInt(_keyThemeMode, settings.themeMode.index),
       _prefs.setInt(_keyLocale, settings.locale.index),
     ]);

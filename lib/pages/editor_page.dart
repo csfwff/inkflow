@@ -4,6 +4,7 @@ import '../main.dart';
 import '../models/article.dart';
 import '../services/github_service.dart';
 import '../widgets/responsive.dart';
+import 'metadata_page.dart';
 
 class EditorPage extends StatefulWidget {
   final int? articleId;
@@ -17,6 +18,7 @@ class EditorPage extends StatefulWidget {
 class _EditorPageState extends State<EditorPage> {
   final _titleCtrl = TextEditingController();
   final _contentCtrl = TextEditingController();
+
   DateTime _selectedDate = DateTime.now();
   bool _publishing = false;
   String _previewText = '';
@@ -62,18 +64,8 @@ class _EditorPageState extends State<EditorPage> {
         .replaceAll(RegExp(r'^-|-$'), '');
   }
 
-  String _buildFrontmatter() {
-    final title = _titleCtrl.text;
-    final date = _formatDateTime(_selectedDate);
-    return '---\ntitle: $title\ndate: $date\n---\n';
-  }
-
   String _formatDate(DateTime d) {
     return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-  }
-
-  String _formatDateTime(DateTime d) {
-    return '${_formatDate(d)} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}:${d.second.toString().padLeft(2, '0')}';
   }
 
   Future<void> _pickDate() async {
@@ -88,6 +80,59 @@ class _EditorPageState extends State<EditorPage> {
     }
   }
 
+  Article _buildArticle() {
+    final title = _titleCtrl.text.trim();
+    final slug = _slugify(title);
+    final filePath =
+        '${_selectedDate.year}/${_selectedDate.month.toString().padLeft(2, '0')}/$slug.md';
+
+    return Article(
+      id: _editingArticle?.id,
+      title: title,
+      content: _contentCtrl.text,
+      date: _selectedDate,
+      slug: slug,
+      status: _editingArticle?.status ?? ArticleStatus.draft,
+      filePath: filePath,
+      githubSha: _editingArticle?.githubSha,
+      createdAt: _editingArticle?.createdAt,
+      tags: _editingArticle?.tags ?? [],
+      categories: _editingArticle?.categories ?? [],
+      permalink: _editingArticle?.permalink,
+      topImg: _editingArticle?.topImg,
+      cover: _editingArticle?.cover,
+      layout: _editingArticle?.layout,
+      comments: _editingArticle?.comments,
+      published: _editingArticle?.published,
+      excerpt: _editingArticle?.excerpt,
+      description: _editingArticle?.description,
+      author: _editingArticle?.author,
+    );
+  }
+
+  Future<void> _openMetadata() async {
+    if (_editingArticle == null) {
+      final article = _buildArticle();
+      final id = await articleService.insert(article);
+      _editingArticle = await articleService.getById(id);
+    }
+
+    if (!mounted) return;
+
+    final result = await Navigator.push<Article>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MetadataPage(article: _editingArticle!),
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _editingArticle = result;
+      });
+    }
+  }
+
   Future<void> _saveDraft() async {
     final s = AppStrings.current;
     final title = _titleCtrl.text.trim();
@@ -98,28 +143,11 @@ class _EditorPageState extends State<EditorPage> {
       return;
     }
 
-    final slug = _slugify(title);
-    final filePath =
-        '${_selectedDate.year}/${_selectedDate.month.toString().padLeft(2, '0')}/$slug.md';
-
+    final article = _buildArticle();
     if (_editingArticle != null) {
-      _editingArticle!
-        ..title = title
-        ..content = _contentCtrl.text
-        ..date = _selectedDate
-        ..slug = slug
-        ..filePath = filePath
-        ..updatedAt = DateTime.now();
-      await articleService.update(_editingArticle!);
+      article.updatedAt = DateTime.now();
+      await articleService.update(article);
     } else {
-      final article = Article(
-        title: title,
-        content: _contentCtrl.text,
-        date: _selectedDate,
-        slug: slug,
-        status: ArticleStatus.draft,
-        filePath: filePath,
-      );
       final id = await articleService.insert(article);
       _editingArticle = await articleService.getById(id);
     }
@@ -153,13 +181,9 @@ class _EditorPageState extends State<EditorPage> {
 
     setState(() => _publishing = true);
 
-    final slug = _slugify(title);
-    final year = _selectedDate.year.toString();
-    final month = _selectedDate.month.toString().padLeft(2, '0');
-    final fileName = '$year/$month/$slug.md';
-
-    final frontmatter = _buildFrontmatter();
-    final fullContent = frontmatter + _contentCtrl.text;
+    final article = _buildArticle();
+    final fileName = article.filePath;
+    final fullContent = article.fullContent;
 
     final service = GitHubService(
       token: settings.githubToken,
@@ -194,30 +218,13 @@ class _EditorPageState extends State<EditorPage> {
     setState(() => _publishing = false);
 
     if (result.success) {
+      article.status = targetStatus;
+      article.githubSha = result.sha;
+
       if (_editingArticle != null) {
-        if (drafts) {
-          await articleService.markAsRepoDraft(
-            _editingArticle!.id!,
-            result.sha ?? '',
-          );
-        } else {
-          await articleService.markAsSynced(
-            _editingArticle!.id!,
-            result.sha ?? '',
-          );
-        }
-        _editingArticle!.status = targetStatus;
-        _editingArticle!.githubSha = result.sha;
+        article.updatedAt = DateTime.now();
+        await articleService.update(article);
       } else {
-        final article = Article(
-          title: title,
-          content: _contentCtrl.text,
-          date: _selectedDate,
-          slug: slug,
-          status: targetStatus,
-          filePath: fileName,
-          githubSha: result.sha,
-        );
         final id = await articleService.insert(article);
         _editingArticle = await articleService.getById(id);
       }
@@ -251,6 +258,11 @@ class _EditorPageState extends State<EditorPage> {
               ),
             )
           else ...[
+            IconButton(
+              onPressed: _openMetadata,
+              icon: const Icon(Icons.tune),
+              tooltip: s.metadata,
+            ),
             TextButton.icon(
               onPressed: _saveDraft,
               icon: const Icon(Icons.save),

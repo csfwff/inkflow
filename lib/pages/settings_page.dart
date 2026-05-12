@@ -29,8 +29,11 @@ class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController _imageGithubRepoCtrl;
   late final TextEditingController _imageGithubPathCtrl;
   late final TextEditingController _imageGithubDomainCtrl;
-  late final TextEditingController _smmsTokenCtrl;
-  late final TextEditingController _imgurClientIdCtrl;
+  late final TextEditingController _upyunBucketCtrl;
+  late final TextEditingController _upyunOperatorCtrl;
+  late final TextEditingController _upyunPasswordCtrl;
+  late final TextEditingController _upyunDomainCtrl;
+  late final TextEditingController _upyunPathCtrl;
 
   @override
   void initState() {
@@ -44,8 +47,11 @@ class _SettingsPageState extends State<SettingsPage> {
     _imageGithubRepoCtrl = TextEditingController(text: _settings.imageGithubRepo);
     _imageGithubPathCtrl = TextEditingController(text: _settings.imageGithubPath);
     _imageGithubDomainCtrl = TextEditingController(text: _settings.imageGithubDomain);
-    _smmsTokenCtrl = TextEditingController(text: _settings.smmsToken);
-    _imgurClientIdCtrl = TextEditingController(text: _settings.imgurClientId);
+    _upyunBucketCtrl = TextEditingController(text: _settings.upyunBucket);
+    _upyunOperatorCtrl = TextEditingController(text: _settings.upyunOperator);
+    _upyunPasswordCtrl = TextEditingController(text: _settings.upyunPassword);
+    _upyunDomainCtrl = TextEditingController(text: _settings.upyunDomain);
+    _upyunPathCtrl = TextEditingController(text: _settings.upyunPath);
 
     _loadVersion();
   }
@@ -59,8 +65,11 @@ class _SettingsPageState extends State<SettingsPage> {
     _imageGithubRepoCtrl.dispose();
     _imageGithubPathCtrl.dispose();
     _imageGithubDomainCtrl.dispose();
-    _smmsTokenCtrl.dispose();
-    _imgurClientIdCtrl.dispose();
+    _upyunBucketCtrl.dispose();
+    _upyunOperatorCtrl.dispose();
+    _upyunPasswordCtrl.dispose();
+    _upyunDomainCtrl.dispose();
+    _upyunPathCtrl.dispose();
     super.dispose();
   }
 
@@ -319,9 +328,7 @@ class _SettingsPageState extends State<SettingsPage> {
             DropdownMenuItem(
                 value: ImageHostType.github, child: Text(s.imageHostGithub)),
             DropdownMenuItem(
-                value: ImageHostType.smms, child: Text(s.imageHostSmms)),
-            DropdownMenuItem(
-                value: ImageHostType.imgur, child: Text(s.imageHostImgur)),
+                value: ImageHostType.upyun, child: Text(s.imageHostUpyun)),
           ],
           onChanged: (v) {
             if (v == null) return;
@@ -369,30 +376,57 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ],
         );
-      case ImageHostType.smms:
+      case ImageHostType.upyun:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _sectionHeader(s.smmsToken),
+            _sectionHeader(s.upyunBucket),
             _inputRow(
-              controller: _smmsTokenCtrl,
-              obscure: true,
+              controller: _upyunBucketCtrl,
+              hint: s.upyunBucketHint,
               onChanged: (v) {
-                _settings.smmsToken = v;
+                _settings.upyunBucket = v;
                 _save();
               },
             ),
-          ],
-        );
-      case ImageHostType.imgur:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _sectionHeader(s.imgurClientId),
+            _divider(),
+            _sectionHeader(s.upyunOperator),
             _inputRow(
-              controller: _imgurClientIdCtrl,
+              controller: _upyunOperatorCtrl,
+              hint: s.upyunOperatorHint,
               onChanged: (v) {
-                _settings.imgurClientId = v;
+                _settings.upyunOperator = v;
+                _save();
+              },
+            ),
+            _divider(),
+            _sectionHeader(s.upyunPassword),
+            _inputRow(
+              controller: _upyunPasswordCtrl,
+              hint: s.upyunPasswordHint,
+              obscure: true,
+              onChanged: (v) {
+                _settings.upyunPassword = v;
+                _save();
+              },
+            ),
+            _divider(),
+            _sectionHeader(s.upyunDomain),
+            _inputRow(
+              controller: _upyunDomainCtrl,
+              hint: s.upyunDomainHint,
+              onChanged: (v) {
+                _settings.upyunDomain = v;
+                _save();
+              },
+            ),
+            _divider(),
+            _sectionHeader(s.upyunPath),
+            _inputRow(
+              controller: _upyunPathCtrl,
+              hint: s.upyunPathHint,
+              onChanged: (v) {
+                _settings.upyunPath = v;
                 _save();
               },
             ),
@@ -425,13 +459,15 @@ class _SettingsPageState extends State<SettingsPage> {
     required TextEditingController controller,
     required ValueChanged<String> onChanged,
     bool obscure = false,
+    String? hint,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: TextField(
         controller: controller,
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           isDense: true,
+          hintText: hint,
           contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           border: OutlineInputBorder(),
         ),

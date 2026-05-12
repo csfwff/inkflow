@@ -10,24 +10,58 @@ class ArticleService {
     final path = p.join(dbPath, 'inkflow.db');
     _db = await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
-        await db.execute('''
-          CREATE TABLE articles (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            content TEXT NOT NULL,
-            date TEXT NOT NULL,
-            slug TEXT NOT NULL,
-            status INTEGER NOT NULL DEFAULT 0,
-            filePath TEXT NOT NULL DEFAULT '',
-            githubSha TEXT,
-            createdAt TEXT NOT NULL,
-            updatedAt TEXT NOT NULL
-          )
-        ''');
+        await _createTableV2(db);
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await _migrateV2(db);
+        }
       },
     );
+  }
+
+  Future<void> _createTableV2(Database db) async {
+    await db.execute('''
+      CREATE TABLE articles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        date TEXT NOT NULL,
+        slug TEXT NOT NULL,
+        status INTEGER NOT NULL DEFAULT 0,
+        filePath TEXT NOT NULL DEFAULT '',
+        githubSha TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        tags TEXT DEFAULT '',
+        categories TEXT DEFAULT '',
+        permalink TEXT,
+        topImg TEXT,
+        cover TEXT,
+        layout TEXT,
+        comments INTEGER DEFAULT 1,
+        published INTEGER DEFAULT 1,
+        excerpt TEXT,
+        description TEXT,
+        author TEXT
+      )
+    ''');
+  }
+
+  Future<void> _migrateV2(Database db) async {
+    await db.execute('ALTER TABLE articles ADD COLUMN tags TEXT DEFAULT ""');
+    await db.execute('ALTER TABLE articles ADD COLUMN categories TEXT DEFAULT ""');
+    await db.execute('ALTER TABLE articles ADD COLUMN permalink TEXT');
+    await db.execute('ALTER TABLE articles ADD COLUMN topImg TEXT');
+    await db.execute('ALTER TABLE articles ADD COLUMN cover TEXT');
+    await db.execute('ALTER TABLE articles ADD COLUMN layout TEXT');
+    await db.execute('ALTER TABLE articles ADD COLUMN comments INTEGER DEFAULT 1');
+    await db.execute('ALTER TABLE articles ADD COLUMN published INTEGER DEFAULT 1');
+    await db.execute('ALTER TABLE articles ADD COLUMN excerpt TEXT');
+    await db.execute('ALTER TABLE articles ADD COLUMN description TEXT');
+    await db.execute('ALTER TABLE articles ADD COLUMN author TEXT');
   }
 
   Future<int> insert(Article article) async {
@@ -93,6 +127,17 @@ class ArticleService {
           'status': article.status.index,
           'githubSha': article.githubSha,
           'updatedAt': DateTime.now().toIso8601String(),
+          'tags': article.tags.join(','),
+          'categories': article.categories.join(','),
+          'permalink': article.permalink,
+          'topImg': article.topImg,
+          'cover': article.cover,
+          'layout': article.layout,
+          'comments': article.comments == true ? 1 : 0,
+          'published': article.published == true ? 1 : 0,
+          'excerpt': article.excerpt,
+          'description': article.description,
+          'author': article.author,
         },
         where: 'filePath = ?',
         whereArgs: [article.filePath],
