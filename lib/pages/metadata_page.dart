@@ -30,7 +30,8 @@ class _MetadataPageState extends State<MetadataPage> {
     super.initState();
     final article = widget.article;
     _tagsCtrl = TextEditingController(text: article.tags.join(', '));
-    _categoriesCtrl = TextEditingController(text: article.categories.join('\n'));
+    _categoriesCtrl =
+        TextEditingController(text: article.categories.join('\n'));
     _permalinkCtrl = TextEditingController(text: article.permalink ?? '');
     _topImgCtrl = TextEditingController(text: article.topImg ?? '');
     _coverCtrl = TextEditingController(text: article.cover ?? '');
@@ -118,9 +119,7 @@ class _MetadataPageState extends State<MetadataPage> {
             const SizedBox(height: 8),
             _buildTextField(
               controller: _tagsCtrl,
-              label: s.tags,
               hint: s.tagsHint,
-              icon: Icons.tag,
             ),
             const SizedBox(height: 16),
 
@@ -128,9 +127,7 @@ class _MetadataPageState extends State<MetadataPage> {
             const SizedBox(height: 8),
             _buildTextField(
               controller: _categoriesCtrl,
-              label: s.categories,
               hint: s.categoriesHint,
-              icon: Icons.folder_outlined,
               maxLines: 2,
             ),
             const SizedBox(height: 16),
@@ -140,9 +137,7 @@ class _MetadataPageState extends State<MetadataPage> {
             const SizedBox(height: 8),
             _buildTextField(
               controller: _permalinkCtrl,
-              label: s.permalink,
               hint: s.permalinkHint,
-              icon: Icons.link,
             ),
             const SizedBox(height: 16),
 
@@ -151,9 +146,7 @@ class _MetadataPageState extends State<MetadataPage> {
             const SizedBox(height: 8),
             _buildTextField(
               controller: _topImgCtrl,
-              label: s.topImg,
               hint: s.topImgHint,
-              icon: Icons.image,
             ),
             const SizedBox(height: 16),
 
@@ -161,9 +154,7 @@ class _MetadataPageState extends State<MetadataPage> {
             const SizedBox(height: 8),
             _buildTextField(
               controller: _coverCtrl,
-              label: s.cover,
               hint: s.coverHint,
-              icon: Icons.image_outlined,
             ),
             const SizedBox(height: 16),
 
@@ -205,9 +196,7 @@ class _MetadataPageState extends State<MetadataPage> {
             const SizedBox(height: 8),
             _buildTextField(
               controller: _excerptCtrl,
-              label: s.excerpt,
               hint: s.excerptHint,
-              icon: Icons.short_text,
               maxLines: 3,
             ),
             const SizedBox(height: 16),
@@ -216,9 +205,7 @@ class _MetadataPageState extends State<MetadataPage> {
             const SizedBox(height: 8),
             _buildTextField(
               controller: _descriptionCtrl,
-              label: s.description,
               hint: s.descriptionHint,
-              icon: Icons.description,
               maxLines: 3,
             ),
             const SizedBox(height: 16),
@@ -228,9 +215,7 @@ class _MetadataPageState extends State<MetadataPage> {
             const SizedBox(height: 8),
             _buildTextField(
               controller: _authorCtrl,
-              label: s.author,
               hint: s.authorHint,
-              icon: Icons.person_outline,
             ),
             const SizedBox(height: 32),
           ],
@@ -258,20 +243,17 @@ class _MetadataPageState extends State<MetadataPage> {
 
   Widget _buildTextField({
     required TextEditingController controller,
-    required String label,
     required String hint,
-    required IconData icon,
     int maxLines = 1,
   }) {
     return TextField(
       controller: controller,
       maxLines: maxLines,
       decoration: InputDecoration(
-        labelText: label,
         hintText: hint,
         isDense: true,
-        prefixIcon: Icon(icon, size: 18),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         border: const OutlineInputBorder(),
         filled: true,
         fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
@@ -281,17 +263,28 @@ class _MetadataPageState extends State<MetadataPage> {
   }
 
   Widget _buildLayoutDropdown(AppStrings s) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return DropdownButtonFormField<String>(
       initialValue: _selectedLayout,
       decoration: InputDecoration(
-        labelText: s.layout,
         isDense: true,
-        prefixIcon: const Icon(Icons.dashboard_outlined, size: 18),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        border: const OutlineInputBorder(),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: colorScheme.outline),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
+        ),
         filled: true,
-        fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+        fillColor: colorScheme.surfaceContainerLowest,
       ),
+      dropdownColor: colorScheme.surfaceContainerLowest,
+      iconEnabledColor: colorScheme.primary,
+      iconDisabledColor: colorScheme.onSurfaceVariant,
       items: [
         DropdownMenuItem(value: null, child: Text('Default')),
         DropdownMenuItem(value: 'post', child: Text(s.layoutPost)),
@@ -299,7 +292,7 @@ class _MetadataPageState extends State<MetadataPage> {
         DropdownMenuItem(value: 'page', child: Text(s.layoutPage)),
       ],
       onChanged: (v) => setState(() => _selectedLayout = v),
-      style: const TextStyle(fontSize: 14),
+      style: TextStyle(fontSize: 14, color: colorScheme.onSurface),
     );
   }
 

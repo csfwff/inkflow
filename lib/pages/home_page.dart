@@ -8,6 +8,10 @@ import '../widgets/responsive.dart';
 import 'editor_page.dart';
 import 'settings_page.dart';
 
+enum _ArticleFilter { all, draft, synced, repoDraft }
+
+enum _ArticleAction { edit, delete }
+
 class HomePage extends StatefulWidget {
   final VoidCallback? onSettingsChanged;
 
@@ -18,14 +22,27 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  final _searchCtrl = TextEditingController();
+
   List<Article> _articles = [];
   bool _loading = true;
   bool _syncing = false;
+  _ArticleFilter _filter = _ArticleFilter.all;
+  String _query = '';
 
   @override
   void initState() {
     super.initState();
+    _searchCtrl.addListener(() {
+      setState(() => _query = _searchCtrl.text);
+    });
     _loadArticles();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadArticles() async {
@@ -39,10 +56,16 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _syncFromGitHub() async {
+    if (_syncing) return;
+
+    final s = AppStrings.current;
     final settings = settingsService.settings;
     if (settings.githubToken.isEmpty ||
         settings.githubOwner.isEmpty ||
         settings.githubRepo.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(s.githubNotConfigured)),
+      );
       return;
     }
 
@@ -61,14 +84,12 @@ class _HomePageState extends State<HomePage> {
 
     if (result.success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${AppStrings.current.syncSuccess}: ${result.count}'),
-        ),
+        SnackBar(content: Text('${s.syncSuccess}: ${result.count}')),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${AppStrings.current.syncFailed}: ${result.error}'),
+          content: Text('${s.syncFailed}: ${result.error}'),
           backgroundColor: Colors.red,
         ),
       );
@@ -91,13 +112,16 @@ class _HomePageState extends State<HomePage> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(s.deleteArticle, style: TextStyle(color: Colors.red)),
+            child: Text(
+              s.deleteArticle,
+              style: const TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
     );
 
-    if (confirmed == true) {
+    if (confirmed == true && article.id != null) {
       await articleService.delete(article.id!);
       await _loadArticles();
     }
@@ -109,6 +133,29 @@ class _HomePageState extends State<HomePage> {
       MaterialPageRoute(builder: (_) => EditorPage(articleId: articleId)),
     );
     _loadArticles();
+  }
+
+  List<Article> get _visibleArticles {
+    final query = _query.trim().toLowerCase();
+    return _articles.where((article) {
+      final matchesFilter = switch (_filter) {
+        _ArticleFilter.all => true,
+        _ArticleFilter.draft => article.status == ArticleStatus.draft,
+        _ArticleFilter.synced => article.status == ArticleStatus.synced,
+        _ArticleFilter.repoDraft => article.status == ArticleStatus.repoDraft,
+      };
+
+      if (!matchesFilter) return false;
+      if (query.isEmpty) return true;
+
+      final searchable = [
+        article.title,
+        article.content,
+        article.tags.join(' '),
+        article.categories.join(' '),
+      ].join(' ').toLowerCase();
+      return searchable.contains(query);
+    }).toList();
   }
 
   @override
@@ -136,6 +183,7 @@ class _HomePageState extends State<HomePage> {
             ),
           IconButton(
             icon: const Icon(Icons.settings),
+            tooltip: s.settingsTitle,
             onPressed: () async {
               await Navigator.push(
                 context,
@@ -151,51 +199,263 @@ class _HomePageState extends State<HomePage> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _articles.isEmpty
-              ? _buildEmptyState()
-              : _buildArticleList(),
-      floatingActionButton: FloatingActionButton(
+          : _buildBody(),
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openEditor(),
-        child: const Icon(Icons.add),
+        icon: const Icon(Icons.add),
+        label: Text(s.newArticle),
       ),
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
+  Widget _buildBody() {
+    final visibleArticles = _visibleArticles;
+
+    return SafeArea(
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: Responsive.maxWidth),
+          child: Column(
+            children: [
+              _buildHeader(),
+              Expanded(
+                child: visibleArticles.isEmpty
+                    ? _buildEmptyState(filtered: _articles.isNotEmpty)
+                    : _buildArticleList(visibleArticles),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    final s = AppStrings.current;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.article_outlined, size: 64, color: Colors.grey),
-          SizedBox(height: 16),
-          Text(
-            AppStrings.current.noArticles,
-            style: TextStyle(fontSize: 16, color: Colors.grey),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _label('写作空间', 'Writing desk'),
+                      style:
+                          Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0,
+                              ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      s.subtitle,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              _CountBadge(count: _articles.length),
+            ],
           ),
-          SizedBox(height: 24),
-          OutlinedButton.icon(
-            onPressed: _syncFromGitHub,
-            icon: Icon(Icons.sync),
-            label: Text(AppStrings.current.syncFromGitHub),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _searchCtrl,
+            decoration: InputDecoration(
+              hintText: _label('搜索标题、正文或标签', 'Search title, content, or tags'),
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _query.isEmpty
+                  ? null
+                  : IconButton(
+                      icon: const Icon(Icons.close),
+                      tooltip: _label('清空搜索', 'Clear search'),
+                      onPressed: _searchCtrl.clear,
+                    ),
+            ),
           ),
+          const SizedBox(height: 12),
+          _buildFilterBar(),
         ],
       ),
     );
   }
 
-  Widget _buildArticleList() {
-    return Responsive.constrain(
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: _articles.length,
-        itemBuilder: (context, index) {
-          final article = _articles[index];
-          return _ArticleListItem(
-            article: article,
-            onTap: () => _openEditor(articleId: article.id),
-            onDelete: () => _deleteArticle(article),
+  Widget _buildFilterBar() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: _ArticleFilter.values.map((filter) {
+          final selected = _filter == filter;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              label: Text('${_filterLabel(filter)} ${_countFor(filter)}'),
+              selected: selected,
+              onSelected: (_) => setState(() => _filter = filter),
+            ),
           );
-        },
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState({required bool filtered}) {
+    final s = AppStrings.current;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              filtered ? Icons.search_off : Icons.article_outlined,
+              size: 56,
+              color: colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              filtered
+                  ? _label('没有匹配的文章', 'No matching articles')
+                  : s.noArticles,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              filtered
+                  ? _label('调整搜索条件或切换状态筛选。', 'Adjust the search or filter.')
+                  : _label(
+                      '新建一篇文章，或者从 GitHub 仓库同步现有内容。',
+                      'Create a post or sync existing content from GitHub.',
+                    ),
+              textAlign: TextAlign.center,
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 20),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 12,
+              runSpacing: 12,
+              children: filtered
+                  ? [
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          _searchCtrl.clear();
+                          setState(() => _filter = _ArticleFilter.all);
+                        },
+                        icon: const Icon(Icons.filter_alt_off),
+                        label: Text(_label('清除筛选', 'Clear filters')),
+                      ),
+                    ]
+                  : [
+                      FilledButton.icon(
+                        onPressed: () => _openEditor(),
+                        icon: const Icon(Icons.add),
+                        label: Text(s.newArticle),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: _syncing ? null : _syncFromGitHub,
+                        icon: const Icon(Icons.sync),
+                        label: Text(s.syncFromGitHub),
+                      ),
+                    ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildArticleList(List<Article> articles) {
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
+      itemCount: articles.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final article = articles[index];
+        return _ArticleListItem(
+          article: article,
+          excerpt: _excerptFor(article),
+          onTap: () => _openEditor(articleId: article.id),
+          onDelete: () => _deleteArticle(article),
+        );
+      },
+    );
+  }
+
+  int _countFor(_ArticleFilter filter) {
+    return switch (filter) {
+      _ArticleFilter.all => _articles.length,
+      _ArticleFilter.draft =>
+        _articles.where((a) => a.status == ArticleStatus.draft).length,
+      _ArticleFilter.synced =>
+        _articles.where((a) => a.status == ArticleStatus.synced).length,
+      _ArticleFilter.repoDraft =>
+        _articles.where((a) => a.status == ArticleStatus.repoDraft).length,
+    };
+  }
+
+  String _filterLabel(_ArticleFilter filter) {
+    final s = AppStrings.current;
+    return switch (filter) {
+      _ArticleFilter.all => _label('全部', 'All'),
+      _ArticleFilter.draft => s.draftStatus,
+      _ArticleFilter.synced => s.synced,
+      _ArticleFilter.repoDraft => s.repoDraft,
+    };
+  }
+
+  String _excerptFor(Article article) {
+    final text = article.content.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (text.isEmpty) return _label('还没有正文内容', 'No content yet');
+    if (text.length <= 140) return text;
+    return '${text.substring(0, 140)}...';
+  }
+
+  String _label(String zh, String en) {
+    return identical(AppStrings.current, AppStrings.zh) ? zh : en;
+  }
+}
+
+class _CountBadge extends StatelessWidget {
+  final int count;
+
+  const _CountBadge({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.article_outlined, size: 16, color: colorScheme.primary),
+          const SizedBox(width: 6),
+          Text(
+            count.toString(),
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ],
       ),
     );
   }
@@ -203,54 +463,222 @@ class _HomePageState extends State<HomePage> {
 
 class _ArticleListItem extends StatelessWidget {
   final Article article;
+  final String excerpt;
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
   const _ArticleListItem({
     required this.article,
+    required this.excerpt,
     required this.onTap,
     required this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
-    final s = AppStrings.current;
+    final colorScheme = Theme.of(context).colorScheme;
     final dateStr =
         '${article.date.year}-${article.date.month.toString().padLeft(2, '0')}-${article.date.day.toString().padLeft(2, '0')}';
 
-    final (label, color) = switch (article.status) {
-      ArticleStatus.synced => (s.synced, Colors.green),
-      ArticleStatus.repoDraft => (s.repoDraft, Colors.orange),
-      ArticleStatus.draft when article.githubSha != null =>
-        (s.remoteDeleted, Colors.red),
-      ArticleStatus.draft => (s.draftStatus, Colors.grey),
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            article.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _StatusPill(article: article),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      excerpt,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            height: 1.35,
+                          ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        _MetaPill(icon: Icons.calendar_today, text: dateStr),
+                        if (article.tags.isNotEmpty)
+                          ...article.tags.take(3).map(
+                                (tag) => _MetaPill(
+                                  icon: Icons.tag,
+                                  text: tag,
+                                  dense: true,
+                                ),
+                              ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuButton<_ArticleAction>(
+                tooltip: MaterialLocalizations.of(context).showMenuTooltip,
+                onSelected: (action) {
+                  switch (action) {
+                    case _ArticleAction.edit:
+                      onTap();
+                    case _ArticleAction.delete:
+                      onDelete();
+                  }
+                },
+                itemBuilder: (context) {
+                  final s = AppStrings.current;
+                  return [
+                    PopupMenuItem(
+                      value: _ArticleAction.edit,
+                      child: ListTile(
+                        leading: const Icon(Icons.edit_outlined),
+                        title: Text(s.editorTitle),
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: _ArticleAction.delete,
+                      child: ListTile(
+                        leading: const Icon(Icons.delete_outline),
+                        title: Text(s.deleteArticle),
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ];
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  final Article article;
+
+  const _StatusPill({required this.article});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppStrings.current;
+    final (label, color, icon) = switch (article.status) {
+      ArticleStatus.synced => (
+          s.synced,
+          const Color(0xFF2F7D57),
+          Icons.cloud_done
+        ),
+      ArticleStatus.repoDraft => (
+          s.repoDraft,
+          const Color(0xFF9A6A1F),
+          Icons.drafts_outlined,
+        ),
+      ArticleStatus.draft when article.githubSha != null => (
+          s.remoteDeleted,
+          const Color(0xFFB64B45),
+          Icons.cloud_off_outlined,
+        ),
+      ArticleStatus.draft => (
+          s.draftStatus,
+          const Color(0xFF6F7672),
+          Icons.edit_note,
+        ),
     };
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: ListTile(
-        title: Text(
-          article.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w500),
-        ),
-        subtitle: Text(
-          dateStr,
-          style: TextStyle(fontSize: 13, color: Colors.grey[500]),
-        ),
-        leading: Chip(
-          label: Text(label, style: TextStyle(fontSize: 12)),
-          visualDensity: VisualDensity.compact,
-          side: BorderSide(color: color),
-          labelStyle: TextStyle(color: color),
-          backgroundColor: Colors.transparent,
-        ),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete_outline, size: 20),
-          onPressed: onDelete,
-        ),
-        onTap: onTap,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MetaPill extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final bool dense;
+
+  const _MetaPill({
+    required this.icon,
+    required this.text,
+    this.dense = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: dense ? 8 : 10,
+        vertical: dense ? 4 : 5,
+      ),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: colorScheme.onSurfaceVariant),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 12,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
       ),
     );
   }
