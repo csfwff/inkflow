@@ -158,6 +158,45 @@ class GitHubService {
       );
     }
   }
+
+  Future<GitHubResult> deletePost({
+    required String filePath,
+    required String sha,
+    String? commitMessage,
+  }) async {
+    final path = 'source/_posts/$filePath';
+    final message = commitMessage ?? 'post: delete $filePath';
+
+    final body = jsonEncode({
+      'message': message,
+      'sha': sha,
+      'branch': branch,
+    });
+
+    final url = Uri.parse('$_baseUrl/$path');
+
+    try {
+      final response = await http.delete(url, headers: _headers, body: body);
+
+      if (response.statusCode == 200) {
+        return GitHubResult(
+          success: true,
+          message: 'Deleted',
+        );
+      } else {
+        final data = jsonDecode(response.body);
+        return GitHubResult(
+          success: false,
+          message: data['message'] ?? 'Delete failed: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      return GitHubResult(
+        success: false,
+        message: '${AppStrings.current.networkError}: $e',
+      );
+    }
+  }
 }
 
 class GitHubResult {

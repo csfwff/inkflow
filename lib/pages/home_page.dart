@@ -122,10 +122,39 @@ class _HomePageState extends State<HomePage> {
       ),
     );
 
-    if (confirmed == true && article.id != null) {
-      await articleService.delete(article.id!);
-      await _loadArticles();
+    if (confirmed != true || article.id == null) return;
+
+    // 如果有远程文件（synced 或 repoDraft），先删除远程
+    if (article.githubSha != null && article.githubSha!.isNotEmpty &&
+        article.status != ArticleStatus.draft) {
+      final settings = settingsService.settings;
+      if (settings.githubToken.isNotEmpty &&
+          settings.githubOwner.isNotEmpty &&
+          settings.githubRepo.isNotEmpty) {
+        final github = GitHubService(
+          token: settings.githubToken,
+          owner: settings.githubOwner,
+          repo: settings.githubRepo,
+          branch: settings.githubBranch,
+        );
+        final result = await github.deletePost(
+          filePath: article.filePath,
+          sha: article.githubSha!,
+        );
+        if (!result.success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${s.syncFailed}: ${result.message}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+      }
     }
+
+    await articleService.delete(article.id!);
+    await _loadArticles();
   }
 
   void _openEditor({int? articleId}) async {
