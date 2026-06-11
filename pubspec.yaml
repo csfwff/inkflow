@@ -41,6 +41,7 @@ dependencies:
   sqlite3_flutter_libs: any
   sqlite3: any
   path: ^1.9.0
+  flutter_markdown_plus: ^1.0.7
 
 dev_dependencies:
   flutter_test:

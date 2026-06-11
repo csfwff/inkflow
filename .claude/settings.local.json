@@ -11,7 +11,10 @@
       "Bash(flutter pub *)",
       "WebSearch",
       "WebFetch(domain:pub.dev)",
-      "Bash(dart pub *)"
+      "Bash(dart pub *)",
+      "Bash(curl -s \"https://pub.dev/api/packages/flutter_markdown_plus\")",
+      "Bash(python3 -c ' *)",
+      "Bash(curl -s \"https://raw.githubusercontent.com/foresightmobile/flutter_markdown_plus/main/README.md\")"
     ]
   }
 }

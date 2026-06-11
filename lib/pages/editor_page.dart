@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import '../l10n/app_strings.dart';
 import '../main.dart';
 import '../models/article.dart';
@@ -448,22 +449,21 @@ class _EditorPageState extends State<EditorPage> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               children: [
-                _ToolButton(
-                  icon: Icons.title,
-                  tooltip: _label('插入标题', 'Insert heading'),
-                  onPressed: () => _insertLine('## ', _label('小标题', 'Heading')),
+                _HeadingButton(
+                  label: _label,
+                  contentCtrl: _contentCtrl,
                 ),
                 _ToolButton(
                   icon: Icons.format_bold,
                   tooltip: _label('加粗', 'Bold'),
                   onPressed: () =>
-                      _insertMarkdown('**', '**', _label('重点', 'bold')),
+                      _toggleMarkdown('**', '**', _label('重点', 'bold')),
                 ),
                 _ToolButton(
                   icon: Icons.format_italic,
                   tooltip: _label('斜体', 'Italic'),
                   onPressed: () =>
-                      _insertMarkdown('*', '*', _label('强调', 'italic')),
+                      _toggleMarkdown('*', '*', _label('强调', 'italic')),
                 ),
                 _ToolButton(
                   icon: Icons.link,
@@ -477,7 +477,7 @@ class _EditorPageState extends State<EditorPage> {
                 _ToolButton(
                   icon: Icons.format_quote,
                   tooltip: _label('引用', 'Quote'),
-                  onPressed: () => _insertLine('> ', _label('引用内容', 'Quote')),
+                  onPressed: () => _toggleLine('> ', _label('引用内容', 'Quote')),
                 ),
                 _ToolButton(
                   icon: Icons.code,
@@ -574,114 +574,13 @@ class _EditorPageState extends State<EditorPage> {
                   style: TextStyle(color: colorScheme.onSurfaceVariant),
                 ),
               )
-            : SingleChildScrollView(
+            : Markdown(
+                data: _previewText,
                 padding: const EdgeInsets.all(22),
-                child: _buildPreviewContent(_previewText),
+                selectable: true,
               ),
       ),
     );
-  }
-
-  Widget _buildPreviewContent(String text) {
-    final children = <Widget>[];
-    final codeLines = <String>[];
-    var inCode = false;
-
-    for (final line in text.split('\n')) {
-      if (line.trim().startsWith('```')) {
-        if (inCode) {
-          children.add(_PreviewCodeBlock(code: codeLines.join('\n')));
-          codeLines.clear();
-          inCode = false;
-        } else {
-          inCode = true;
-        }
-        continue;
-      }
-
-      if (inCode) {
-        codeLines.add(line);
-        continue;
-      }
-
-      children.add(_renderPreviewLine(line));
-    }
-
-    if (codeLines.isNotEmpty) {
-      children.add(_PreviewCodeBlock(code: codeLines.join('\n')));
-    }
-
-    return Column(
-        crossAxisAlignment: CrossAxisAlignment.start, children: children);
-  }
-
-  Widget _renderPreviewLine(String line) {
-    final trimmed = line.trim();
-    if (trimmed.isEmpty) return const SizedBox(height: 12);
-
-    final textTheme = Theme.of(context).textTheme;
-    final colorScheme = Theme.of(context).colorScheme;
-
-    if (trimmed.startsWith('### ')) {
-      return _PreviewText(
-        text: trimmed.substring(4),
-        style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-      );
-    }
-    if (trimmed.startsWith('## ')) {
-      return _PreviewText(
-        text: trimmed.substring(3),
-        style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-      );
-    }
-    if (trimmed.startsWith('# ')) {
-      return _PreviewText(
-        text: trimmed.substring(2),
-        style: textTheme.headlineSmall?.copyWith(
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0,
-        ),
-      );
-    }
-    if (trimmed.startsWith('>')) {
-      return Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(8),
-          border:
-              Border(left: BorderSide(color: colorScheme.primary, width: 3)),
-        ),
-        child: Text(
-          trimmed.substring(1).trim(),
-          style: TextStyle(
-            color: colorScheme.onSurfaceVariant,
-            height: 1.5,
-          ),
-        ),
-      );
-    }
-    if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('• ', style: TextStyle(color: colorScheme.primary)),
-            Expanded(
-              child: Text(
-                trimmed.substring(2),
-                style: const TextStyle(fontSize: 16, height: 1.5),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return _PreviewText(text: line);
   }
 
   void _insertMarkdown(String prefix, String suffix, String placeholder) {
@@ -706,27 +605,86 @@ class _EditorPageState extends State<EditorPage> {
     );
   }
 
-  void _insertLine(String prefix, String placeholder) {
+  void _toggleMarkdown(String prefix, String suffix, String placeholder) {
     final value = _contentCtrl.value;
+    final text = value.text;
     final selection = value.selection;
-    final start = selection.isValid ? selection.start : value.text.length;
-    final end = selection.isValid ? selection.end : value.text.length;
-    final selected =
-        start == end ? placeholder : value.text.substring(start, end);
-    final needsNewLine = start > 0 && value.text[start - 1] != '\n';
-    final replacement = '${needsNewLine ? '\n' : ''}$prefix$selected';
-    final nextText = value.text.replaceRange(start, end, replacement);
-    final selectionStart = start + (needsNewLine ? 1 : 0) + prefix.length;
-    final selectionEnd = selectionStart + selected.length;
+    final start = selection.isValid ? selection.start : text.length;
+    final end = selection.isValid ? selection.end : text.length;
 
-    _contentCtrl.value = value.copyWith(
-      text: nextText,
-      selection: TextSelection(
-        baseOffset: selectionStart,
-        extentOffset: selectionEnd,
-      ),
-      composing: TextRange.empty,
-    );
+    // Check if the selected text is already wrapped: prefix + content + suffix
+    final beforeStart = start - prefix.length;
+    final afterEnd = end + suffix.length;
+    if (beforeStart >= 0 &&
+        afterEnd <= text.length &&
+        text.substring(beforeStart, start) == prefix &&
+        text.substring(end, afterEnd) == suffix) {
+      // Already wrapped → unwrap
+      final inner = text.substring(start, end);
+      final nextText =
+          text.replaceRange(beforeStart, afterEnd, inner);
+      _contentCtrl.value = value.copyWith(
+        text: nextText,
+        selection: TextSelection(
+          baseOffset: beforeStart,
+          extentOffset: beforeStart + inner.length,
+        ),
+        composing: TextRange.empty,
+      );
+    } else {
+      // Not wrapped → wrap (same as _insertMarkdown)
+      final selected = start == end ? placeholder : text.substring(start, end);
+      final replacement = '$prefix$selected$suffix';
+      final nextText = text.replaceRange(start, end, replacement);
+      _contentCtrl.value = value.copyWith(
+        text: nextText,
+        selection: TextSelection(
+          baseOffset: start + prefix.length,
+          extentOffset: start + prefix.length + selected.length,
+        ),
+        composing: TextRange.empty,
+      );
+    }
+  }
+
+  void _toggleLine(String prefix, String placeholder) {
+    final value = _contentCtrl.value;
+    final text = value.text;
+    final selection = value.selection;
+    final cursor = selection.isValid ? selection.start : text.length;
+
+    // Find current line boundaries
+    final lineStart = text.lastIndexOf('\n', cursor > 0 ? cursor - 1 : 0) + 1;
+    int lineEnd = text.indexOf('\n', cursor);
+    if (lineEnd < 0) lineEnd = text.length;
+
+    final line = text.substring(lineStart, lineEnd);
+
+    if (line.startsWith(prefix)) {
+      // Already has prefix → remove it
+      final newLine = line.substring(prefix.length);
+      final nextText = text.replaceRange(lineStart, lineEnd, newLine);
+      _contentCtrl.value = value.copyWith(
+        text: nextText,
+        selection: TextSelection.collapsed(offset: lineStart + newLine.length),
+        composing: TextRange.empty,
+      );
+    } else {
+      // No prefix → add it
+      final needsNewLine = lineStart > 0;
+      final selected = line.isEmpty ? placeholder : line;
+      final replacement =
+          '${needsNewLine && lineStart > 0 ? '' : ''}$prefix$selected';
+      final nextText = text.replaceRange(lineStart, lineEnd, replacement);
+      _contentCtrl.value = value.copyWith(
+        text: nextText,
+        selection: TextSelection(
+          baseOffset: lineStart + prefix.length,
+          extentOffset: lineStart + prefix.length + selected.length,
+        ),
+        composing: TextRange.empty,
+      );
+    }
   }
 
   void _insertBlock(String block) {
@@ -924,48 +882,109 @@ class _EditorPill extends StatelessWidget {
   }
 }
 
-class _PreviewText extends StatelessWidget {
-  final String text;
-  final TextStyle? style;
+class _HeadingButton extends StatelessWidget {
+  final TextEditingController contentCtrl;
+  final String Function(String zh, String en) label;
 
-  const _PreviewText({required this.text, this.style});
+  const _HeadingButton({required this.contentCtrl, required this.label});
 
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: SelectableText(
-        text,
-        style: style ?? const TextStyle(fontSize: 16, height: 1.55),
-      ),
+  /// Returns (startOffset, currentLevel) for the line under cursor.
+  /// currentLevel 0 = no heading, 1-6 = H1-H6.
+  (int, int) _detectHeading() {
+    final text = contentCtrl.text;
+    if (text.isEmpty) return (0, 0);
+    final cursor = contentCtrl.selection.baseOffset;
+    if (cursor < 0 || cursor > text.length) return (text.length, 0);
+
+    // Find line start
+    final searchFrom = cursor > 0 ? cursor - 1 : 0;
+    int lineStart = text.lastIndexOf('\n', searchFrom) + 1;
+    // Find line end
+    int lineEnd = text.indexOf('\n', cursor);
+    if (lineEnd < 0) lineEnd = text.length;
+
+    if (lineStart < 0 || lineStart > lineEnd) return (0, 0);
+    final line = text.substring(lineStart, lineEnd);
+    final match = RegExp(r'^(#{1,4})\s').matchAsPrefix(line);
+    if (match == null) return (lineStart, 0);
+    return (lineStart, match.group(1)!.length);
+  }
+
+  void _toggleHeading() {
+    final (lineStart, level) = _detectHeading();
+    final text = contentCtrl.text;
+
+    String newLine;
+    int newCursorOffset;
+
+    if (level == 0) {
+      // No heading → insert H1
+      final lineEnd = text.indexOf('\n', lineStart);
+      final end = lineEnd < 0 ? text.length : lineEnd;
+      final line = text.substring(lineStart, end);
+      newLine = '# $line';
+      newCursorOffset = lineStart + 2; // after "# "
+    } else if (level < 4) {
+      // H1-H3 → bump up one level
+      final lineEnd = text.indexOf('\n', lineStart);
+      final end = lineEnd < 0 ? text.length : lineEnd;
+      final line = text.substring(lineStart, end);
+      final oldPrefix = '${'#' * level} ';
+      final newPrefix = '${'#' * (level + 1)} ';
+      newLine = newPrefix + line.substring(oldPrefix.length);
+      newCursorOffset = lineStart + newPrefix.length;
+    } else {
+      // H4 → clear heading
+      final lineEnd = text.indexOf('\n', lineStart);
+      final end = lineEnd < 0 ? text.length : lineEnd;
+      final line = text.substring(lineStart, end);
+      newLine = line.substring(5); // remove "#### "
+      newCursorOffset = lineStart;
+    }
+
+    final nextText = text.replaceRange(lineStart, text.indexOf('\n', lineStart) < 0 ? text.length : text.indexOf('\n', lineStart), newLine);
+    contentCtrl.value = contentCtrl.value.copyWith(
+      text: nextText,
+      selection: TextSelection.collapsed(offset: newCursorOffset),
+      composing: TextRange.empty,
     );
   }
-}
-
-class _PreviewCodeBlock extends StatelessWidget {
-  final String code;
-
-  const _PreviewCodeBlock({required this.code});
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final (_, level) = _detectHeading();
+    final displayLevel = level == 0 ? '' : '$level';
 
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: SelectableText(
-        code,
-        style: const TextStyle(
-          fontFamily: 'monospace',
-          fontSize: 14,
-          height: 1.5,
+    return SizedBox(
+      width: 40,
+      height: 40,
+      child: TextButton(
+        onPressed: _toggleHeading,
+        style: TextButton.styleFrom(
+          padding: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Transform.translate(
+              offset: const Offset(0, -2),
+              child: Text('H',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Theme.of(context).iconTheme.color,
+                  )),
+            ),
+            if (displayLevel.isNotEmpty)
+              Text(displayLevel,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Theme.of(context).iconTheme.color,
+                  )),
+          ],
         ),
       ),
     );
