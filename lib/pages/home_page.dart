@@ -420,7 +420,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   String _excerptFor(Article article) {
-    final text = article.content.trim().replaceAll(RegExp(r'\s+'), ' ');
+    final text = article.bodyContent.trim().replaceAll(RegExp(r'\s+'), ' ');
     if (text.isEmpty) return _label('还没有正文内容', 'No content yet');
     if (text.length <= 140) return text;
     return '${text.substring(0, 140)}...';

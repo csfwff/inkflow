@@ -162,6 +162,13 @@ class Article {
 
   String get fullContent => updateFrontmatter();
 
+  /// 去掉 frontmatter，只返回正文
+  String get bodyContent {
+    final regex = RegExp(r'^---\s*\n(.*?)\n---\s*\n(.*)$', dotAll: true);
+    final match = regex.firstMatch(content);
+    return match != null ? match.group(2)! : content;
+  }
+
   /// 更新已有 frontmatter 中支持的字段，保留不支持的字段。
   /// 如果没有 frontmatter，则新建。
   String updateFrontmatter() {

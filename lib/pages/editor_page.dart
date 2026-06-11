@@ -29,6 +29,7 @@ class _EditorPageState extends State<EditorPage> {
   bool _dirty = false;
   bool _updatingFields = false;
   String _previewText = '';
+  String _originalFrontmatter = ''; // 保留原始 frontmatter
   Article? _editingArticle;
 
   @override
@@ -64,13 +65,17 @@ class _EditorPageState extends State<EditorPage> {
   Future<void> _loadArticle(int id) async {
     final article = await articleService.getById(id);
     if (article != null && mounted) {
+      final body = article.bodyContent;
+      // 保留原始 frontmatter（含不支持的字段）
+      final fmMatch = RegExp(r'^---\s*\n(.*?)\n---\s*\n', dotAll: true).firstMatch(article.content);
       _updatingFields = true;
       setState(() {
         _editingArticle = article;
+        _originalFrontmatter = fmMatch != null ? fmMatch.group(1)! : '';
         _titleCtrl.text = article.title;
-        _contentCtrl.text = article.content;
+        _contentCtrl.text = body;
         _selectedDate = article.date;
-        _previewText = article.content;
+        _previewText = body;
         _dirty = false;
       });
       _updatingFields = false;
@@ -139,10 +144,15 @@ class _EditorPageState extends State<EditorPage> {
       appendSlug: false,
     );
 
+    // 合并：原始 frontmatter + 编辑后的正文
+    final fullContent = _originalFrontmatter.isNotEmpty
+        ? '---\n$_originalFrontmatter\n---\n${_contentCtrl.text}'
+        : _contentCtrl.text;
+
     return Article(
       id: _editingArticle?.id,
       title: title,
-      content: _contentCtrl.text,
+      content: fullContent,
       date: _selectedDate,
       slug: slug,
       status: _editingArticle?.status ?? ArticleStatus.draft,
