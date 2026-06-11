@@ -7,11 +7,13 @@ class GitHubService {
   final String token;
   final String owner;
   final String repo;
+  final String branch;
 
   GitHubService({
     required this.token,
     required this.owner,
     required this.repo,
+    this.branch = 'main',
   });
 
   String get _baseUrl => 'https://api.github.com/repos/$owner/$repo/contents';
@@ -40,6 +42,7 @@ class GitHubService {
     final body = jsonEncode({
       'message': message,
       'content': encodedContent,
+      'branch': branch,
     });
 
     final url = Uri.parse('$_baseUrl/$path');
@@ -125,6 +128,7 @@ class GitHubService {
       'message': message,
       'content': encodedContent,
       'sha': sha,
+      'branch': branch,
     });
 
     final url = Uri.parse('$_baseUrl/$path');

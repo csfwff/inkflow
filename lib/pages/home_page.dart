@@ -75,6 +75,7 @@ class _HomePageState extends State<HomePage> {
       token: settings.githubToken,
       owner: settings.githubOwner,
       repo: settings.githubRepo,
+      branch: settings.githubBranch,
     );
     final sync = SyncService(github: github, articleService: articleService);
     final result = await sync.syncFromGitHub();

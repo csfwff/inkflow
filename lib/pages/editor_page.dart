@@ -216,6 +216,7 @@ class _EditorPageState extends State<EditorPage> {
       token: settings.githubToken,
       owner: settings.githubOwner,
       repo: settings.githubRepo,
+      branch: settings.githubBranch,
     );
 
     final targetStatus =
