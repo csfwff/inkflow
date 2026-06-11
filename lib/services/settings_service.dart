@@ -6,6 +6,8 @@ class SettingsService {
   static const _keyGithubOwner = 'github_owner';
   static const _keyGithubRepo = 'github_repo';
   static const _keyGithubBranch = 'github_branch';
+  static const _keyGithubPathPattern = 'github_path_pattern';
+  static const _keyPermalinkPattern = 'permalink_pattern';
   static const _keyImageHostType = 'image_host_type';
   static const _keyImageGithubRepo = 'image_github_repo';
   static const _keyImageGithubPath = 'image_github_path';
@@ -32,6 +34,8 @@ class SettingsService {
       githubOwner: _prefs.getString(_keyGithubOwner) ?? '',
       githubRepo: _prefs.getString(_keyGithubRepo) ?? '',
       githubBranch: _prefs.getString(_keyGithubBranch) ?? 'main',
+      githubPathPattern: _prefs.getString(_keyGithubPathPattern) ?? '{year}/{month}',
+      permalinkPattern: _prefs.getString(_keyPermalinkPattern) ?? 'articles/{year}/{month}/{day}/{timestamp}.html',
       imageHostType: ImageHostType.values[_prefs.getInt(_keyImageHostType) ?? 0],
       imageGithubRepo: _prefs.getString(_keyImageGithubRepo) ?? '',
       imageGithubPath: _prefs.getString(_keyImageGithubPath) ?? 'images',
@@ -52,6 +56,8 @@ class SettingsService {
       _prefs.setString(_keyGithubOwner, settings.githubOwner),
       _prefs.setString(_keyGithubRepo, settings.githubRepo),
       _prefs.setString(_keyGithubBranch, settings.githubBranch),
+      _prefs.setString(_keyGithubPathPattern, settings.githubPathPattern),
+      _prefs.setString(_keyPermalinkPattern, settings.permalinkPattern),
       _prefs.setInt(_keyImageHostType, settings.imageHostType.index),
       _prefs.setString(_keyImageGithubRepo, settings.imageGithubRepo),
       _prefs.setString(_keyImageGithubPath, settings.imageGithubPath),

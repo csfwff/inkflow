@@ -21,10 +21,6 @@ class _MetadataPageState extends State<MetadataPage> {
   late final TextEditingController _descriptionCtrl;
   late final TextEditingController _authorCtrl;
 
-  late String? _selectedLayout;
-  late bool _commentsEnabled;
-  late bool _isPublished;
-
   @override
   void initState() {
     super.initState();
@@ -38,9 +34,6 @@ class _MetadataPageState extends State<MetadataPage> {
     _excerptCtrl = TextEditingController(text: article.excerpt ?? '');
     _descriptionCtrl = TextEditingController(text: article.description ?? '');
     _authorCtrl = TextEditingController(text: article.author ?? '');
-    _selectedLayout = article.layout;
-    _commentsEnabled = article.comments ?? true;
-    _isPublished = article.published ?? true;
   }
 
   @override
@@ -84,9 +77,6 @@ class _MetadataPageState extends State<MetadataPage> {
     article.permalink = _emptyToNull(_permalinkCtrl.text);
     article.topImg = _emptyToNull(_topImgCtrl.text);
     article.cover = _emptyToNull(_coverCtrl.text);
-    article.layout = _selectedLayout;
-    article.comments = _commentsEnabled;
-    article.published = _isPublished;
     article.excerpt = _emptyToNull(_excerptCtrl.text);
     article.description = _emptyToNull(_descriptionCtrl.text);
     article.author = _emptyToNull(_authorCtrl.text);
@@ -158,39 +148,6 @@ class _MetadataPageState extends State<MetadataPage> {
             ),
             const SizedBox(height: 16),
 
-            // Layout
-            _buildSectionTitle(s.layout, Icons.dashboard_outlined),
-            const SizedBox(height: 8),
-            _buildLayoutDropdown(s),
-            const SizedBox(height: 16),
-
-            // Switches
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    _buildSwitchTile(
-                      title: s.comments,
-                      subtitle: 'Allow comments on this post',
-                      value: _commentsEnabled,
-                      onChanged: (v) => setState(() => _commentsEnabled = v),
-                      icon: Icons.comment_outlined,
-                    ),
-                    const Divider(),
-                    _buildSwitchTile(
-                      title: s.published,
-                      subtitle: 'Make this post publicly visible',
-                      value: _isPublished,
-                      onChanged: (v) => setState(() => _isPublished = v),
-                      icon: Icons.public,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
             // Excerpt & Description
             _buildSectionTitle(s.excerpt, Icons.short_text),
             const SizedBox(height: 8),
@@ -259,59 +216,6 @@ class _MetadataPageState extends State<MetadataPage> {
         fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
       ),
       style: const TextStyle(fontSize: 14),
-    );
-  }
-
-  Widget _buildLayoutDropdown(AppStrings s) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return DropdownButtonFormField<String>(
-      initialValue: _selectedLayout,
-      decoration: InputDecoration(
-        isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: colorScheme.outline),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
-        ),
-        filled: true,
-        fillColor: colorScheme.surfaceContainerLowest,
-      ),
-      dropdownColor: colorScheme.surfaceContainerLowest,
-      iconEnabledColor: colorScheme.primary,
-      iconDisabledColor: colorScheme.onSurfaceVariant,
-      items: [
-        DropdownMenuItem(value: null, child: Text('Default')),
-        DropdownMenuItem(value: 'post', child: Text(s.layoutPost)),
-        DropdownMenuItem(value: 'draft', child: Text(s.layoutDraft)),
-        DropdownMenuItem(value: 'page', child: Text(s.layoutPage)),
-      ],
-      onChanged: (v) => setState(() => _selectedLayout = v),
-      style: TextStyle(fontSize: 14, color: colorScheme.onSurface),
-    );
-  }
-
-  Widget _buildSwitchTile({
-    required String title,
-    required String subtitle,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-    required IconData icon,
-  }) {
-    return ListTile(
-      leading: Icon(icon, size: 20),
-      title: Text(title, style: const TextStyle(fontSize: 14)),
-      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
-      trailing: Switch(
-        value: value,
-        onChanged: onChanged,
-      ),
-      contentPadding: EdgeInsets.zero,
     );
   }
 }

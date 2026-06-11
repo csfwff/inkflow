@@ -26,6 +26,8 @@ class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController _githubOwnerCtrl;
   late final TextEditingController _githubRepoCtrl;
   late final TextEditingController _githubBranchCtrl;
+  late final TextEditingController _githubPathPatternCtrl;
+  late final TextEditingController _permalinkPatternCtrl;
   late final TextEditingController _imageGithubRepoCtrl;
   late final TextEditingController _imageGithubPathCtrl;
   late final TextEditingController _imageGithubDomainCtrl;
@@ -44,6 +46,8 @@ class _SettingsPageState extends State<SettingsPage> {
     _githubOwnerCtrl = TextEditingController(text: _settings.githubOwner);
     _githubRepoCtrl = TextEditingController(text: _settings.githubRepo);
     _githubBranchCtrl = TextEditingController(text: _settings.githubBranch);
+    _githubPathPatternCtrl = TextEditingController(text: _settings.githubPathPattern);
+    _permalinkPatternCtrl = TextEditingController(text: _settings.permalinkPattern);
     _imageGithubRepoCtrl = TextEditingController(text: _settings.imageGithubRepo);
     _imageGithubPathCtrl = TextEditingController(text: _settings.imageGithubPath);
     _imageGithubDomainCtrl = TextEditingController(text: _settings.imageGithubDomain);
@@ -62,6 +66,8 @@ class _SettingsPageState extends State<SettingsPage> {
     _githubOwnerCtrl.dispose();
     _githubRepoCtrl.dispose();
     _githubBranchCtrl.dispose();
+    _githubPathPatternCtrl.dispose();
+    _permalinkPatternCtrl.dispose();
     _imageGithubRepoCtrl.dispose();
     _imageGithubPathCtrl.dispose();
     _imageGithubDomainCtrl.dispose();
@@ -244,6 +250,27 @@ class _SettingsPageState extends State<SettingsPage> {
         _sectionHeader(s.theme),
         _segmentedTheme(s),
         _divider(),
+        _sectionHeader(identical(s, AppStrings.zh) ? '永久链接格式' : 'Permalink pattern'),
+        _inputRow(
+          controller: _permalinkPatternCtrl,
+          hint: 'articles/{year}/{month}/{day}/{timestamp}.html',
+          onChanged: (v) {
+            _settings.permalinkPattern = v;
+            _save();
+          },
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+          child: Text(
+            identical(s, AppStrings.zh)
+                ? '可用占位符：{year} 年 · {month} 月 · {day} 日 · {timestamp} 秒级时间戳 · {slug} 标题别名 · {category} 分类（取第一个）\n示例：articles/{year}/{month}/{day}/{timestamp}.html'
+                : 'Placeholders: {year} · {month} · {day} · {timestamp} (unix seconds) · {slug} · {category} (first tag)\nExample: articles/{year}/{month}/{day}/{timestamp}.html',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+        ),
+        _divider(),
         _infoRow(s.version, _version),
       ],
     );
@@ -311,6 +338,27 @@ class _SettingsPageState extends State<SettingsPage> {
             _settings.githubBranch = v;
             _save();
           },
+        ),
+        _divider(),
+        _sectionHeader(identical(s, AppStrings.zh) ? '文章目录格式' : 'Post directory pattern'),
+        _inputRow(
+          controller: _githubPathPatternCtrl,
+          hint: '{year}/{month}',
+          onChanged: (v) {
+            _settings.githubPathPattern = v;
+            _save();
+          },
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+          child: Text(
+            identical(s, AppStrings.zh)
+                ? '可用占位符：{year} 年 · {month} 月 · {day} 日 · {category} 分类（取第一个）\n示例：{year}/{month} → 2026/06/my-post.md'
+                : 'Placeholders: {year} · {month} · {day} · {category} (first tag)\nExample: {year}/{month} → 2026/06/my-post.md',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
         ),
       ],
     );

@@ -10,6 +10,10 @@ class Settings {
   String githubOwner;
   String githubRepo;
   String githubBranch;
+  String githubPathPattern;
+
+  // Permalink
+  String permalinkPattern;
 
   // Image host
   ImageHostType imageHostType;
@@ -31,6 +35,8 @@ class Settings {
     this.githubOwner = '',
     this.githubRepo = '',
     this.githubBranch = 'main',
+    this.githubPathPattern = '{year}/{month}',
+    this.permalinkPattern = 'articles/{year}/{month}/{day}/{timestamp}.html',
     this.imageHostType = ImageHostType.github,
     this.imageGithubRepo = '',
     this.imageGithubPath = 'images',

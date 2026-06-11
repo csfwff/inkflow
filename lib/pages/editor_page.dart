@@ -86,6 +86,22 @@ class _EditorPageState extends State<EditorPage> {
         .replaceAll(RegExp(r'^-|-$'), '');
   }
 
+  String _resolvePathPattern(String pattern, {
+    required String slug,
+    String category = '',
+    bool appendSlug = true,
+  }) {
+    final d = _selectedDate;
+    final result = pattern
+        .replaceAll('{year}', '${d.year}')
+        .replaceAll('{month}', d.month.toString().padLeft(2, '0'))
+        .replaceAll('{day}', d.day.toString().padLeft(2, '0'))
+        .replaceAll('{category}', category)
+        .replaceAll('{slug}', slug)
+        .replaceAll('{timestamp}', '${d.millisecondsSinceEpoch ~/ 1000}');
+    return appendSlug ? '$result/$slug.md' : result;
+  }
+
   String _formatDate(DateTime d) {
     return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
   }
@@ -108,8 +124,20 @@ class _EditorPageState extends State<EditorPage> {
   Article _buildArticle() {
     final title = _titleCtrl.text.trim();
     final slug = _slugify(title);
-    final filePath =
-        '${_selectedDate.year}/${_selectedDate.month.toString().padLeft(2, '0')}/$slug.md';
+    final category = _editingArticle?.categories.isNotEmpty == true
+        ? _editingArticle!.categories.first
+        : '';
+    final filePath = _resolvePathPattern(
+      settingsService.settings.githubPathPattern,
+      slug: slug,
+      category: category,
+    );
+    final permalink = _resolvePathPattern(
+      settingsService.settings.permalinkPattern,
+      slug: slug,
+      category: category,
+      appendSlug: false,
+    );
 
     return Article(
       id: _editingArticle?.id,
@@ -123,7 +151,7 @@ class _EditorPageState extends State<EditorPage> {
       createdAt: _editingArticle?.createdAt,
       tags: _editingArticle?.tags ?? [],
       categories: _editingArticle?.categories ?? [],
-      permalink: _editingArticle?.permalink,
+      permalink: permalink,
       topImg: _editingArticle?.topImg,
       cover: _editingArticle?.cover,
       layout: _editingArticle?.layout,

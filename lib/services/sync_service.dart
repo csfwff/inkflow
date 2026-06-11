@@ -126,22 +126,60 @@ class SyncService {
 
     String title = '';
     DateTime date = DateTime.now();
-    String body;
+    List<String> tags = [];
+    List<String> categories = [];
+    String? permalink;
+    String? topImg;
+    String? cover;
+    String? excerpt;
+    String? description;
+    String? author;
 
     if (match != null) {
       final meta = match.group(1)!;
-      body = match.group(2)!;
 
       for (final line in meta.split('\n')) {
         if (line.startsWith('title:')) {
           title = line.substring(6).trim();
         } else if (line.startsWith('date:')) {
           date = DateTime.tryParse(line.substring(5).trim()) ?? DateTime.now();
+        } else if (line.startsWith('tags:')) {
+          final raw = line.substring(5).trim();
+          // tags: [a, b, c] or tags: a, b, c
+          final inner = raw.startsWith('[') && raw.endsWith(']')
+              ? raw.substring(1, raw.length - 1)
+              : raw;
+          tags = inner.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+        } else if (line.startsWith('categories:')) {
+          // categories 是多行的，后面以 - 开头
+          // 这里简单处理：跳过，下面用循环收集
+        } else if (line.trimLeft().startsWith('- ') && categories.isEmpty == false) {
+          // 已在 categories 模式中
+        } else if (line.startsWith('permalink:')) {
+          permalink = line.substring(10).trim();
+        } else if (line.startsWith('top_img:')) {
+          topImg = line.substring(8).trim();
+        } else if (line.startsWith('cover:')) {
+          cover = line.substring(6).trim();
+        } else if (line.startsWith('excerpt:')) {
+          excerpt = line.substring(8).trim();
+        } else if (line.startsWith('description:')) {
+          description = line.substring(12).trim();
+        } else if (line.startsWith('author:')) {
+          author = line.substring(7).trim();
         }
       }
-    } else {
-      body = rawContent;
-      date = DateTime.now();
+
+      // 解析多行 categories
+      if (meta.contains('categories:')) {
+        final catMatch = RegExp(r'categories:\s*\n((?:\s+-\s+.+\n?)*)').firstMatch(meta);
+        if (catMatch != null) {
+          categories = RegExp(r'-\s+(.+)')
+              .allMatches(catMatch.group(1)!)
+              .map((m) => m.group(1)!.trim())
+              .toList();
+        }
+      }
     }
 
     final slug = filePath.split('/').last.replaceAll('.md', '');
@@ -149,12 +187,20 @@ class SyncService {
 
     return Article(
       title: title,
-      content: body,
+      content: rawContent, // 保留完整内容（含 frontmatter）
       date: date,
       slug: slug,
       status: status,
       filePath: filePath,
       githubSha: sha,
+      tags: tags,
+      categories: categories,
+      permalink: permalink,
+      topImg: topImg,
+      cover: cover,
+      excerpt: excerpt,
+      description: description,
+      author: author,
     );
   }
 }

@@ -160,7 +160,110 @@ class Article {
     return buffer.toString();
   }
 
-  String get fullContent => buildFrontmatter() + content;
+  String get fullContent => updateFrontmatter();
+
+  /// 更新已有 frontmatter 中支持的字段，保留不支持的字段。
+  /// 如果没有 frontmatter，则新建。
+  String updateFrontmatter() {
+    final regex = RegExp(r'^---\s*\n(.*?)\n---\s*\n(.*)$', dotAll: true);
+    final match = regex.firstMatch(content);
+
+    if (match == null) {
+      // 没有 frontmatter，新建
+      return buildFrontmatter() + content;
+    }
+
+    final existingMeta = match.group(1)!;
+    final body = match.group(2)!;
+
+    // 解析已有的 key-value 行
+    final lines = existingMeta.split('\n');
+    final output = StringBuffer();
+    final handled = <String>{};
+
+    // 支持的单行字段
+    final singleLineFields = {
+      'title': title,
+      'date': _formatDateTime(date),
+      'permalink': permalink,
+      'top_img': topImg,
+      'cover': cover,
+      'excerpt': excerpt,
+      'description': description,
+      'author': author,
+    };
+
+    // 支持的列表字段（tags, categories）需要特殊处理
+    bool inCategories = false;
+
+    for (final line in lines) {
+      final trimmed = line.trim();
+
+      // 跳过多行 categories 的子行
+      if (inCategories) {
+        if (trimmed.startsWith('- ')) continue;
+        inCategories = false;
+      }
+
+      // 检测单行字段
+      bool matched = false;
+      for (final entry in singleLineFields.entries) {
+        if (trimmed.startsWith('${entry.key}:')) {
+          handled.add(entry.key);
+          if (entry.value != null && entry.value!.isNotEmpty) {
+            output.writeln('${entry.key}: ${entry.value}');
+          }
+          // 如果值为空，跳过（删除该行）
+          matched = true;
+          break;
+        }
+      }
+      if (matched) continue;
+
+      // tags
+      if (trimmed.startsWith('tags:')) {
+        handled.add('tags');
+        if (tags.isNotEmpty) {
+          output.writeln('tags: [${tags.join(', ')}]');
+        }
+        continue;
+      }
+
+      // categories
+      if (trimmed.startsWith('categories:')) {
+        handled.add('categories');
+        inCategories = true;
+        if (categories.isNotEmpty) {
+          output.writeln('categories:');
+          for (final cat in categories) {
+            output.writeln('  - $cat');
+          }
+        }
+        continue;
+      }
+
+      // 不认识的行，原样保留
+      output.writeln(line);
+    }
+
+    // 补充新增的字段
+    for (final entry in singleLineFields.entries) {
+      if (!handled.contains(entry.key) && entry.value != null && entry.value!.isNotEmpty) {
+        output.writeln('${entry.key}: ${entry.value}');
+      }
+    }
+    if (!handled.contains('tags') && tags.isNotEmpty) {
+      output.writeln('tags: [${tags.join(', ')}]');
+    }
+    if (!handled.contains('categories') && categories.isNotEmpty) {
+      output.writeln('categories:');
+      for (final cat in categories) {
+        output.writeln('  - $cat');
+      }
+    }
+
+    return '---\n${output.toString()}---\n$body';
+  }
 
   static String _formatDateTime(DateTime d) {
     return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')} '
