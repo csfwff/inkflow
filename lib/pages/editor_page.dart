@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:image_picker/image_picker.dart';
 import '../l10n/app_strings.dart';
 import '../main.dart';
 import '../models/article.dart';
 import '../services/github_service.dart';
+import '../services/image_host/image_host_service.dart';
 import '../widgets/responsive.dart';
 import 'metadata_page.dart';
 
@@ -22,6 +24,7 @@ class _EditorPageState extends State<EditorPage> {
 
   DateTime _selectedDate = DateTime.now();
   bool _publishing = false;
+  bool _uploading = false;
   bool _previewMode = false;
   bool _dirty = false;
   bool _updatingFields = false;
@@ -267,6 +270,70 @@ class _EditorPageState extends State<EditorPage> {
     );
   }
 
+  Future<void> _pickAndUploadImage() async {
+    // Check image host config
+    final imageHost = ImageHostService(settings: settingsService.settings);
+    if (!imageHost.isConfigured) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_label('请先在设置中配置图床', 'Please configure image host in settings'))),
+      );
+      return;
+    }
+
+    // Show source picker (gallery / camera)
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: Text(_label('从相册选择', 'Gallery')),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+            if (Theme.of(ctx).platform == TargetPlatform.android ||
+                Theme.of(ctx).platform == TargetPlatform.iOS)
+              ListTile(
+                leading: const Icon(Icons.camera_alt_outlined),
+                title: Text(_label('拍照', 'Camera')),
+                onTap: () => Navigator.pop(ctx, ImageSource.camera),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+
+    // Pick image
+    final picker = ImagePicker();
+    final file = await picker.pickImage(source: source, maxWidth: 2048);
+    if (file == null) return;
+
+    if (!mounted) return;
+    setState(() => _uploading = true);
+
+    // Upload
+    final bytes = await file.readAsBytes();
+    final result = await imageHost.upload(bytes, file.name);
+
+    if (!mounted) return;
+    setState(() => _uploading = false);
+
+    if (result.success && result.url != null) {
+      _insertBlock('![${file.name}](${result.url})');
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${_label('上传失败', 'Upload failed')}: ${result.error}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final wide = Responsive.isWide(context);
@@ -486,11 +553,11 @@ class _EditorPageState extends State<EditorPage> {
                       _insertBlock('```\n${_label('代码', 'code')}\n```'),
                 ),
                 _ToolButton(
-                  icon: Icons.image_outlined,
+                  icon: _uploading
+                      ? Icons.hourglass_top
+                      : Icons.image_outlined,
                   tooltip: _label('插入图片', 'Insert image'),
-                  onPressed: () => _insertBlock(
-                    '![${_label('图片描述', 'alt text')}](https://example.com/image.png)',
-                  ),
+                  onPressed: _uploading ? null : () => _pickAndUploadImage(),
                 ),
               ],
             ),
@@ -785,12 +852,12 @@ class _ActionButton extends StatelessWidget {
 class _ToolButton extends StatelessWidget {
   final IconData icon;
   final String tooltip;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   const _ToolButton({
     required this.icon,
     required this.tooltip,
-    required this.onPressed,
+    this.onPressed,
   });
 
   @override

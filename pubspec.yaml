@@ -42,6 +42,7 @@ dependencies:
   sqlite3: any
   path: ^1.9.0
   flutter_markdown_plus: ^1.0.7
+  image_picker: ^1.2.2
 
 dev_dependencies:
   flutter_test:

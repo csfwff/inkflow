@@ -51,7 +51,8 @@ class UpyunUploader implements ImageUploader {
 
       if (response.statusCode == 200) {
         final cleanDomain = domain.endsWith('/') ? domain.substring(0, domain.length - 1) : domain;
-        final imageUrl = '$cleanDomain/$remotePath';
+        final cleanRemote = remotePath.startsWith('/') ? remotePath : '/$remotePath';
+        final imageUrl = '$cleanDomain$cleanRemote';
         return UploadResult(success: true, url: imageUrl);
       } else {
         final data = jsonDecode(response.body);
