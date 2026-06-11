@@ -10,8 +10,8 @@ final articleService = ArticleService();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await settingsService.init();
   await articleService.init();
+  await settingsService.init();
   runApp(const MyApp());
 }
 

@@ -92,8 +92,9 @@ class _SettingsPageState extends State<SettingsPage> {
     final wide = Responsive.isWide(context);
 
     return Scaffold(
-      appBar:
-          wide ? null : AppBar(title: Text(AppStrings.current.settingsTitle)),
+      appBar: AppBar(
+        title: Text(AppStrings.current.settingsTitle),
+      ),
       body: wide ? _buildWide() : _buildNarrow(),
     );
   }

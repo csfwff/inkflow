@@ -37,19 +37,17 @@ dependencies:
   http: ^1.2.0
   shared_preferences: ^2.2.0
   package_info_plus: ^8.0.0
-  sqflite: ^2.3.0
+  drift: any
+  sqlite3_flutter_libs: any
+  sqlite3: any
   path: ^1.9.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
-  # The "flutter_lints" package below contains a set of recommended lints to
-  # encourage good coding practices. The lint set provided by the package is
-  # activated in the `analysis_options.yaml` file located at the root of your
-  # package. See that file for information about deactivating specific lint
-  # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  drift_dev: any
+  build_runner: any
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

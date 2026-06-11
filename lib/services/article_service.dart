@@ -1,197 +1,122 @@
-import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart' as p;
+import 'package:drift/drift.dart';
 import '../models/article.dart';
+import 'database/app_database.dart';
 
 class ArticleService {
-  late Database _db;
+  late final AppDatabase _db;
 
   Future<void> init() async {
-    final dbPath = await getDatabasesPath();
-    final path = p.join(dbPath, 'inkflow.db');
-    _db = await openDatabase(
-      path,
-      version: 2,
-      onCreate: (db, version) async {
-        await _createTableV2(db);
-      },
-      onUpgrade: (db, oldVersion, newVersion) async {
-        if (oldVersion < 2) {
-          await _migrateV2(db);
-        }
-      },
-    );
-  }
-
-  Future<void> _createTableV2(Database db) async {
-    await db.execute('''
-      CREATE TABLE articles (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        content TEXT NOT NULL,
-        date TEXT NOT NULL,
-        slug TEXT NOT NULL,
-        status INTEGER NOT NULL DEFAULT 0,
-        filePath TEXT NOT NULL DEFAULT '',
-        githubSha TEXT,
-        createdAt TEXT NOT NULL,
-        updatedAt TEXT NOT NULL,
-        tags TEXT DEFAULT '',
-        categories TEXT DEFAULT '',
-        permalink TEXT,
-        topImg TEXT,
-        cover TEXT,
-        layout TEXT,
-        comments INTEGER DEFAULT 1,
-        published INTEGER DEFAULT 1,
-        excerpt TEXT,
-        description TEXT,
-        author TEXT
-      )
-    ''');
-  }
-
-  Future<void> _migrateV2(Database db) async {
-    await db.execute('ALTER TABLE articles ADD COLUMN tags TEXT DEFAULT ""');
-    await db.execute('ALTER TABLE articles ADD COLUMN categories TEXT DEFAULT ""');
-    await db.execute('ALTER TABLE articles ADD COLUMN permalink TEXT');
-    await db.execute('ALTER TABLE articles ADD COLUMN topImg TEXT');
-    await db.execute('ALTER TABLE articles ADD COLUMN cover TEXT');
-    await db.execute('ALTER TABLE articles ADD COLUMN layout TEXT');
-    await db.execute('ALTER TABLE articles ADD COLUMN comments INTEGER DEFAULT 1');
-    await db.execute('ALTER TABLE articles ADD COLUMN published INTEGER DEFAULT 1');
-    await db.execute('ALTER TABLE articles ADD COLUMN excerpt TEXT');
-    await db.execute('ALTER TABLE articles ADD COLUMN description TEXT');
-    await db.execute('ALTER TABLE articles ADD COLUMN author TEXT');
+    _db = await AppDatabase.create();
   }
 
   Future<int> insert(Article article) async {
-    final map = article.toMap();
-    map.remove('id');
-    return await _db.insert('articles', map);
+    return await _db.into(_db.articleRows).insert(toCompanion(article));
   }
 
   Future<void> update(Article article) async {
-    await _db.update(
-      'articles',
-      article.toMap(),
-      where: 'id = ?',
-      whereArgs: [article.id],
-    );
+    await (_db.update(_db.articleRows)
+          ..where((t) => t.id.equals(article.id!)))
+        .write(toCompanion(article));
   }
 
   Future<void> delete(int id) async {
-    await _db.delete('articles', where: 'id = ?', whereArgs: [id]);
+    await (_db.delete(_db.articleRows)..where((t) => t.id.equals(id))).go();
   }
 
   Future<Article?> getById(int id) async {
-    final maps = await _db.query('articles', where: 'id = ?', whereArgs: [id]);
-    if (maps.isEmpty) return null;
-    return Article.fromMap(maps.first);
+    final row = await (_db.select(_db.articleRows)
+          ..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
+    return row == null ? null : articleFromRow(row);
   }
 
   Future<List<Article>> getAll({ArticleStatus? status}) async {
-    final orderBy = 'date DESC';
+    final query = _db.select(_db.articleRows)
+      ..orderBy([(t) => OrderingTerm.desc(t.date)]);
     if (status != null) {
-      final maps = await _db.query(
-        'articles',
-        where: 'status = ?',
-        whereArgs: [status.index],
-        orderBy: orderBy,
-      );
-      return maps.map((m) => Article.fromMap(m)).toList();
+      query.where((t) => t.status.equalsValue(status));
     }
-    final maps = await _db.query('articles', orderBy: orderBy);
-    return maps.map((m) => Article.fromMap(m)).toList();
+    final rows = await query.get();
+    return rows.map(articleFromRow).toList();
   }
 
   Future<List<Article>> getDrafts() => getAll(status: ArticleStatus.draft);
 
   Future<List<Article>> getSynced() => getAll(status: ArticleStatus.synced);
 
-  Future<List<Article>> getRepoDrafts() => getAll(status: ArticleStatus.repoDraft);
+  Future<List<Article>> getRepoDrafts() =>
+      getAll(status: ArticleStatus.repoDraft);
+
+  Future<List<Article>> getSyncedAndRepoDrafts() async {
+    final rows = await (_db.select(_db.articleRows)
+          ..where((t) =>
+              t.status.equalsValue(ArticleStatus.synced) |
+              t.status.equalsValue(ArticleStatus.repoDraft))
+          ..orderBy([(t) => OrderingTerm.desc(t.date)]))
+        .get();
+    return rows.map(articleFromRow).toList();
+  }
 
   Future<void> upsertFromGitHub(Article article) async {
-    final existing = await _db.query(
-      'articles',
-      where: 'filePath = ?',
-      whereArgs: [article.filePath],
-    );
-    if (existing.isNotEmpty) {
-      await _db.update(
-        'articles',
-        {
-          'title': article.title,
-          'content': article.content,
-          'date': article.date.toIso8601String(),
-          'slug': article.slug,
-          'status': article.status.index,
-          'githubSha': article.githubSha,
-          'updatedAt': DateTime.now().toIso8601String(),
-          'tags': article.tags.join(','),
-          'categories': article.categories.join(','),
-          'permalink': article.permalink,
-          'topImg': article.topImg,
-          'cover': article.cover,
-          'layout': article.layout,
-          'comments': article.comments == true ? 1 : 0,
-          'published': article.published == true ? 1 : 0,
-          'excerpt': article.excerpt,
-          'description': article.description,
-          'author': article.author,
-        },
-        where: 'filePath = ?',
-        whereArgs: [article.filePath],
-      );
+    final existing = await (_db.select(_db.articleRows)
+          ..where((t) => t.filePath.equals(article.filePath))
+          ..limit(1))
+        .getSingleOrNull();
+
+    if (existing != null) {
+      await (_db.update(_db.articleRows)
+            ..where((t) => t.id.equals(existing.id)))
+          .write(ArticleRowsCompanion(
+        title: Value(article.title),
+        content: Value(article.content),
+        date: Value(article.date.toIso8601String()),
+        slug: Value(article.slug),
+        status: Value(article.status),
+        githubSha: Value(article.githubSha),
+        updatedAt: Value(DateTime.now().toIso8601String()),
+        tags: Value(article.tags.join(',')),
+        categories: Value(article.categories.join(',')),
+        permalink: Value(article.permalink),
+        topImg: Value(article.topImg),
+        cover: Value(article.cover),
+        layout: Value(article.layout),
+        comments: Value(article.comments == true ? 1 : 0),
+        published: Value(article.published == true ? 1 : 0),
+        excerpt: Value(article.excerpt),
+        description: Value(article.description),
+        author: Value(article.author),
+      ));
     } else {
-      await _db.insert('articles', article.toMap()..remove('id'));
+      await _db.into(_db.articleRows).insert(toCompanion(article));
     }
   }
 
   Future<void> markAsSynced(int id, String githubSha) async {
-    await _db.update(
-      'articles',
-      {
-        'status': ArticleStatus.synced.index,
-        'githubSha': githubSha,
-        'updatedAt': DateTime.now().toIso8601String(),
-      },
-      where: 'id = ?',
-      whereArgs: [id],
+    await (_db.update(_db.articleRows)..where((t) => t.id.equals(id))).write(
+      ArticleRowsCompanion(
+        status: const Value(ArticleStatus.synced),
+        githubSha: Value(githubSha),
+        updatedAt: Value(DateTime.now().toIso8601String()),
+      ),
     );
   }
 
   Future<void> markAsRepoDraft(int id, String githubSha) async {
-    await _db.update(
-      'articles',
-      {
-        'status': ArticleStatus.repoDraft.index,
-        'githubSha': githubSha,
-        'updatedAt': DateTime.now().toIso8601String(),
-      },
-      where: 'id = ?',
-      whereArgs: [id],
+    await (_db.update(_db.articleRows)..where((t) => t.id.equals(id))).write(
+      ArticleRowsCompanion(
+        status: const Value(ArticleStatus.repoDraft),
+        githubSha: Value(githubSha),
+        updatedAt: Value(DateTime.now().toIso8601String()),
+      ),
     );
-  }
-
-  Future<List<Article>> getSyncedAndRepoDrafts() async {
-    final maps = await _db.query(
-      'articles',
-      where: 'status IN (?, ?)',
-      whereArgs: [ArticleStatus.synced.index, ArticleStatus.repoDraft.index],
-      orderBy: 'date DESC',
-    );
-    return maps.map((m) => Article.fromMap(m)).toList();
   }
 
   Future<void> markAsDraft(int id) async {
-    await _db.update(
-      'articles',
-      {
-        'status': ArticleStatus.draft.index,
-        'updatedAt': DateTime.now().toIso8601String(),
-      },
-      where: 'id = ?',
-      whereArgs: [id],
+    await (_db.update(_db.articleRows)..where((t) => t.id.equals(id))).write(
+      ArticleRowsCompanion(
+        status: const Value(ArticleStatus.draft),
+        updatedAt: Value(DateTime.now().toIso8601String()),
+      ),
     );
   }
 }
