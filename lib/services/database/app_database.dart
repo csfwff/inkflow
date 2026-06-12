@@ -36,6 +36,18 @@ class AppDatabase extends _$AppDatabase {
   @override
   int get schemaVersion => 1;
 
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (Migrator m) async {
+          await m.createAll();
+        },
+        onUpgrade: (Migrator m, int from, int to) async {
+          // 开发阶段：直接删除重建
+          await m.database.customStatement('DROP TABLE IF EXISTS article_rows');
+          await m.createAll();
+        },
+      );
+
   static Future<AppDatabase> create() async {
     final executor = await openConnection();
     return AppDatabase(executor);
