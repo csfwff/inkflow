@@ -14,7 +14,14 @@
       "Bash(dart pub *)",
       "Bash(curl -s \"https://pub.dev/api/packages/flutter_markdown_plus\")",
       "Bash(python3 -c ' *)",
-      "Bash(curl -s \"https://raw.githubusercontent.com/foresightmobile/flutter_markdown_plus/main/README.md\")"
+      "Bash(curl -s \"https://raw.githubusercontent.com/foresightmobile/flutter_markdown_plus/main/README.md\")",
+      "Bash(tasklist)",
+      "Bash(./gradlew --status)",
+      "Bash(./gradlew --stop)",
+      "Bash(handle.exe \"E:\\\\git\\\\inkflow\\\\.dart_tool\\\\hooks_runner\\\\shared\\\\sqlite3\\\\.lock\")",
+      "Bash(taskkill //F //IM dart.exe)",
+      "Bash(taskkill //F //IM dartvm.exe)",
+      "Bash(taskkill //F //IM dartaotruntime.exe)"
     ]
   }
 }

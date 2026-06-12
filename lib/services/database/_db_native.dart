@@ -1,26 +1,34 @@
 import 'dart:io';
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
+import 'package:drift_sqflite/drift_sqflite.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 Future<QueryExecutor> openConnection() async {
   final dbDir = await _getDbDir();
-  final file = File(p.join(dbDir.path, 'inkflow.db'));
-  return NativeDatabase.createInBackground(file);
+  // 确保目录存在
+  if (!await dbDir.exists()) {
+    await dbDir.create(recursive: true);
+  }
+  final dbPath = p.join(dbDir.path, 'inkflow.db');
+  return SqfliteQueryExecutor.inDatabaseFolder(path: 'inkflow.db');
 }
 
 Future<Directory> _getDbDir() async {
-  // 尝试 path_provider，不可用时回退到可执行文件目录
+  if (Platform.isAndroid || Platform.isIOS) {
+    // Android/iOS 使用 path_provider
+    return await getApplicationDocumentsDirectory();
+  }
+  // 桌面平台使用自定义路径
   try {
-    final dir = await getApplicationDocumentsDirectory();
+    final dir = await _getDesktopDir();
     return dir;
   } catch (_) {
     return Directory('.');
   }
 }
 
-// path_provider 可能不在依赖中，直接用 Platform 拿路径
-Future<Directory> getApplicationDocumentsDirectory() async {
+Future<Directory> _getDesktopDir() async {
   if (Platform.isLinux) {
     final home = Platform.environment['HOME'] ?? '.';
     return Directory(p.join(home, '.local', 'share', 'inkflow'));
@@ -34,6 +42,5 @@ Future<Directory> getApplicationDocumentsDirectory() async {
     return Directory(
         p.join(home, 'Library', 'Application Support', 'inkflow'));
   }
-  // Android/iOS — 由 path_provider 处理，此处不应到达
   return Directory('.');
 }
