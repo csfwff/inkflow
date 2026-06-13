@@ -85,10 +85,31 @@ class _EditorPageState extends State<EditorPage> {
   String _slugify(String text) {
     return text
         .toLowerCase()
-        .replaceAll(RegExp(r'[^\w\s-]'), '')
+        // 保留 Unicode 字母/数字（含中文），去掉其余符号；空白转连字符。
+        // 这一步已滤掉所有跨平台非法字符：\ / : * ? " < > | 及控制符等。
+        .replaceAll(RegExp(r'[^\p{L}\p{N}\s-]', unicode: true), '')
         .replaceAll(RegExp(r'\s+'), '-')
         .replaceAll(RegExp(r'-+'), '-')
         .replaceAll(RegExp(r'^-|-$'), '');
+  }
+
+  /// 由标题生成文件系统安全的 slug：
+  /// 非法字符已由 [_slugify] 的白名单滤除；此处再避开 Windows 保留设备名
+  /// （CON/NUL/COM1… 用作文件名会报错），并对空结果用时间戳兜底，避免只剩 ".md"。
+  String _safeSlug(String title) {
+    var slug = _slugify(title);
+    const reserved = {
+      'con', 'prn', 'aux', 'nul',
+      'com1', 'com2', 'com3', 'com4', 'com5', 'com6', 'com7', 'com8', 'com9',
+      'lpt1', 'lpt2', 'lpt3', 'lpt4', 'lpt5', 'lpt6', 'lpt7', 'lpt8', 'lpt9',
+    };
+    if (reserved.contains(slug)) {
+      slug = 'post-$slug';
+    }
+    if (slug.isEmpty) {
+      slug = 'post-${_selectedDate.millisecondsSinceEpoch ~/ 1000}';
+    }
+    return slug;
   }
 
   String _resolvePathPattern(String pattern, {
@@ -128,7 +149,7 @@ class _EditorPageState extends State<EditorPage> {
 
   Article _buildArticle() {
     final title = _titleCtrl.text.trim();
-    final slug = _slugify(title);
+    final slug = _safeSlug(title);
     final category = _editingArticle?.categories.isNotEmpty == true
         ? _editingArticle!.categories.first
         : '';
