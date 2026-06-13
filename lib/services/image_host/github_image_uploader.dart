@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import '../../models/settings.dart';
+import 'image_path_builder.dart';
 import 'image_uploader.dart';
 
 class GitHubImageUploader implements ImageUploader {
@@ -10,6 +12,8 @@ class GitHubImageUploader implements ImageUploader {
   final String branch;
   final String path;
   final String? domain;
+  final bool useDateFolder;
+  final ImageNamingMode namingMode;
 
   GitHubImageUploader({
     required this.token,
@@ -18,6 +22,8 @@ class GitHubImageUploader implements ImageUploader {
     this.branch = 'main',
     this.path = 'images',
     this.domain,
+    this.useDateFolder = false,
+    this.namingMode = ImageNamingMode.timestamp,
   });
 
   Map<String, String> get _headers => {
@@ -28,18 +34,14 @@ class GitHubImageUploader implements ImageUploader {
 
   String get _baseUrl => 'https://api.github.com/repos/$owner/$repo/contents';
 
-  String _buildPath(String filename) {
-    final now = DateTime.now();
-    final datePath = '${now.year}/${now.month.toString().padLeft(2, '0')}';
-    final timestamp = now.millisecondsSinceEpoch;
-    final name = '${timestamp}_$filename';
-    final cleanPath = path.endsWith('/') ? path : '$path/';
-    return '$cleanPath$datePath/$name';
-  }
-
   @override
   Future<UploadResult> upload(Uint8List bytes, String filename) async {
-    final remotePath = _buildPath(filename);
+    final remotePath = buildRemoteImagePath(
+      path,
+      filename,
+      useDateFolder: useDateFolder,
+      namingMode: namingMode,
+    );
     final encodedContent = base64Encode(bytes);
 
     final body = jsonEncode({

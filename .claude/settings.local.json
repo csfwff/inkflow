@@ -21,7 +21,9 @@
       "Bash(handle.exe \"E:\\\\git\\\\inkflow\\\\.dart_tool\\\\hooks_runner\\\\shared\\\\sqlite3\\\\.lock\")",
       "Bash(taskkill //F //IM dart.exe)",
       "Bash(taskkill //F //IM dartvm.exe)",
-      "Bash(taskkill //F //IM dartaotruntime.exe)"
+      "Bash(taskkill //F //IM dartaotruntime.exe)",
+      "mcp__codegraph__codegraph_explore",
+      "mcp__codegraph__codegraph_search"
     ]
   }
 }

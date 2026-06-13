@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import '../../models/settings.dart';
+import 'image_path_builder.dart';
 import 'image_uploader.dart';
 
 class UpyunUploader implements ImageUploader {
@@ -9,6 +11,8 @@ class UpyunUploader implements ImageUploader {
   final String password;
   final String domain;
   final String path;
+  final bool useDateFolder;
+  final ImageNamingMode namingMode;
 
   UpyunUploader({
     required this.bucket,
@@ -16,6 +20,8 @@ class UpyunUploader implements ImageUploader {
     required this.password,
     required this.domain,
     this.path = 'images/',
+    this.useDateFolder = false,
+    this.namingMode = ImageNamingMode.timestamp,
   });
 
   String get _auth {
@@ -25,18 +31,14 @@ class UpyunUploader implements ImageUploader {
 
   String get _baseUrl => 'https://v0.api.upyun.com/$bucket';
 
-  String _buildPath(String filename) {
-    final now = DateTime.now();
-    final datePath = '${now.year}/${now.month.toString().padLeft(2, '0')}';
-    final timestamp = now.millisecondsSinceEpoch;
-    final name = '${timestamp}_$filename';
-    final cleanPath = path.endsWith('/') ? path : '$path/';
-    return '$cleanPath$datePath/$name';
-  }
-
   @override
   Future<UploadResult> upload(Uint8List bytes, String filename) async {
-    final remotePath = _buildPath(filename);
+    final remotePath = buildRemoteImagePath(
+      path,
+      filename,
+      useDateFolder: useDateFolder,
+      namingMode: namingMode,
+    );
     final url = '$_baseUrl/$remotePath';
 
     try {

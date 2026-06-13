@@ -3,6 +3,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../l10n/app_strings.dart';
 import '../main.dart';
 import '../models/settings.dart';
+import '../services/image_host/image_path_builder.dart';
 import '../widgets/responsive.dart';
 
 enum _Tab { general, github, imageHost }
@@ -367,6 +368,7 @@ class _SettingsPageState extends State<SettingsPage> {
   // ── Image Host tab ──
 
   Widget _buildImageHostTab(AppStrings s) {
+    final zh = identical(s, AppStrings.zh);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -387,8 +389,67 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         _divider(),
         _buildImageHostFields(s),
+        _divider(),
+        _sectionHeader(zh ? '按日期分目录' : 'Date subfolders'),
+        _dropdownRow<bool>(
+          value: _settings.imageUseDateFolder,
+          items: [
+            DropdownMenuItem(value: false, child: Text(zh ? '不使用' : 'None')),
+            DropdownMenuItem(
+                value: true, child: Text(zh ? '年 / 月' : 'Year / Month')),
+          ],
+          onChanged: (v) {
+            if (v == null) return;
+            setState(() => _settings.imageUseDateFolder = v);
+            _save();
+          },
+        ),
+        _divider(),
+        _sectionHeader(zh ? '文件命名' : 'File naming'),
+        _dropdownRow<ImageNamingMode>(
+          value: _settings.imageNamingMode,
+          items: [
+            DropdownMenuItem(
+                value: ImageNamingMode.timestamp,
+                child: Text(zh ? '时间戳' : 'Timestamp')),
+            DropdownMenuItem(
+                value: ImageNamingMode.original,
+                child: Text(zh ? '源文件名' : 'Original name')),
+            DropdownMenuItem(
+                value: ImageNamingMode.timestampOriginal,
+                child: Text(zh ? '时间戳 _ 源文件名' : 'Timestamp _ Original')),
+          ],
+          onChanged: (v) {
+            if (v == null) return;
+            setState(() => _settings.imageNamingMode = v);
+            _save();
+          },
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+          child: Text(
+            '${zh ? '示例：' : 'Example: '}${_imagePathPreview()}',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+        ),
       ],
     );
+  }
+
+  /// 根据当前图床、路径与命名选择生成一条示例远程路径，与真实上传共用同一套逻辑。
+  String _imagePathPreview() {
+    final basePath = _settings.imageHostType == ImageHostType.github
+        ? _settings.imageGithubPath
+        : _settings.upyunPath;
+    final remotePath = buildRemoteImagePath(
+      basePath,
+      'example.png',
+      useDateFolder: _settings.imageUseDateFolder,
+      namingMode: _settings.imageNamingMode,
+    );
+    return '/$remotePath';
   }
 
   Widget _buildImageHostFields(AppStrings s) {
@@ -410,7 +471,7 @@ class _SettingsPageState extends State<SettingsPage> {
             _inputRow(
               controller: _imageGithubPathCtrl,
               onChanged: (v) {
-                _settings.imageGithubPath = v;
+                setState(() => _settings.imageGithubPath = v);
                 _save();
               },
             ),
@@ -475,7 +536,7 @@ class _SettingsPageState extends State<SettingsPage> {
               controller: _upyunPathCtrl,
               hint: s.upyunPathHint,
               onChanged: (v) {
-                _settings.upyunPath = v;
+                setState(() => _settings.upyunPath = v);
                 _save();
               },
             ),

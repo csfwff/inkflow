@@ -1,5 +1,7 @@
 enum ImageHostType { github, upyun }
 
+enum ImageNamingMode { timestamp, original, timestampOriginal }
+
 enum AppThemeMode { system, light, dark }
 
 enum AppLocale { system, zh, en }
@@ -26,6 +28,10 @@ class Settings {
   String upyunDomain;
   String upyunPath;
 
+  // Image upload path / naming (shared across hosts)
+  bool imageUseDateFolder;
+  ImageNamingMode imageNamingMode;
+
   // App
   AppThemeMode themeMode;
   AppLocale locale;
@@ -46,6 +52,8 @@ class Settings {
     this.upyunPassword = '',
     this.upyunDomain = '',
     this.upyunPath = '/',
+    this.imageUseDateFolder = false,
+    this.imageNamingMode = ImageNamingMode.timestamp,
     this.themeMode = AppThemeMode.system,
     this.locale = AppLocale.system,
   });

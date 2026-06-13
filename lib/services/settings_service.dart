@@ -17,6 +17,8 @@ class SettingsService {
   static const _keyUpyunPassword = 'upyun_password';
   static const _keyUpyunDomain = 'upyun_domain';
   static const _keyUpyunPath = 'upyun_path';
+  static const _keyImageUseDateFolder = 'image_use_date_folder';
+  static const _keyImageNamingMode = 'image_naming_mode';
   static const _keyThemeMode = 'theme_mode';
   static const _keyLocale = 'locale';
 
@@ -45,6 +47,8 @@ class SettingsService {
       upyunPassword: _prefs.getString(_keyUpyunPassword) ?? '',
       upyunDomain: _prefs.getString(_keyUpyunDomain) ?? '',
       upyunPath: _prefs.getString(_keyUpyunPath) ?? '/',
+      imageUseDateFolder: _prefs.getBool(_keyImageUseDateFolder) ?? false,
+      imageNamingMode: ImageNamingMode.values[_prefs.getInt(_keyImageNamingMode) ?? 0],
       themeMode: AppThemeMode.values[_prefs.getInt(_keyThemeMode) ?? 0],
       locale: AppLocale.values[_prefs.getInt(_keyLocale) ?? 0],
     );
@@ -67,6 +71,8 @@ class SettingsService {
       _prefs.setString(_keyUpyunPassword, settings.upyunPassword),
       _prefs.setString(_keyUpyunDomain, settings.upyunDomain),
       _prefs.setString(_keyUpyunPath, settings.upyunPath),
+      _prefs.setBool(_keyImageUseDateFolder, settings.imageUseDateFolder),
+      _prefs.setInt(_keyImageNamingMode, settings.imageNamingMode.index),
       _prefs.setInt(_keyThemeMode, settings.themeMode.index),
       _prefs.setInt(_keyLocale, settings.locale.index),
     ]);
