@@ -156,17 +156,17 @@ class _EditorPageState extends State<EditorPage> {
     final category = _editingArticle?.categories.isNotEmpty == true
         ? _editingArticle!.categories.first
         : '';
-    final filePath = _resolvePathPattern(
-      settingsService.settings.githubPathPattern,
-      slug: slug,
-      category: category,
-    );
-    final permalink = _resolvePathPattern(
-      settingsService.settings.permalinkPattern,
-      slug: slug,
-      category: category,
-      appendSlug: false,
-    );
+
+    // 已同步的文章保留原 filePath，避免路径模板变更后重新发布导致重复
+    final filePath = (_editingArticle?.githubSha != null &&
+            _editingArticle!.filePath.isNotEmpty)
+        ? _editingArticle!.filePath
+        : _resolvePathPattern(
+            settingsService.settings.githubPathPattern,
+            slug: slug,
+            category: category,
+          );
+    // permalink 不再自动生成，保留已有值（由用户在元数据页手动生成或输入）
 
     // 合并：原始 frontmatter + 编辑后的正文
     final fullContent = _originalFrontmatter.isNotEmpty
@@ -185,7 +185,7 @@ class _EditorPageState extends State<EditorPage> {
       createdAt: _editingArticle?.createdAt,
       tags: _editingArticle?.tags ?? [],
       categories: _editingArticle?.categories ?? [],
-      permalink: permalink,
+      permalink: _editingArticle?.permalink,
       topImg: _editingArticle?.topImg,
       cover: _editingArticle?.cover,
       layout: _editingArticle?.layout,
@@ -204,7 +204,7 @@ class _EditorPageState extends State<EditorPage> {
     final result = await Navigator.push<Article>(
       context,
       MaterialPageRoute(
-        builder: (_) => MetadataPage(article: _editingArticle!),
+        builder: (_) => MetadataPage(article: _editingArticle!, settingsService: settingsService),
       ),
     );
 

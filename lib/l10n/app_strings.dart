@@ -88,6 +88,7 @@ class AppStrings {
   final String categoriesHint;
   final String permalink;
   final String permalinkHint;
+  final String generatePermalink;
   final String topImg;
   final String topImgHint;
   final String cover;
@@ -179,6 +180,7 @@ class AppStrings {
     required this.categoriesHint,
     required this.permalink,
     required this.permalinkHint,
+    required this.generatePermalink,
     required this.topImg,
     required this.topImgHint,
     required this.cover,
@@ -271,6 +273,7 @@ class AppStrings {
     categoriesHint: 'One per line',
     permalink: 'Permalink',
     permalinkHint: '/articles/2024/01/01/hello.html',
+    generatePermalink: 'Generate',
     topImg: 'Top Image',
     topImgHint: 'Header image URL',
     cover: 'Cover',
@@ -363,6 +366,7 @@ class AppStrings {
     categoriesHint: '每行一个',
     permalink: '永久链接',
     permalinkHint: '/articles/2024/01/01/hello.html',
+    generatePermalink: '自动生成',
     topImg: '头图',
     topImgHint: '头图 URL',
     cover: '封面',

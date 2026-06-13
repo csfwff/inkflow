@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_strings.dart';
 import '../models/article.dart';
+import '../services/settings_service.dart';
 
 class MetadataPage extends StatefulWidget {
   final Article article;
+  final SettingsService settingsService;
 
-  const MetadataPage({super.key, required this.article});
+  const MetadataPage({super.key, required this.article, required this.settingsService});
 
   @override
   State<MetadataPage> createState() => _MetadataPageState();
@@ -70,6 +72,29 @@ class _MetadataPageState extends State<MetadataPage> {
     return trimmed.isEmpty ? null : trimmed;
   }
 
+  String _resolvePathPattern(String pattern, {
+    required String slug,
+    String category = '',
+  }) {
+    final d = widget.article.date;
+    return pattern
+        .replaceAll('{year}', '${d.year}')
+        .replaceAll('{month}', d.month.toString().padLeft(2, '0'))
+        .replaceAll('{day}', d.day.toString().padLeft(2, '0'))
+        .replaceAll('{category}', category)
+        .replaceAll('{slug}', slug)
+        .replaceAll('{timestamp}', '${d.millisecondsSinceEpoch ~/ 1000}');
+  }
+
+  void _generatePermalink() {
+    final article = widget.article;
+    final slug = article.slug.isNotEmpty ? article.slug : 'post';
+    final category = article.categories.isNotEmpty ? article.categories.first : '';
+    final pattern = widget.settingsService.settings.permalinkPattern;
+    final permalink = _resolvePathPattern(pattern, slug: slug, category: category);
+    _permalinkCtrl.text = permalink;
+  }
+
   void _save() {
     final article = widget.article;
     article.tags = _parseTags(_tagsCtrl.text);
@@ -125,9 +150,21 @@ class _MetadataPageState extends State<MetadataPage> {
             // Permalink
             _buildSectionTitle(s.permalink, Icons.link),
             const SizedBox(height: 8),
-            _buildTextField(
-              controller: _permalinkCtrl,
-              hint: s.permalinkHint,
+            Row(
+              children: [
+                Expanded(
+                  child: _buildTextField(
+                    controller: _permalinkCtrl,
+                    hint: s.permalinkHint,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filled(
+                  onPressed: _generatePermalink,
+                  icon: const Icon(Icons.auto_fix_high, size: 20),
+                  tooltip: s.generatePermalink,
+                ),
+              ],
             ),
             const SizedBox(height: 16),
 
