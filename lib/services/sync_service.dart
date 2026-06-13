@@ -170,16 +170,12 @@ class SyncService {
         }
       }
 
-      // 解析多行 categories
-      if (meta.contains('categories:')) {
-        final catMatch = RegExp(r'categories:\s*\n((?:\s+-\s+.+\n?)*)').firstMatch(meta);
-        if (catMatch != null) {
-          categories = RegExp(r'-\s+(.+)')
-              .allMatches(catMatch.group(1)!)
-              .map((m) => m.group(1)!.trim())
-              .toList();
-        }
+      // tags / categories 的块状写法（key 下方以 `  - item` 多行列出）。
+      // tags 已在上面解析了行内写法（[a, b] / a, b），仅当行内为空时再按块状解析。
+      if (tags.isEmpty) {
+        tags = _parseBlockList(meta, 'tags');
       }
+      categories = _parseBlockList(meta, 'categories');
     }
 
     final slug = filePath.split('/').last.replaceAll('.md', '');
@@ -202,6 +198,17 @@ class SyncService {
       description: description,
       author: author,
     );
+  }
+
+  /// 解析块状列表写法（key 下方以 `  - item` 多行列出），tags / categories 共用。
+  /// 行内写法（如 `tags: [a, b]`）不在此处理，返回空列表。
+  static List<String> _parseBlockList(String meta, String key) {
+    final match = RegExp(key + r':\s*\n((?:\s+-\s+.+\n?)*)').firstMatch(meta);
+    if (match == null) return [];
+    return RegExp(r'-\s+(.+)')
+        .allMatches(match.group(1)!)
+        .map((m) => m.group(1)!.trim())
+        .toList();
   }
 }
 

@@ -136,13 +136,8 @@ class Article {
       buffer.writeln('layout: $layout');
     }
 
-    if (comments == false) {
-      buffer.writeln('comments: false');
-    }
-
-    if (published == false) {
-      buffer.writeln('published: false');
-    }
+    // comments / published 不主动写入：源数据没有时不应凭空添加。
+    // （已有的 comments/published 行由 updateFrontmatter 原样保留）
 
     if (excerpt != null && excerpt!.isNotEmpty) {
       buffer.writeln('excerpt: $excerpt');
