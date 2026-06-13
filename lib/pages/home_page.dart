@@ -129,7 +129,8 @@ class _HomePageState extends State<HomePage> {
     if (remotePath != null &&
         article.githubSha != null &&
         article.githubSha!.isNotEmpty &&
-        article.status != ArticleStatus.draft) {
+        article.status != ArticleStatus.draft &&
+        article.status != ArticleStatus.remoteDeleted) {
       final settings = settingsService.settings;
       if (settings.githubToken.isNotEmpty &&
           settings.githubOwner.isNotEmpty &&
@@ -686,7 +687,12 @@ class _StatusPill extends StatelessWidget {
           const Color(0xFF9A6A1F),
           Icons.drafts_outlined,
         ),
-      ArticleStatus.draft when article.githubSha != null => (
+      ArticleStatus.pendingPublish => (
+          s.pendingPublish,
+          const Color(0xFF7A5CDB),
+          Icons.cloud_upload_outlined,
+        ),
+      ArticleStatus.remoteDeleted => (
           s.remoteDeleted,
           const Color(0xFFB64B45),
           Icons.cloud_off_outlined,

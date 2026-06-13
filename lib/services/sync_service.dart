@@ -9,6 +9,32 @@ class SyncService {
 
   SyncService({required this.github, required this.articleService});
 
+  Future<Article?> fetchRemoteArticle(Article local) async {
+    final remotePath = local.effectiveRemotePath;
+    if (remotePath == null || remotePath.isEmpty) return null;
+
+    final remoteKind =
+        local.effectiveRemoteKind ?? _remoteKindForPath(remotePath);
+    if (remoteKind == null) return null;
+
+    final fileData = await github.getFileContent(remotePath);
+    if (fileData == null) return null;
+
+    final prefix = _prefixForRemoteKind(remoteKind);
+    final filePath = remotePath.startsWith(prefix)
+        ? remotePath.substring(prefix.length)
+        : local.filePath;
+
+    return _parseFrontmatter(
+      fileData.content,
+      filePath: filePath,
+      remotePath: remotePath,
+      remoteKind: remoteKind,
+      sha: fileData.sha,
+      status: _statusForRemoteKind(remoteKind),
+    );
+  }
+
   Future<SyncResult> syncFromGitHub() async {
     try {
       debugPrint('[Sync] === syncFromGitHub START ===');
@@ -50,15 +76,19 @@ class SyncService {
       }
 
       // 检测远程已删除：本地 synced/repoDraft 但远程不存在的
-      final localSynced = await articleService.getSyncedAndRepoDrafts();
+      final localSynced = await articleService.getRemoteTracked();
       debugPrint('[Sync] Local synced/repoDraft count: ${localSynced.length}');
       int deletedCount = 0;
       for (final local in localSynced) {
+        if (local.status == ArticleStatus.pendingPublish) {
+          continue;
+        }
+
         final remotePath = local.effectiveRemotePath;
         if (remotePath == null || !remotePaths.contains(remotePath)) {
           debugPrint(
               '[Sync] Remote deleted: "${local.title}" (${remotePath ?? local.filePath})');
-          await articleService.markAsDraft(local.id!);
+          await articleService.markAsRemoteDeleted(local.id!);
           deletedCount++;
         }
       }
@@ -83,12 +113,36 @@ class SyncService {
   ) async {
     debugPrint('[Sync] _syncDirectory: $dirPath');
     final List<Article> articles = [];
-    final prefix = '$dirPath/';
+    final prefix = _prefixForRemoteKind(remoteKind);
 
     await _traverseDirectory(dirPath, prefix, status, remoteKind, articles);
 
     debugPrint('[Sync] $dirPath -> ${articles.length} articles total');
     return articles;
+  }
+
+  ArticleRemoteKind? _remoteKindForPath(String remotePath) {
+    if (remotePath.startsWith('source/_posts/')) {
+      return ArticleRemoteKind.post;
+    }
+    if (remotePath.startsWith('source/_drafts/')) {
+      return ArticleRemoteKind.repoDraft;
+    }
+    return null;
+  }
+
+  String _prefixForRemoteKind(ArticleRemoteKind remoteKind) {
+    return switch (remoteKind) {
+      ArticleRemoteKind.post => 'source/_posts/',
+      ArticleRemoteKind.repoDraft => 'source/_drafts/',
+    };
+  }
+
+  ArticleStatus _statusForRemoteKind(ArticleRemoteKind remoteKind) {
+    return switch (remoteKind) {
+      ArticleRemoteKind.post => ArticleStatus.synced,
+      ArticleRemoteKind.repoDraft => ArticleStatus.repoDraft,
+    };
   }
 
   Future<void> _traverseDirectory(

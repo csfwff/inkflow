@@ -6,6 +6,7 @@ import '../main.dart';
 import '../models/article.dart';
 import '../services/github_service.dart';
 import '../services/image_host/image_host_service.dart';
+import '../services/sync_service.dart';
 import '../widgets/responsive.dart';
 import 'metadata_page.dart';
 
@@ -220,6 +221,17 @@ class _EditorPageState extends State<EditorPage> {
     );
   }
 
+  ArticleStatus _statusAfterLocalSave(Article article) {
+    return switch (article.status) {
+      ArticleStatus.synced ||
+      ArticleStatus.repoDraft ||
+      ArticleStatus.pendingPublish =>
+        ArticleStatus.pendingPublish,
+      ArticleStatus.draft => ArticleStatus.draft,
+      ArticleStatus.remoteDeleted => ArticleStatus.remoteDeleted,
+    };
+  }
+
   Future<void> _openMetadata() async {
     final saved = await _saveDraft(showMessage: false);
     if (!saved || !mounted || _editingArticle == null) return;
@@ -252,6 +264,7 @@ class _EditorPageState extends State<EditorPage> {
 
     final article = _buildArticle();
     if (_editingArticle != null) {
+      article.status = _statusAfterLocalSave(_editingArticle!);
       article.updatedAt = DateTime.now();
       await articleService.update(article);
       _editingArticle = article;
@@ -387,6 +400,81 @@ class _EditorPageState extends State<EditorPage> {
     );
   }
 
+  Future<void> _restoreFromRemote() async {
+    final article = _editingArticle;
+    if (article == null ||
+        article.status != ArticleStatus.pendingPublish ||
+        article.effectiveRemotePath == null) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(_label('从远端覆盖', 'Restore from remote')),
+        content: Text(_label(
+          '这会放弃本地未发布修改，并用远端最新内容覆盖当前文章。',
+          'This discards local unpublished changes and replaces this article with the latest remote content.',
+        )),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(AppStrings.current.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(_label('覆盖本地', 'Restore')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final settings = settingsService.settings;
+    if (settings.githubToken.isEmpty ||
+        settings.githubOwner.isEmpty ||
+        settings.githubRepo.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.current.githubNotConfigured)),
+      );
+      return;
+    }
+
+    final github = GitHubService(
+      token: settings.githubToken,
+      owner: settings.githubOwner,
+      repo: settings.githubRepo,
+      branch: settings.githubBranch,
+    );
+    final sync = SyncService(github: github, articleService: articleService);
+    final remoteArticle = await sync.fetchRemoteArticle(article);
+
+    if (!mounted) return;
+    if (remoteArticle == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_label(
+            '远端文件不存在或读取失败',
+            'Remote file does not exist or could not be read',
+          )),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    await articleService.replaceWithRemote(remoteArticle);
+    if (article.id != null) {
+      await _loadArticle(article.id!);
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(_label('已从远端覆盖本地', 'Restored from remote'))),
+    );
+  }
+
   Future<void> _pickAndUploadImage() async {
     // Check image host config
     final imageHost = ImageHostService(settings: settingsService.settings);
@@ -483,6 +571,13 @@ class _EditorPageState extends State<EditorPage> {
     }
 
     return [
+      if (_editingArticle?.status == ArticleStatus.pendingPublish &&
+          _editingArticle?.effectiveRemotePath != null)
+        IconButton(
+          onPressed: _restoreFromRemote,
+          icon: const Icon(Icons.cloud_download_outlined),
+          tooltip: _label('从远端覆盖', 'Restore from remote'),
+        ),
       IconButton(
         onPressed: _openMetadata,
         icon: const Icon(Icons.tune),
@@ -957,7 +1052,8 @@ class _EditorPageState extends State<EditorPage> {
     return switch (article.status) {
       ArticleStatus.synced => s.synced,
       ArticleStatus.repoDraft => s.repoDraft,
-      ArticleStatus.draft when article.githubSha != null => s.remoteDeleted,
+      ArticleStatus.pendingPublish => s.pendingPublish,
+      ArticleStatus.remoteDeleted => s.remoteDeleted,
       ArticleStatus.draft => s.draftStatus,
     };
   }
@@ -969,8 +1065,8 @@ class _EditorPageState extends State<EditorPage> {
     return switch (article.status) {
       ArticleStatus.synced => Icons.cloud_done,
       ArticleStatus.repoDraft => Icons.drafts_outlined,
-      ArticleStatus.draft when article.githubSha != null =>
-        Icons.cloud_off_outlined,
+      ArticleStatus.pendingPublish => Icons.cloud_upload_outlined,
+      ArticleStatus.remoteDeleted => Icons.cloud_off_outlined,
       ArticleStatus.draft => Icons.edit_note,
     };
   }
@@ -982,8 +1078,8 @@ class _EditorPageState extends State<EditorPage> {
     return switch (article.status) {
       ArticleStatus.synced => const Color(0xFF2F7D57),
       ArticleStatus.repoDraft => const Color(0xFF9A6A1F),
-      ArticleStatus.draft when article.githubSha != null =>
-        const Color(0xFFB64B45),
+      ArticleStatus.pendingPublish => const Color(0xFF7A5CDB),
+      ArticleStatus.remoteDeleted => const Color(0xFFB64B45),
       ArticleStatus.draft => const Color(0xFF6F7672),
     };
   }

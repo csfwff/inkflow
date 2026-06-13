@@ -68,6 +68,7 @@ class AppStrings {
   final String saveDraft;
   final String synced;
   final String draftStatus;
+  final String pendingPublish;
   final String syncFromGitHub;
   final String syncSuccess;
   final String syncFailed;
@@ -162,6 +163,7 @@ class AppStrings {
     required this.saveDraft,
     required this.synced,
     required this.draftStatus,
+    required this.pendingPublish,
     required this.syncFromGitHub,
     required this.syncSuccess,
     required this.syncFailed,
@@ -255,6 +257,7 @@ class AppStrings {
     saveDraft: 'Save Draft',
     synced: 'Synced',
     draftStatus: 'Draft',
+    pendingPublish: 'Pending Publish',
     syncFromGitHub: 'Sync from GitHub',
     syncSuccess: 'Sync complete',
     syncFailed: 'Sync failed',
@@ -348,6 +351,7 @@ class AppStrings {
     saveDraft: '保存草稿',
     synced: '已同步',
     draftStatus: '草稿',
+    pendingPublish: '待发布',
     syncFromGitHub: '从 GitHub 同步',
     syncSuccess: '同步完成',
     syncFailed: '同步失败',

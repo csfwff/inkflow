@@ -1,4 +1,4 @@
-enum ArticleStatus { draft, synced, repoDraft }
+enum ArticleStatus { draft, synced, repoDraft, pendingPublish, remoteDeleted }
 
 enum ArticleRemoteKind { post, repoDraft }
 
@@ -144,6 +144,9 @@ class Article {
         return ArticleRemoteKind.post;
       case ArticleStatus.repoDraft:
         return ArticleRemoteKind.repoDraft;
+      case ArticleStatus.pendingPublish:
+      case ArticleStatus.remoteDeleted:
+        return null;
       case ArticleStatus.draft:
         return null;
     }

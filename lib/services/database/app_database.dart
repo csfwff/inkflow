@@ -36,7 +36,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -65,6 +65,15 @@ class AppDatabase extends _$AppDatabase {
                   ELSE remote_kind
                 END
               WHERE github_sha IS NOT NULL AND github_sha <> ''
+            ''');
+          }
+          if (from < 3) {
+            await m.database.customStatement('''
+              UPDATE article_rows
+              SET status = ${ArticleStatus.remoteDeleted.index}
+              WHERE status = ${ArticleStatus.draft.index}
+                AND github_sha IS NOT NULL
+                AND github_sha <> ''
             ''');
           }
         },

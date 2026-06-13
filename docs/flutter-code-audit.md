@@ -112,6 +112,8 @@
 
 优先级：高
 
+状态：已修复。当前 `schemaVersion` 已升级到 2，迁移逻辑使用 `addColumn` 和数据回填，不再删除 `article_rows`。
+
 相关位置：
 
 - `lib/services/database/app_database.dart`
@@ -119,7 +121,7 @@
 
 问题：
 
-- `onUpgrade` 直接执行 `DROP TABLE IF EXISTS article_rows`。
+- 旧实现中 `onUpgrade` 直接执行 `DROP TABLE IF EXISTS article_rows`。
 - 后续任何 `schemaVersion` 增加都会清空用户本地文章。
 
 建议修复：
@@ -184,15 +186,24 @@
 
 建议修复：
 
-- 增加状态，例如 `modified` / `pendingSync`。
-- 本地保存已同步文章时，把状态改为待发布。
-- 同步远端内容前检测本地是否有未发布修改。
+- 增加显式状态：
+  - `pendingPublish`：本地修改，待发布。
+  - `remoteDeleted`：远程已删除，本地保留。
+- 本地保存已同步文章或仓库草稿时，把状态改为 `pendingPublish`，并保留 `remotePath`、`remoteKind`、`githubSha`。
+- 同步远端内容前检测本地是否为 `pendingPublish`，是则不静默覆盖。
+- 远端消失时，普通 `synced/repoDraft` 改为 `remoteDeleted`。
+- 规划一个“从远端覆盖本地/放弃本地修改”的显式操作：
+  - 仅对 `pendingPublish` 且仍存在远端文件的文章展示。
+  - 点击后拉取 `remotePath` 最新内容，用远端内容覆盖本地内容和 metadata。
+  - 状态恢复为 `synced` 或 `repoDraft`，`githubSha` 更新为远端最新 sha。
+  - 如果远端已经不存在，提示远端文件不存在，不覆盖本地内容。
 - 基于 `githubSha` 或 `updatedAt` 做冲突提示。
 
 验收标准：
 
 - 修改已同步文章并保存后，列表和编辑页显示“待发布/本地修改”。
 - 拉取远端时不会静默覆盖本地未发布内容。
+- 用户可以通过显式操作放弃本地修改，并从远端覆盖本地。
 - 成功发布后状态恢复为 `synced`。
 
 ### AUDIT-006：Frontmatter 解析和生成不够可靠
@@ -353,9 +364,9 @@
 
 - [x] AUDIT-001
 - [x] AUDIT-002
-- [ ] AUDIT-003
+- [x] AUDIT-003
 - [ ] AUDIT-004
-- [ ] AUDIT-005
+- [x] AUDIT-005
 - [ ] AUDIT-006
 - [ ] AUDIT-007
 - [ ] AUDIT-008

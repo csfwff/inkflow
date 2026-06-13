@@ -46,23 +46,45 @@ class ArticleService {
   Future<List<Article>> getRepoDrafts() =>
       getAll(status: ArticleStatus.repoDraft);
 
-  Future<List<Article>> getSyncedAndRepoDrafts() async {
+  Future<List<Article>> getRemoteTracked() async {
     final rows = await (_db.select(_db.articleRows)
           ..where((t) =>
               t.status.equalsValue(ArticleStatus.synced) |
-              t.status.equalsValue(ArticleStatus.repoDraft))
+              t.status.equalsValue(ArticleStatus.repoDraft) |
+              t.status.equalsValue(ArticleStatus.pendingPublish))
           ..orderBy([(t) => OrderingTerm.desc(t.date)]))
         .get();
     return rows.map(articleFromRow).toList();
   }
 
+  Future<List<Article>> getSyncedAndRepoDrafts() => getRemoteTracked();
+
   Future<void> upsertFromGitHub(Article article) async {
     final existing = await _findExistingRemoteArticle(article);
 
     if (existing != null) {
-      await (_db.update(_db.articleRows)
-            ..where((t) => t.id.equals(existing.id)))
-          .write(ArticleRowsCompanion(
+      if (existing.status == ArticleStatus.pendingPublish) {
+        return;
+      }
+
+      await _writeRemoteArticle(existing.id, article);
+    } else {
+      await _db.into(_db.articleRows).insert(toCompanion(article));
+    }
+  }
+
+  Future<void> replaceWithRemote(Article article) async {
+    final existing = await _findExistingRemoteArticle(article);
+    if (existing != null) {
+      await _writeRemoteArticle(existing.id, article);
+    } else {
+      await _db.into(_db.articleRows).insert(toCompanion(article));
+    }
+  }
+
+  Future<void> _writeRemoteArticle(int id, Article article) async {
+    await (_db.update(_db.articleRows)..where((t) => t.id.equals(id))).write(
+      ArticleRowsCompanion(
         title: Value(article.title),
         content: Value(article.content),
         date: Value(article.date.toIso8601String()),
@@ -84,10 +106,8 @@ class ArticleService {
         excerpt: Value(article.excerpt),
         description: Value(article.description),
         author: Value(article.author),
-      ));
-    } else {
-      await _db.into(_db.articleRows).insert(toCompanion(article));
-    }
+      ),
+    );
   }
 
   Future<ArticleRow?> _findExistingRemoteArticle(Article article) async {
@@ -146,6 +166,27 @@ class ArticleService {
     await (_db.update(_db.articleRows)..where((t) => t.id.equals(id))).write(
       ArticleRowsCompanion(
         status: const Value(ArticleStatus.draft),
+        remotePath: const Value(null),
+        remoteKind: const Value(null),
+        githubSha: const Value(null),
+        updatedAt: Value(DateTime.now().toIso8601String()),
+      ),
+    );
+  }
+
+  Future<void> markAsPendingPublish(int id) async {
+    await (_db.update(_db.articleRows)..where((t) => t.id.equals(id))).write(
+      ArticleRowsCompanion(
+        status: const Value(ArticleStatus.pendingPublish),
+        updatedAt: Value(DateTime.now().toIso8601String()),
+      ),
+    );
+  }
+
+  Future<void> markAsRemoteDeleted(int id) async {
+    await (_db.update(_db.articleRows)..where((t) => t.id.equals(id))).write(
+      ArticleRowsCompanion(
+        status: const Value(ArticleStatus.remoteDeleted),
         updatedAt: Value(DateTime.now().toIso8601String()),
       ),
     );
