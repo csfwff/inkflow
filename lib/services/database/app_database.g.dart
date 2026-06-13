@@ -58,6 +58,18 @@ class $ArticleRowsTable extends ArticleRows
       type: DriftSqlType.string,
       requiredDuringInsert: false,
       defaultValue: const Constant(''));
+  static const VerificationMeta _remotePathMeta =
+      const VerificationMeta('remotePath');
+  @override
+  late final GeneratedColumn<String> remotePath = GeneratedColumn<String>(
+      'remote_path', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  @override
+  late final GeneratedColumnWithTypeConverter<ArticleRemoteKind?, int>
+      remoteKind = GeneratedColumn<int>('remote_kind', aliasedName, true,
+              type: DriftSqlType.int, requiredDuringInsert: false)
+          .withConverter<ArticleRemoteKind?>(
+              $ArticleRowsTable.$converterremoteKindn);
   static const VerificationMeta _githubShaMeta =
       const VerificationMeta('githubSha');
   @override
@@ -154,6 +166,8 @@ class $ArticleRowsTable extends ArticleRows
         slug,
         status,
         filePath,
+        remotePath,
+        remoteKind,
         githubSha,
         createdAt,
         updatedAt,
@@ -203,6 +217,12 @@ class $ArticleRowsTable extends ArticleRows
     if (data.containsKey('file_path')) {
       context.handle(_filePathMeta,
           filePath.isAcceptableOrUnknown(data['file_path']!, _filePathMeta));
+    }
+    if (data.containsKey('remote_path')) {
+      context.handle(
+          _remotePathMeta,
+          remotePath.isAcceptableOrUnknown(
+              data['remote_path']!, _remotePathMeta));
     }
     if (data.containsKey('github_sha')) {
       context.handle(_githubShaMeta,
@@ -292,6 +312,11 @@ class $ArticleRowsTable extends ArticleRows
           .read(DriftSqlType.int, data['${effectivePrefix}status'])!),
       filePath: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}file_path'])!,
+      remotePath: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}remote_path']),
+      remoteKind: $ArticleRowsTable.$converterremoteKindn.fromSql(
+          attachedDatabase.typeMapping
+              .read(DriftSqlType.int, data['${effectivePrefix}remote_kind'])),
       githubSha: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}github_sha']),
       createdAt: attachedDatabase.typeMapping
@@ -330,6 +355,11 @@ class $ArticleRowsTable extends ArticleRows
 
   static JsonTypeConverter2<ArticleStatus, int, int> $converterstatus =
       const EnumIndexConverter<ArticleStatus>(ArticleStatus.values);
+  static JsonTypeConverter2<ArticleRemoteKind, int, int> $converterremoteKind =
+      const EnumIndexConverter<ArticleRemoteKind>(ArticleRemoteKind.values);
+  static JsonTypeConverter2<ArticleRemoteKind?, int?, int?>
+      $converterremoteKindn =
+      JsonTypeConverter2.asNullable($converterremoteKind);
 }
 
 class ArticleRow extends DataClass implements Insertable<ArticleRow> {
@@ -340,6 +370,8 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
   final String slug;
   final ArticleStatus status;
   final String filePath;
+  final String? remotePath;
+  final ArticleRemoteKind? remoteKind;
   final String? githubSha;
   final String createdAt;
   final String updatedAt;
@@ -362,6 +394,8 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
       required this.slug,
       required this.status,
       required this.filePath,
+      this.remotePath,
+      this.remoteKind,
       this.githubSha,
       required this.createdAt,
       required this.updatedAt,
@@ -389,6 +423,13 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
           Variable<int>($ArticleRowsTable.$converterstatus.toSql(status));
     }
     map['file_path'] = Variable<String>(filePath);
+    if (!nullToAbsent || remotePath != null) {
+      map['remote_path'] = Variable<String>(remotePath);
+    }
+    if (!nullToAbsent || remoteKind != null) {
+      map['remote_kind'] = Variable<int>(
+          $ArticleRowsTable.$converterremoteKindn.toSql(remoteKind));
+    }
     if (!nullToAbsent || githubSha != null) {
       map['github_sha'] = Variable<String>(githubSha);
     }
@@ -431,6 +472,12 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
       slug: Value(slug),
       status: Value(status),
       filePath: Value(filePath),
+      remotePath: remotePath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(remotePath),
+      remoteKind: remoteKind == null && nullToAbsent
+          ? const Value.absent()
+          : Value(remoteKind),
       githubSha: githubSha == null && nullToAbsent
           ? const Value.absent()
           : Value(githubSha),
@@ -472,6 +519,9 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
       status: $ArticleRowsTable.$converterstatus
           .fromJson(serializer.fromJson<int>(json['status'])),
       filePath: serializer.fromJson<String>(json['filePath']),
+      remotePath: serializer.fromJson<String?>(json['remotePath']),
+      remoteKind: $ArticleRowsTable.$converterremoteKindn
+          .fromJson(serializer.fromJson<int?>(json['remoteKind'])),
       githubSha: serializer.fromJson<String?>(json['githubSha']),
       createdAt: serializer.fromJson<String>(json['createdAt']),
       updatedAt: serializer.fromJson<String>(json['updatedAt']),
@@ -500,6 +550,9 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
       'status': serializer
           .toJson<int>($ArticleRowsTable.$converterstatus.toJson(status)),
       'filePath': serializer.toJson<String>(filePath),
+      'remotePath': serializer.toJson<String?>(remotePath),
+      'remoteKind': serializer.toJson<int?>(
+          $ArticleRowsTable.$converterremoteKindn.toJson(remoteKind)),
       'githubSha': serializer.toJson<String?>(githubSha),
       'createdAt': serializer.toJson<String>(createdAt),
       'updatedAt': serializer.toJson<String>(updatedAt),
@@ -525,6 +578,8 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
           String? slug,
           ArticleStatus? status,
           String? filePath,
+          Value<String?> remotePath = const Value.absent(),
+          Value<ArticleRemoteKind?> remoteKind = const Value.absent(),
           Value<String?> githubSha = const Value.absent(),
           String? createdAt,
           String? updatedAt,
@@ -547,6 +602,8 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
         slug: slug ?? this.slug,
         status: status ?? this.status,
         filePath: filePath ?? this.filePath,
+        remotePath: remotePath.present ? remotePath.value : this.remotePath,
+        remoteKind: remoteKind.present ? remoteKind.value : this.remoteKind,
         githubSha: githubSha.present ? githubSha.value : this.githubSha,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
@@ -571,6 +628,10 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
       slug: data.slug.present ? data.slug.value : this.slug,
       status: data.status.present ? data.status.value : this.status,
       filePath: data.filePath.present ? data.filePath.value : this.filePath,
+      remotePath:
+          data.remotePath.present ? data.remotePath.value : this.remotePath,
+      remoteKind:
+          data.remoteKind.present ? data.remoteKind.value : this.remoteKind,
       githubSha: data.githubSha.present ? data.githubSha.value : this.githubSha,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -600,6 +661,8 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
           ..write('slug: $slug, ')
           ..write('status: $status, ')
           ..write('filePath: $filePath, ')
+          ..write('remotePath: $remotePath, ')
+          ..write('remoteKind: $remoteKind, ')
           ..write('githubSha: $githubSha, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -627,6 +690,8 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
         slug,
         status,
         filePath,
+        remotePath,
+        remoteKind,
         githubSha,
         createdAt,
         updatedAt,
@@ -653,6 +718,8 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
           other.slug == this.slug &&
           other.status == this.status &&
           other.filePath == this.filePath &&
+          other.remotePath == this.remotePath &&
+          other.remoteKind == this.remoteKind &&
           other.githubSha == this.githubSha &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
@@ -677,6 +744,8 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
   final Value<String> slug;
   final Value<ArticleStatus> status;
   final Value<String> filePath;
+  final Value<String?> remotePath;
+  final Value<ArticleRemoteKind?> remoteKind;
   final Value<String?> githubSha;
   final Value<String> createdAt;
   final Value<String> updatedAt;
@@ -699,6 +768,8 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
     this.slug = const Value.absent(),
     this.status = const Value.absent(),
     this.filePath = const Value.absent(),
+    this.remotePath = const Value.absent(),
+    this.remoteKind = const Value.absent(),
     this.githubSha = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -722,6 +793,8 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
     this.slug = const Value.absent(),
     required ArticleStatus status,
     this.filePath = const Value.absent(),
+    this.remotePath = const Value.absent(),
+    this.remoteKind = const Value.absent(),
     this.githubSha = const Value.absent(),
     required String createdAt,
     required String updatedAt,
@@ -748,6 +821,8 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
     Expression<String>? slug,
     Expression<int>? status,
     Expression<String>? filePath,
+    Expression<String>? remotePath,
+    Expression<int>? remoteKind,
     Expression<String>? githubSha,
     Expression<String>? createdAt,
     Expression<String>? updatedAt,
@@ -771,6 +846,8 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
       if (slug != null) 'slug': slug,
       if (status != null) 'status': status,
       if (filePath != null) 'file_path': filePath,
+      if (remotePath != null) 'remote_path': remotePath,
+      if (remoteKind != null) 'remote_kind': remoteKind,
       if (githubSha != null) 'github_sha': githubSha,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -796,6 +873,8 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
       Value<String>? slug,
       Value<ArticleStatus>? status,
       Value<String>? filePath,
+      Value<String?>? remotePath,
+      Value<ArticleRemoteKind?>? remoteKind,
       Value<String?>? githubSha,
       Value<String>? createdAt,
       Value<String>? updatedAt,
@@ -818,6 +897,8 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
       slug: slug ?? this.slug,
       status: status ?? this.status,
       filePath: filePath ?? this.filePath,
+      remotePath: remotePath ?? this.remotePath,
+      remoteKind: remoteKind ?? this.remoteKind,
       githubSha: githubSha ?? this.githubSha,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -859,6 +940,13 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
     }
     if (filePath.present) {
       map['file_path'] = Variable<String>(filePath.value);
+    }
+    if (remotePath.present) {
+      map['remote_path'] = Variable<String>(remotePath.value);
+    }
+    if (remoteKind.present) {
+      map['remote_kind'] = Variable<int>(
+          $ArticleRowsTable.$converterremoteKindn.toSql(remoteKind.value));
     }
     if (githubSha.present) {
       map['github_sha'] = Variable<String>(githubSha.value);
@@ -915,6 +1003,8 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
           ..write('slug: $slug, ')
           ..write('status: $status, ')
           ..write('filePath: $filePath, ')
+          ..write('remotePath: $remotePath, ')
+          ..write('remoteKind: $remoteKind, ')
           ..write('githubSha: $githubSha, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -954,6 +1044,8 @@ typedef $$ArticleRowsTableCreateCompanionBuilder = ArticleRowsCompanion
   Value<String> slug,
   required ArticleStatus status,
   Value<String> filePath,
+  Value<String?> remotePath,
+  Value<ArticleRemoteKind?> remoteKind,
   Value<String?> githubSha,
   required String createdAt,
   required String updatedAt,
@@ -978,6 +1070,8 @@ typedef $$ArticleRowsTableUpdateCompanionBuilder = ArticleRowsCompanion
   Value<String> slug,
   Value<ArticleStatus> status,
   Value<String> filePath,
+  Value<String?> remotePath,
+  Value<ArticleRemoteKind?> remoteKind,
   Value<String?> githubSha,
   Value<String> createdAt,
   Value<String> updatedAt,
@@ -1025,6 +1119,14 @@ class $$ArticleRowsTableFilterComposer
 
   ColumnFilters<String> get filePath => $composableBuilder(
       column: $table.filePath, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get remotePath => $composableBuilder(
+      column: $table.remotePath, builder: (column) => ColumnFilters(column));
+
+  ColumnWithTypeConverterFilters<ArticleRemoteKind?, ArticleRemoteKind, int>
+      get remoteKind => $composableBuilder(
+          column: $table.remoteKind,
+          builder: (column) => ColumnWithTypeConverterFilters(column));
 
   ColumnFilters<String> get githubSha => $composableBuilder(
       column: $table.githubSha, builder: (column) => ColumnFilters(column));
@@ -1099,6 +1201,12 @@ class $$ArticleRowsTableOrderingComposer
   ColumnOrderings<String> get filePath => $composableBuilder(
       column: $table.filePath, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get remotePath => $composableBuilder(
+      column: $table.remotePath, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get remoteKind => $composableBuilder(
+      column: $table.remoteKind, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get githubSha => $composableBuilder(
       column: $table.githubSha, builder: (column) => ColumnOrderings(column));
 
@@ -1171,6 +1279,13 @@ class $$ArticleRowsTableAnnotationComposer
 
   GeneratedColumn<String> get filePath =>
       $composableBuilder(column: $table.filePath, builder: (column) => column);
+
+  GeneratedColumn<String> get remotePath => $composableBuilder(
+      column: $table.remotePath, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<ArticleRemoteKind?, int> get remoteKind =>
+      $composableBuilder(
+          column: $table.remoteKind, builder: (column) => column);
 
   GeneratedColumn<String> get githubSha =>
       $composableBuilder(column: $table.githubSha, builder: (column) => column);
@@ -1245,6 +1360,8 @@ class $$ArticleRowsTableTableManager extends RootTableManager<
             Value<String> slug = const Value.absent(),
             Value<ArticleStatus> status = const Value.absent(),
             Value<String> filePath = const Value.absent(),
+            Value<String?> remotePath = const Value.absent(),
+            Value<ArticleRemoteKind?> remoteKind = const Value.absent(),
             Value<String?> githubSha = const Value.absent(),
             Value<String> createdAt = const Value.absent(),
             Value<String> updatedAt = const Value.absent(),
@@ -1268,6 +1385,8 @@ class $$ArticleRowsTableTableManager extends RootTableManager<
             slug: slug,
             status: status,
             filePath: filePath,
+            remotePath: remotePath,
+            remoteKind: remoteKind,
             githubSha: githubSha,
             createdAt: createdAt,
             updatedAt: updatedAt,
@@ -1291,6 +1410,8 @@ class $$ArticleRowsTableTableManager extends RootTableManager<
             Value<String> slug = const Value.absent(),
             required ArticleStatus status,
             Value<String> filePath = const Value.absent(),
+            Value<String?> remotePath = const Value.absent(),
+            Value<ArticleRemoteKind?> remoteKind = const Value.absent(),
             Value<String?> githubSha = const Value.absent(),
             required String createdAt,
             required String updatedAt,
@@ -1314,6 +1435,8 @@ class $$ArticleRowsTableTableManager extends RootTableManager<
             slug: slug,
             status: status,
             filePath: filePath,
+            remotePath: remotePath,
+            remoteKind: remoteKind,
             githubSha: githubSha,
             createdAt: createdAt,
             updatedAt: updatedAt,

@@ -70,7 +70,8 @@ class _EditorPageState extends State<EditorPage> {
     if (article != null && mounted) {
       final body = article.bodyContent;
       // 保留原始 frontmatter（含不支持的字段）
-      final fmMatch = RegExp(r'^---\s*\n(.*?)\n---\s*\n', dotAll: true).firstMatch(article.content);
+      final fmMatch = RegExp(r'^---\s*\n(.*?)\n---\s*\n', dotAll: true)
+          .firstMatch(article.content);
       _updatingFields = true;
       setState(() {
         _editingArticle = article;
@@ -102,9 +103,28 @@ class _EditorPageState extends State<EditorPage> {
   String _safeSlug(String title) {
     var slug = _slugify(title);
     const reserved = {
-      'con', 'prn', 'aux', 'nul',
-      'com1', 'com2', 'com3', 'com4', 'com5', 'com6', 'com7', 'com8', 'com9',
-      'lpt1', 'lpt2', 'lpt3', 'lpt4', 'lpt5', 'lpt6', 'lpt7', 'lpt8', 'lpt9',
+      'con',
+      'prn',
+      'aux',
+      'nul',
+      'com1',
+      'com2',
+      'com3',
+      'com4',
+      'com5',
+      'com6',
+      'com7',
+      'com8',
+      'com9',
+      'lpt1',
+      'lpt2',
+      'lpt3',
+      'lpt4',
+      'lpt5',
+      'lpt6',
+      'lpt7',
+      'lpt8',
+      'lpt9',
     };
     if (reserved.contains(slug)) {
       slug = 'post-$slug';
@@ -115,7 +135,8 @@ class _EditorPageState extends State<EditorPage> {
     return slug;
   }
 
-  String _resolvePathPattern(String pattern, {
+  String _resolvePathPattern(
+    String pattern, {
     required String slug,
     String category = '',
     bool appendSlug = true,
@@ -181,6 +202,8 @@ class _EditorPageState extends State<EditorPage> {
       slug: slug,
       status: _editingArticle?.status ?? ArticleStatus.draft,
       filePath: filePath,
+      remotePath: _editingArticle?.remotePath,
+      remoteKind: _editingArticle?.remoteKind,
       githubSha: _editingArticle?.githubSha,
       createdAt: _editingArticle?.createdAt,
       tags: _editingArticle?.tags ?? [],
@@ -204,7 +227,8 @@ class _EditorPageState extends State<EditorPage> {
     final result = await Navigator.push<Article>(
       context,
       MaterialPageRoute(
-        builder: (_) => MetadataPage(article: _editingArticle!, settingsService: settingsService),
+        builder: (_) => MetadataPage(
+            article: _editingArticle!, settingsService: settingsService),
       ),
     );
 
@@ -283,26 +307,54 @@ class _EditorPageState extends State<EditorPage> {
 
     final targetStatus =
         drafts ? ArticleStatus.repoDraft : ArticleStatus.synced;
+    final targetRemoteKind =
+        drafts ? ArticleRemoteKind.repoDraft : ArticleRemoteKind.post;
+    final targetRemotePath = Article.buildRemotePath(
+      kind: targetRemoteKind,
+      filePath: fileName,
+    );
+    final previousRemotePath = _editingArticle?.effectiveRemotePath;
+    final previousSha = _editingArticle?.githubSha;
     final commitPrefix = drafts ? 'draft' : 'post';
 
     GitHubResult result;
 
-    if (_editingArticle?.githubSha != null &&
-        _editingArticle!.githubSha!.isNotEmpty) {
-      result = await service.updatePost(
-        filePath: fileName,
+    if (previousSha != null &&
+        previousSha.isNotEmpty &&
+        previousRemotePath == targetRemotePath) {
+      result = await service.updateFile(
+        remotePath: targetRemotePath,
         content: fullContent,
-        sha: _editingArticle!.githubSha!,
+        sha: previousSha,
         commitMessage: '$commitPrefix: update $title',
-        drafts: drafts,
       );
     } else {
-      result = await service.createPost(
-        fileName: fileName,
+      result = await service.createFile(
+        remotePath: targetRemotePath,
         content: fullContent,
         commitMessage: '$commitPrefix: $title',
-        drafts: drafts,
       );
+
+      if (result.success &&
+          previousRemotePath != null &&
+          previousRemotePath != targetRemotePath &&
+          previousSha != null &&
+          previousSha.isNotEmpty) {
+        final deleteResult = await service.deleteFile(
+          remotePath: previousRemotePath,
+          sha: previousSha,
+          commitMessage: '$commitPrefix: remove old $title',
+        );
+        if (!deleteResult.success) {
+          result = GitHubResult(
+            success: false,
+            message:
+                '${_label('新文件已创建，但旧远程文件删除失败', 'Created new file, but failed to delete old remote file')}: ${deleteResult.message}',
+            fileUrl: result.fileUrl,
+            sha: result.sha,
+          );
+        }
+      }
     }
 
     if (!mounted) return;
@@ -310,6 +362,8 @@ class _EditorPageState extends State<EditorPage> {
 
     if (result.success) {
       article.status = targetStatus;
+      article.remotePath = targetRemotePath;
+      article.remoteKind = targetRemoteKind;
       article.githubSha = result.sha;
 
       if (_editingArticle != null) {
@@ -339,7 +393,9 @@ class _EditorPageState extends State<EditorPage> {
     if (!imageHost.isConfigured) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_label('请先在设置中配置图床', 'Please configure image host in settings'))),
+        SnackBar(
+            content: Text(_label(
+                '请先在设置中配置图床', 'Please configure image host in settings'))),
       );
       return;
     }
@@ -459,8 +515,8 @@ class _EditorPageState extends State<EditorPage> {
       builder: (context, constraints) {
         // 内容区至少填满「视口 - 吸顶工具条」，保证空文档也有完整的编辑/预览区域，
         // 内容变长后整页可上滑、工具条吸顶。
-        final fillHeight =
-            (constraints.maxHeight - _kEditorToolbarHeight).clamp(0.0, double.infinity);
+        final fillHeight = (constraints.maxHeight - _kEditorToolbarHeight)
+            .clamp(0.0, double.infinity);
         return CustomScrollView(
           slivers: [
             // 标题、编辑/预览切换：随页面一起上滑
@@ -632,9 +688,7 @@ class _EditorPageState extends State<EditorPage> {
                       _insertBlock('```\n${_label('代码', 'code')}\n```'),
                 ),
                 _ToolButton(
-                  icon: _uploading
-                      ? Icons.hourglass_top
-                      : Icons.image_outlined,
+                  icon: _uploading ? Icons.hourglass_top : Icons.image_outlined,
                   tooltip: _label('插入图片', 'Insert image'),
                   onPressed: _uploading ? null : () => _pickAndUploadImage(),
                 ),
@@ -810,8 +864,7 @@ class _EditorPageState extends State<EditorPage> {
         text.substring(end, afterEnd) == suffix) {
       // Already wrapped → unwrap
       final inner = text.substring(start, end);
-      final nextText =
-          text.replaceRange(beforeStart, afterEnd, inner);
+      final nextText = text.replaceRange(beforeStart, afterEnd, inner);
       _contentCtrl.value = value.copyWith(
         text: nextText,
         selection: TextSelection(
@@ -1159,7 +1212,12 @@ class _HeadingButton extends StatelessWidget {
       newCursorOffset = lineStart;
     }
 
-    final nextText = text.replaceRange(lineStart, text.indexOf('\n', lineStart) < 0 ? text.length : text.indexOf('\n', lineStart), newLine);
+    final nextText = text.replaceRange(
+        lineStart,
+        text.indexOf('\n', lineStart) < 0
+            ? text.length
+            : text.indexOf('\n', lineStart),
+        newLine);
     contentCtrl.value = contentCtrl.value.copyWith(
       text: nextText,
       selection: TextSelection.collapsed(offset: newCursorOffset),

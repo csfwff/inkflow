@@ -37,6 +37,19 @@ class GitHubService {
     final dir = drafts ? 'source/_drafts' : 'source/_posts';
     final path = '$dir/$fileName';
     final message = commitMessage ?? 'post: add $fileName';
+    return createFile(
+      remotePath: path,
+      content: content,
+      commitMessage: message,
+    );
+  }
+
+  Future<GitHubResult> createFile({
+    required String remotePath,
+    required String content,
+    String? commitMessage,
+  }) async {
+    final message = commitMessage ?? 'post: add $remotePath';
     final encodedContent = base64Encode(utf8.encode(content));
 
     final body = jsonEncode({
@@ -45,7 +58,7 @@ class GitHubService {
       'branch': branch,
     });
 
-    final url = Uri.parse('$_baseUrl/$path');
+    final url = Uri.parse('$_baseUrl/$remotePath');
 
     try {
       final response = await http.put(url, headers: _headers, body: body);
@@ -62,7 +75,8 @@ class GitHubService {
         final data = jsonDecode(response.body);
         return GitHubResult(
           success: false,
-          message: '${AppStrings.current.publishFailed}: ${data['message'] ?? response.statusCode}',
+          message:
+              '${AppStrings.current.publishFailed}: ${data['message'] ?? response.statusCode}',
         );
       }
     } catch (e) {
@@ -73,23 +87,45 @@ class GitHubService {
     }
   }
 
-  Future<List<GitHubFileEntry>> listDirectoryContents(String path) async {
+  Future<GitHubDirectoryResult> listDirectoryContents(String path) async {
     final url = Uri.parse('$_baseUrl/$path');
     debugPrint('[GitHub] GET $url');
     try {
       final response = await http.get(url, headers: _headers);
       debugPrint('[GitHub] ${response.statusCode} $path');
       if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
+        final data = jsonDecode(response.body);
+        if (data is! List) {
+          final error = 'Expected a directory at $path';
+          debugPrint('[GitHub] ERROR: $error');
+          return GitHubDirectoryResult.failure(error);
+        }
         debugPrint('[GitHub] $path -> ${data.length} entries');
-        return data.map((e) => GitHubFileEntry.fromJson(e)).toList();
-      } else {
-        debugPrint('[GitHub] ERROR ${response.statusCode}: ${response.body}');
+        return GitHubDirectoryResult.success(
+          data.map((e) => GitHubFileEntry.fromJson(e)).toList(),
+        );
       }
+
+      final error =
+          '${response.statusCode}: ${_extractGitHubMessage(response.body)}';
+      debugPrint('[GitHub] ERROR $path: $error');
+      return GitHubDirectoryResult.failure(error);
     } catch (e) {
       debugPrint('[GitHub] EXCEPTION listing $path: $e');
+      return GitHubDirectoryResult.failure(e.toString());
     }
-    return [];
+  }
+
+  String _extractGitHubMessage(String body) {
+    try {
+      final data = jsonDecode(body);
+      if (data is Map && data['message'] != null) {
+        return data['message'].toString();
+      }
+    } catch (_) {
+      // Fall back to the raw response body below.
+    }
+    return body.isEmpty ? 'Unknown error' : body;
   }
 
   Future<GitHubFileContent?> getFileContent(String path) async {
@@ -104,7 +140,8 @@ class GitHubService {
         final content = utf8.decode(base64Decode(raw));
         return GitHubFileContent(content: content, sha: data['sha']);
       } else {
-        debugPrint('[GitHub] file ERROR ${response.statusCode}: ${response.body}');
+        debugPrint(
+            '[GitHub] file ERROR ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
       debugPrint('[GitHub] EXCEPTION getting file $path: $e');
@@ -122,6 +159,21 @@ class GitHubService {
     final dir = drafts ? 'source/_drafts' : 'source/_posts';
     final path = '$dir/$filePath';
     final message = commitMessage ?? 'post: update $filePath';
+    return updateFile(
+      remotePath: path,
+      content: content,
+      sha: sha,
+      commitMessage: message,
+    );
+  }
+
+  Future<GitHubResult> updateFile({
+    required String remotePath,
+    required String content,
+    required String sha,
+    String? commitMessage,
+  }) async {
+    final message = commitMessage ?? 'post: update $remotePath';
     final encodedContent = base64Encode(utf8.encode(content));
 
     final body = jsonEncode({
@@ -131,7 +183,7 @@ class GitHubService {
       'branch': branch,
     });
 
-    final url = Uri.parse('$_baseUrl/$path');
+    final url = Uri.parse('$_baseUrl/$remotePath');
 
     try {
       final response = await http.put(url, headers: _headers, body: body);
@@ -148,7 +200,8 @@ class GitHubService {
         final data = jsonDecode(response.body);
         return GitHubResult(
           success: false,
-          message: '${AppStrings.current.publishFailed}: ${data['message'] ?? response.statusCode}',
+          message:
+              '${AppStrings.current.publishFailed}: ${data['message'] ?? response.statusCode}',
         );
       }
     } catch (e) {
@@ -163,9 +216,20 @@ class GitHubService {
     required String filePath,
     required String sha,
     String? commitMessage,
+    bool drafts = false,
   }) async {
-    final path = 'source/_posts/$filePath';
+    final dir = drafts ? 'source/_drafts' : 'source/_posts';
+    final path = '$dir/$filePath';
     final message = commitMessage ?? 'post: delete $filePath';
+    return deleteFile(remotePath: path, sha: sha, commitMessage: message);
+  }
+
+  Future<GitHubResult> deleteFile({
+    required String remotePath,
+    required String sha,
+    String? commitMessage,
+  }) async {
+    final message = commitMessage ?? 'post: delete $remotePath';
 
     final body = jsonEncode({
       'message': message,
@@ -173,7 +237,7 @@ class GitHubService {
       'branch': branch,
     });
 
-    final url = Uri.parse('$_baseUrl/$path');
+    final url = Uri.parse('$_baseUrl/$remotePath');
 
     try {
       final response = await http.delete(url, headers: _headers, body: body);
@@ -211,6 +275,20 @@ class GitHubResult {
     this.fileUrl = '',
     this.sha,
   });
+}
+
+class GitHubDirectoryResult {
+  final bool success;
+  final List<GitHubFileEntry> entries;
+  final String? error;
+
+  GitHubDirectoryResult.success(this.entries)
+      : success = true,
+        error = null;
+
+  GitHubDirectoryResult.failure(this.error)
+      : success = false,
+        entries = const [];
 }
 
 class GitHubFileEntry {

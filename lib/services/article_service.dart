@@ -14,8 +14,7 @@ class ArticleService {
   }
 
   Future<void> update(Article article) async {
-    await (_db.update(_db.articleRows)
-          ..where((t) => t.id.equals(article.id!)))
+    await (_db.update(_db.articleRows)..where((t) => t.id.equals(article.id!)))
         .write(toCompanion(article));
   }
 
@@ -58,10 +57,7 @@ class ArticleService {
   }
 
   Future<void> upsertFromGitHub(Article article) async {
-    final existing = await (_db.select(_db.articleRows)
-          ..where((t) => t.filePath.equals(article.filePath))
-          ..limit(1))
-        .getSingleOrNull();
+    final existing = await _findExistingRemoteArticle(article);
 
     if (existing != null) {
       await (_db.update(_db.articleRows)
@@ -72,6 +68,9 @@ class ArticleService {
         date: Value(article.date.toIso8601String()),
         slug: Value(article.slug),
         status: Value(article.status),
+        filePath: Value(article.filePath),
+        remotePath: Value(article.remotePath),
+        remoteKind: Value(article.remoteKind),
         githubSha: Value(article.githubSha),
         updatedAt: Value(DateTime.now().toIso8601String()),
         tags: Value(article.tags.join(',')),
@@ -91,21 +90,53 @@ class ArticleService {
     }
   }
 
-  Future<void> markAsSynced(int id, String githubSha) async {
+  Future<ArticleRow?> _findExistingRemoteArticle(Article article) async {
+    final remotePath = article.effectiveRemotePath;
+    if (remotePath != null && remotePath.isNotEmpty) {
+      final row = await (_db.select(_db.articleRows)
+            ..where((t) => t.remotePath.equals(remotePath))
+            ..limit(1))
+          .getSingleOrNull();
+      if (row != null) return row;
+    }
+
+    return await (_db.select(_db.articleRows)
+          ..where((t) =>
+              t.filePath.equals(article.filePath) &
+              t.status.equalsValue(article.status))
+          ..limit(1))
+        .getSingleOrNull();
+  }
+
+  Future<void> markAsSynced(
+    int id,
+    String githubSha, {
+    String? remotePath,
+  }) async {
     await (_db.update(_db.articleRows)..where((t) => t.id.equals(id))).write(
       ArticleRowsCompanion(
         status: const Value(ArticleStatus.synced),
         githubSha: Value(githubSha),
+        remotePath:
+            remotePath != null ? Value(remotePath) : const Value.absent(),
+        remoteKind: const Value(ArticleRemoteKind.post),
         updatedAt: Value(DateTime.now().toIso8601String()),
       ),
     );
   }
 
-  Future<void> markAsRepoDraft(int id, String githubSha) async {
+  Future<void> markAsRepoDraft(
+    int id,
+    String githubSha, {
+    String? remotePath,
+  }) async {
     await (_db.update(_db.articleRows)..where((t) => t.id.equals(id))).write(
       ArticleRowsCompanion(
         status: const Value(ArticleStatus.repoDraft),
         githubSha: Value(githubSha),
+        remotePath:
+            remotePath != null ? Value(remotePath) : const Value.absent(),
+        remoteKind: const Value(ArticleRemoteKind.repoDraft),
         updatedAt: Value(DateTime.now().toIso8601String()),
       ),
     );

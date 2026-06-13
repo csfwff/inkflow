@@ -125,7 +125,10 @@ class _HomePageState extends State<HomePage> {
     if (confirmed != true || article.id == null) return;
 
     // 如果有远程文件（synced 或 repoDraft），先删除远程
-    if (article.githubSha != null && article.githubSha!.isNotEmpty &&
+    final remotePath = article.effectiveRemotePath;
+    if (remotePath != null &&
+        article.githubSha != null &&
+        article.githubSha!.isNotEmpty &&
         article.status != ArticleStatus.draft) {
       final settings = settingsService.settings;
       if (settings.githubToken.isNotEmpty &&
@@ -137,8 +140,8 @@ class _HomePageState extends State<HomePage> {
           repo: settings.githubRepo,
           branch: settings.githubBranch,
         );
-        final result = await github.deletePost(
-          filePath: article.filePath,
+        final result = await github.deleteFile(
+          remotePath: remotePath,
           sha: article.githubSha!,
         );
         if (!result.success && mounted) {

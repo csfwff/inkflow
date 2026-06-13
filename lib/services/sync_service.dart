@@ -16,24 +16,33 @@ class SyncService {
 
       // 同步已发布文章 (source/_posts)
       debugPrint('[Sync] Syncing source/_posts ...');
-      final posts = await _syncDirectory('source/_posts', ArticleStatus.synced);
+      final posts = await _syncDirectory(
+        'source/_posts',
+        ArticleStatus.synced,
+        ArticleRemoteKind.post,
+      );
       debugPrint('[Sync] source/_posts -> ${posts.length} articles');
       remoteArticles.addAll(posts);
 
       // 同步仓库草稿 (source/_drafts)
       debugPrint('[Sync] Syncing source/_drafts ...');
-      final drafts = await _syncDirectory('source/_drafts', ArticleStatus.repoDraft);
+      final drafts = await _syncDirectory(
+        'source/_drafts',
+        ArticleStatus.repoDraft,
+        ArticleRemoteKind.repoDraft,
+      );
       debugPrint('[Sync] source/_drafts -> ${drafts.length} articles');
       remoteArticles.addAll(drafts);
 
       debugPrint('[Sync] Total remote articles: ${remoteArticles.length}');
 
-      // 收集远程存在的 filePath（posts 和 drafts 分开，带前缀以区分来源）
-      final remoteFilePaths = <String>{};
+      // 收集远程存在的完整路径，避免 posts/drafts 同名文件互相混淆。
+      final remotePaths = <String>{};
       for (final a in remoteArticles) {
-        remoteFilePaths.add(a.filePath);
+        final remotePath = a.effectiveRemotePath;
+        if (remotePath != null) remotePaths.add(remotePath);
       }
-      debugPrint('[Sync] Remote filePaths: $remoteFilePaths');
+      debugPrint('[Sync] Remote paths: $remotePaths');
 
       // upsert 远程文章
       for (final article in remoteArticles) {
@@ -45,8 +54,10 @@ class SyncService {
       debugPrint('[Sync] Local synced/repoDraft count: ${localSynced.length}');
       int deletedCount = 0;
       for (final local in localSynced) {
-        if (!remoteFilePaths.contains(local.filePath)) {
-          debugPrint('[Sync] Remote deleted: "${local.title}" (${local.filePath})');
+        final remotePath = local.effectiveRemotePath;
+        if (remotePath == null || !remotePaths.contains(remotePath)) {
+          debugPrint(
+              '[Sync] Remote deleted: "${local.title}" (${remotePath ?? local.filePath})');
           await articleService.markAsDraft(local.id!);
           deletedCount++;
         }
@@ -55,7 +66,8 @@ class SyncService {
         debugPrint('[Sync] Marked $deletedCount articles as remote deleted');
       }
 
-      debugPrint('[Sync] === syncFromGitHub DONE: ${remoteArticles.length} synced, $deletedCount remote deleted ===');
+      debugPrint(
+          '[Sync] === syncFromGitHub DONE: ${remoteArticles.length} synced, $deletedCount remote deleted ===');
       return SyncResult(success: true, count: remoteArticles.length);
     } catch (e, stack) {
       debugPrint('[Sync] EXCEPTION: $e');
@@ -64,12 +76,16 @@ class SyncService {
     }
   }
 
-  Future<List<Article>> _syncDirectory(String dirPath, ArticleStatus status) async {
+  Future<List<Article>> _syncDirectory(
+    String dirPath,
+    ArticleStatus status,
+    ArticleRemoteKind remoteKind,
+  ) async {
     debugPrint('[Sync] _syncDirectory: $dirPath');
     final List<Article> articles = [];
     final prefix = '$dirPath/';
 
-    await _traverseDirectory(dirPath, prefix, status, articles);
+    await _traverseDirectory(dirPath, prefix, status, remoteKind, articles);
 
     debugPrint('[Sync] $dirPath -> ${articles.length} articles total');
     return articles;
@@ -79,21 +95,35 @@ class SyncService {
     String currentPath,
     String prefix,
     ArticleStatus status,
+    ArticleRemoteKind remoteKind,
     List<Article> articles,
   ) async {
-    final entries = await github.listDirectoryContents(currentPath);
-    debugPrint('[Sync] $currentPath -> ${entries.length} entries: ${entries.map((e) => '${e.name}(${e.type})').join(', ')}');
+    final result = await github.listDirectoryContents(currentPath);
+    if (!result.success) {
+      throw _SyncException(
+        'Failed to list $currentPath: ${result.error ?? 'Unknown error'}',
+      );
+    }
+
+    final entries = result.entries;
+    debugPrint(
+        '[Sync] $currentPath -> ${entries.length} entries: ${entries.map((e) => '${e.name}(${e.type})').join(', ')}');
 
     for (final entry in entries) {
       // entry.path 是 API 返回的完整路径，如 source/_posts/2026/05/test.md
       if (entry.type == 'dir') {
-        await _traverseDirectory(entry.path, prefix, status, articles);
+        await _traverseDirectory(
+          entry.path,
+          prefix,
+          status,
+          remoteKind,
+          articles,
+        );
       } else if (entry.name.endsWith('.md')) {
         debugPrint('[Sync]   reading: ${entry.path}');
         final fileData = await github.getFileContent(entry.path);
         if (fileData == null) {
-          debugPrint('[Sync]   FAILED to read ${entry.path}');
-          continue;
+          throw _SyncException('Failed to read ${entry.path}');
         }
 
         final filePath = entry.path.startsWith(prefix)
@@ -102,6 +132,8 @@ class SyncService {
         final article = _parseFrontmatter(
           fileData.content,
           filePath: filePath,
+          remotePath: entry.path,
+          remoteKind: remoteKind,
           sha: fileData.sha,
           status: status,
         );
@@ -118,6 +150,8 @@ class SyncService {
   Article? _parseFrontmatter(
     String rawContent, {
     required String filePath,
+    required String remotePath,
+    required ArticleRemoteKind remoteKind,
     required String sha,
     required ArticleStatus status,
   }) {
@@ -149,11 +183,16 @@ class SyncService {
           final inner = raw.startsWith('[') && raw.endsWith(']')
               ? raw.substring(1, raw.length - 1)
               : raw;
-          tags = inner.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+          tags = inner
+              .split(',')
+              .map((t) => t.trim())
+              .where((t) => t.isNotEmpty)
+              .toList();
         } else if (line.startsWith('categories:')) {
           // categories 是多行的，后面以 - 开头
           // 这里简单处理：跳过，下面用循环收集
-        } else if (line.trimLeft().startsWith('- ') && categories.isEmpty == false) {
+        } else if (line.trimLeft().startsWith('- ') &&
+            categories.isEmpty == false) {
           // 已在 categories 模式中
         } else if (line.startsWith('permalink:')) {
           permalink = line.substring(10).trim();
@@ -188,6 +227,8 @@ class SyncService {
       slug: slug,
       status: status,
       filePath: filePath,
+      remotePath: remotePath,
+      remoteKind: remoteKind,
       githubSha: sha,
       tags: tags,
       categories: categories,
@@ -218,4 +259,13 @@ class SyncResult {
   final String? error;
 
   SyncResult({required this.success, this.count = 0, this.error});
+}
+
+class _SyncException implements Exception {
+  final String message;
+
+  _SyncException(this.message);
+
+  @override
+  String toString() => message;
 }

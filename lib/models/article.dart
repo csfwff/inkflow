@@ -1,5 +1,7 @@
 enum ArticleStatus { draft, synced, repoDraft }
 
+enum ArticleRemoteKind { post, repoDraft }
+
 class Article {
   final int? id;
   String title;
@@ -8,6 +10,8 @@ class Article {
   String slug;
   ArticleStatus status;
   String filePath;
+  String? remotePath;
+  ArticleRemoteKind? remoteKind;
   String? githubSha;
   DateTime createdAt;
   DateTime updatedAt;
@@ -33,6 +37,8 @@ class Article {
     required this.slug,
     this.status = ArticleStatus.draft,
     this.filePath = '',
+    this.remotePath,
+    this.remoteKind,
     this.githubSha,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -61,6 +67,8 @@ class Article {
       'slug': slug,
       'status': status.index,
       'filePath': filePath,
+      'remotePath': remotePath,
+      'remoteKind': remoteKind?.index,
       'githubSha': githubSha,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
@@ -87,11 +95,23 @@ class Article {
       slug: map['slug'] as String,
       status: ArticleStatus.values[map['status'] as int],
       filePath: map['filePath'] as String? ?? '',
+      remotePath: map['remotePath'] as String?,
+      remoteKind: map['remoteKind'] == null
+          ? null
+          : ArticleRemoteKind.values[map['remoteKind'] as int],
       githubSha: map['githubSha'] as String?,
       createdAt: DateTime.parse(map['createdAt'] as String),
       updatedAt: DateTime.parse(map['updatedAt'] as String),
-      tags: (map['tags'] as String?)?.split(',').where((t) => t.isNotEmpty).toList() ?? [],
-      categories: (map['categories'] as String?)?.split(',').where((c) => c.isNotEmpty).toList() ?? [],
+      tags: (map['tags'] as String?)
+              ?.split(',')
+              .where((t) => t.isNotEmpty)
+              .toList() ??
+          [],
+      categories: (map['categories'] as String?)
+              ?.split(',')
+              .where((c) => c.isNotEmpty)
+              .toList() ??
+          [],
       permalink: map['permalink'] as String?,
       topImg: map['topImg'] as String?,
       cover: map['cover'] as String?,
@@ -102,6 +122,42 @@ class Article {
       description: map['description'] as String?,
       author: map['author'] as String?,
     );
+  }
+
+  String? get effectiveRemotePath {
+    if (remotePath != null && remotePath!.isNotEmpty) {
+      return remotePath;
+    }
+
+    final kind = remoteKind ?? remoteKindForStatus(status);
+    if (kind == null || filePath.isEmpty) return null;
+    return buildRemotePath(kind: kind, filePath: filePath);
+  }
+
+  ArticleRemoteKind? get effectiveRemoteKind {
+    return remoteKind ?? remoteKindForStatus(status);
+  }
+
+  static ArticleRemoteKind? remoteKindForStatus(ArticleStatus status) {
+    switch (status) {
+      case ArticleStatus.synced:
+        return ArticleRemoteKind.post;
+      case ArticleStatus.repoDraft:
+        return ArticleRemoteKind.repoDraft;
+      case ArticleStatus.draft:
+        return null;
+    }
+  }
+
+  static String buildRemotePath({
+    required ArticleRemoteKind kind,
+    required String filePath,
+  }) {
+    final dir = switch (kind) {
+      ArticleRemoteKind.post => 'source/_posts',
+      ArticleRemoteKind.repoDraft => 'source/_drafts',
+    };
+    return '$dir/$filePath';
   }
 
   String buildFrontmatter() {
@@ -250,7 +306,9 @@ class Article {
 
     // 补充新增的字段
     for (final entry in singleLineFields.entries) {
-      if (!handled.contains(entry.key) && entry.value != null && entry.value!.isNotEmpty) {
+      if (!handled.contains(entry.key) &&
+          entry.value != null &&
+          entry.value!.isNotEmpty) {
         output.writeln('${entry.key}: ${entry.value}');
       }
     }

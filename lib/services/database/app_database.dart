@@ -13,6 +13,8 @@ class ArticleRows extends Table {
   TextColumn get slug => text().withDefault(const Constant(''))();
   IntColumn get status => intEnum<ArticleStatus>()();
   TextColumn get filePath => text().withDefault(const Constant(''))();
+  TextColumn get remotePath => text().nullable()();
+  IntColumn get remoteKind => intEnum<ArticleRemoteKind>().nullable()();
   TextColumn get githubSha => text().nullable()();
   TextColumn get createdAt => text()();
   TextColumn get updatedAt => text()();
@@ -34,7 +36,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -42,9 +44,29 @@ class AppDatabase extends _$AppDatabase {
           await m.createAll();
         },
         onUpgrade: (Migrator m, int from, int to) async {
-          // 开发阶段：直接删除重建
-          await m.database.customStatement('DROP TABLE IF EXISTS article_rows');
-          await m.createAll();
+          if (from < 2) {
+            await m.addColumn(articleRows, articleRows.remotePath);
+            await m.addColumn(articleRows, articleRows.remoteKind);
+            await m.database.customStatement('''
+              UPDATE article_rows
+              SET
+                remote_path = CASE
+                  WHEN status = ${ArticleStatus.synced.index} AND file_path <> ''
+                    THEN 'source/_posts/' || file_path
+                  WHEN status = ${ArticleStatus.repoDraft.index} AND file_path <> ''
+                    THEN 'source/_drafts/' || file_path
+                  ELSE remote_path
+                END,
+                remote_kind = CASE
+                  WHEN status = ${ArticleStatus.synced.index}
+                    THEN ${ArticleRemoteKind.post.index}
+                  WHEN status = ${ArticleStatus.repoDraft.index}
+                    THEN ${ArticleRemoteKind.repoDraft.index}
+                  ELSE remote_kind
+                END
+              WHERE github_sha IS NOT NULL AND github_sha <> ''
+            ''');
+          }
         },
       );
 
@@ -64,6 +86,8 @@ ArticleRowsCompanion toCompanion(Article a) => ArticleRowsCompanion(
       slug: Value(a.slug),
       status: Value(a.status),
       filePath: Value(a.filePath),
+      remotePath: Value(a.remotePath),
+      remoteKind: Value(a.remoteKind),
       githubSha: Value(a.githubSha),
       createdAt: Value(a.createdAt.toIso8601String()),
       updatedAt: Value(a.updatedAt.toIso8601String()),
@@ -88,12 +112,13 @@ Article articleFromRow(ArticleRow row) => Article(
       slug: row.slug,
       status: row.status,
       filePath: row.filePath,
+      remotePath: row.remotePath,
+      remoteKind: row.remoteKind,
       githubSha: row.githubSha,
       createdAt: DateTime.parse(row.createdAt),
       updatedAt: DateTime.parse(row.updatedAt),
       tags: row.tags.split(',').where((t) => t.isNotEmpty).toList(),
-      categories:
-          row.categories.split(',').where((c) => c.isNotEmpty).toList(),
+      categories: row.categories.split(',').where((c) => c.isNotEmpty).toList(),
       permalink: row.permalink,
       topImg: row.topImg,
       cover: row.cover,
