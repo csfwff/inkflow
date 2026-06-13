@@ -246,14 +246,25 @@ class _HomePageState extends State<HomePage> {
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: Responsive.maxWidth),
-          child: Column(
-            children: [
-              _buildHeader(),
-              Expanded(
-                child: visibleArticles.isEmpty
-                    ? _buildEmptyState(filtered: _articles.isNotEmpty)
-                    : _buildArticleList(visibleArticles),
+          child: CustomScrollView(
+            slivers: [
+              // 顶部标题与搜索：随页面一起上滑
+              SliverToBoxAdapter(child: _buildHeader()),
+              // 类型切换：吸顶
+              SliverPersistentHeader(
+                pinned: true,
+                delegate: _FilterBarDelegate(
+                  height: 56,
+                  child: _buildFilterBar(),
+                ),
               ),
+              if (visibleArticles.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _buildEmptyState(filtered: _articles.isNotEmpty),
+                )
+              else
+                _buildArticleSliver(visibleArticles),
             ],
           ),
         ),
@@ -313,8 +324,6 @@ class _HomePageState extends State<HomePage> {
                     ),
             ),
           ),
-          const SizedBox(height: 12),
-          _buildFilterBar(),
         ],
       ),
     );
@@ -323,6 +332,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildFilterBar() {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: _ArticleFilter.values.map((filter) {
           final selected = _filter == filter;
@@ -409,20 +419,22 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildArticleList(List<Article> articles) {
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
-      itemCount: articles.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final article = articles[index];
-        return _ArticleListItem(
-          article: article,
-          excerpt: _excerptFor(article),
-          onTap: () => _openEditor(articleId: article.id),
-          onDelete: () => _deleteArticle(article),
-        );
-      },
+  Widget _buildArticleSliver(List<Article> articles) {
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+      sliver: SliverList.separated(
+        itemCount: articles.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        itemBuilder: (context, index) {
+          final article = articles[index];
+          return _ArticleListItem(
+            article: article,
+            excerpt: _excerptFor(article),
+            onTap: () => _openEditor(articleId: article.id),
+            onDelete: () => _deleteArticle(article),
+          );
+        },
+      ),
     );
   }
 
@@ -457,6 +469,43 @@ class _HomePageState extends State<HomePage> {
 
   String _label(String zh, String en) {
     return identical(AppStrings.current, AppStrings.zh) ? zh : en;
+  }
+}
+
+/// 吸顶的类型切换栏：固定高度，滚动时背景不透明并加底部分隔线。
+class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+  final double height;
+
+  _FilterBarDelegate({required this.child, required this.height});
+
+  @override
+  double get minExtent => height;
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        border: overlapsContent
+            ? Border(bottom: BorderSide(color: colorScheme.outlineVariant))
+            : null,
+      ),
+      child: Center(child: child),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _FilterBarDelegate oldDelegate) {
+    return oldDelegate.child != child || oldDelegate.height != height;
   }
 }
 

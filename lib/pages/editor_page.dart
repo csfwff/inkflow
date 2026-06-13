@@ -9,6 +9,9 @@ import '../services/image_host/image_host_service.dart';
 import '../widgets/responsive.dart';
 import 'metadata_page.dart';
 
+/// 窄屏吸顶工具条的固定高度（40 的按钮 + 上下各 8 内边距 + 底部分隔线，留一点余量）。
+const double _kEditorToolbarHeight = 58;
+
 class EditorPage extends StatefulWidget {
   final int? articleId;
 
@@ -452,17 +455,33 @@ class _EditorPageState extends State<EditorPage> {
   }
 
   Widget _buildNarrow() {
-    return Column(
-      children: [
-        _buildTitlePanel(),
-        _buildToolbar(),
-        _buildModeSwitch(),
-        Expanded(
-          child: _previewMode
-              ? _buildPreviewSurface(padding: const EdgeInsets.all(16))
-              : _buildEditorSurface(padding: const EdgeInsets.all(16)),
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 内容区至少填满「视口 - 吸顶工具条」，保证空文档也有完整的编辑/预览区域，
+        // 内容变长后整页可上滑、工具条吸顶。
+        final fillHeight =
+            (constraints.maxHeight - _kEditorToolbarHeight).clamp(0.0, double.infinity);
+        return CustomScrollView(
+          slivers: [
+            // 标题、编辑/预览切换：随页面一起上滑
+            SliverToBoxAdapter(child: _buildTitlePanel()),
+            SliverToBoxAdapter(child: _buildModeSwitch()),
+            // 工具条：吸顶
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _ToolbarHeaderDelegate(
+                height: _kEditorToolbarHeight,
+                child: _buildToolbar(),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: _previewMode
+                  ? _buildPreviewBody(minHeight: fillHeight)
+                  : _buildEditorBody(minHeight: fillHeight),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -652,31 +671,22 @@ class _EditorPageState extends State<EditorPage> {
   }
 
   Widget _buildEditorSurface({required EdgeInsets padding}) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Padding(
       padding: padding,
-      child: Container(
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: colorScheme.outlineVariant),
+      child: TextField(
+        controller: _contentCtrl,
+        maxLines: null,
+        expands: true,
+        textAlignVertical: TextAlignVertical.top,
+        decoration: InputDecoration(
+          hintText: AppStrings.current.editorHint,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          filled: false,
+          contentPadding: const EdgeInsets.all(4),
         ),
-        child: TextField(
-          controller: _contentCtrl,
-          maxLines: null,
-          expands: true,
-          textAlignVertical: TextAlignVertical.top,
-          decoration: InputDecoration(
-            hintText: AppStrings.current.editorHint,
-            border: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            focusedBorder: InputBorder.none,
-            filled: false,
-            contentPadding: const EdgeInsets.all(18),
-          ),
-          style: const TextStyle(fontSize: 16, height: 1.55),
-        ),
+        style: const TextStyle(fontSize: 16, height: 1.55),
       ),
     );
   }
@@ -706,6 +716,58 @@ class _EditorPageState extends State<EditorPage> {
                 padding: const EdgeInsets.all(22),
                 selectable: true,
               ),
+      ),
+    );
+  }
+
+  // 窄屏：无边框、随内容增高的编辑区。内容超出视口时整页滚动、工具条吸顶；
+  // 内容较短时用 minHeight 撑满，保证有完整的可点按编辑区域。
+  Widget _buildEditorBody({required double minHeight}) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: minHeight),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        child: TextField(
+          controller: _contentCtrl,
+          maxLines: null,
+          textAlignVertical: TextAlignVertical.top,
+          keyboardType: TextInputType.multiline,
+          decoration: InputDecoration(
+            hintText: AppStrings.current.editorHint,
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            filled: false,
+            isCollapsed: true,
+          ),
+          style: const TextStyle(fontSize: 16, height: 1.55),
+        ),
+      ),
+    );
+  }
+
+  // 窄屏预览：随内容增高（MarkdownBody 不自带滚动），与编辑区共用整页滚动。
+  Widget _buildPreviewBody({required double minHeight}) {
+    final colorScheme = Theme.of(context).colorScheme;
+    if (_previewText.trim().isEmpty) {
+      return ConstrainedBox(
+        constraints: BoxConstraints(minHeight: minHeight),
+        child: Center(
+          child: Text(
+            AppStrings.current.editorHint,
+            style: TextStyle(color: colorScheme.onSurfaceVariant),
+          ),
+        ),
+      );
+    }
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: minHeight),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        child: MarkdownBody(
+          data: _previewText,
+          selectable: true,
+        ),
       ),
     );
   }
@@ -875,6 +937,34 @@ class _EditorPageState extends State<EditorPage> {
 
   String _label(String zh, String en) {
     return identical(AppStrings.current, AppStrings.zh) ? zh : en;
+  }
+}
+
+class _ToolbarHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+  final double height;
+
+  _ToolbarHeaderDelegate({required this.child, required this.height});
+
+  @override
+  double get minExtent => height;
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    // 工具条自带背景与底部分隔线，铺满吸顶高度即可。
+    return SizedBox.expand(child: child);
+  }
+
+  @override
+  bool shouldRebuild(covariant _ToolbarHeaderDelegate oldDelegate) {
+    return oldDelegate.child != child || oldDelegate.height != height;
   }
 }
 
