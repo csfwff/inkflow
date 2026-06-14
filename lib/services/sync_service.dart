@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/article.dart';
+import 'frontmatter_helper.dart';
 import 'github_service.dart';
 import 'article_service.dart';
 
@@ -209,67 +210,19 @@ class SyncService {
     required String sha,
     required ArticleStatus status,
   }) {
-    final regex = RegExp(r'^---\s*\n(.*?)\n---\s*\n(.*)$', dotAll: true);
-    final match = regex.firstMatch(rawContent);
+    final meta = FrontmatterHelper.parseFrontmatter(rawContent);
 
-    String title = '';
-    DateTime date = DateTime.now();
-    List<String> tags = [];
-    List<String> categories = [];
-    String? permalink;
-    String? topImg;
-    String? cover;
-    String? excerpt;
-    String? description;
-    String? author;
-
-    if (match != null) {
-      final meta = match.group(1)!;
-
-      for (final line in meta.split('\n')) {
-        if (line.startsWith('title:')) {
-          title = line.substring(6).trim();
-        } else if (line.startsWith('date:')) {
-          date = DateTime.tryParse(line.substring(5).trim()) ?? DateTime.now();
-        } else if (line.startsWith('tags:')) {
-          final raw = line.substring(5).trim();
-          // tags: [a, b, c] or tags: a, b, c
-          final inner = raw.startsWith('[') && raw.endsWith(']')
-              ? raw.substring(1, raw.length - 1)
-              : raw;
-          tags = inner
-              .split(',')
-              .map((t) => t.trim())
-              .where((t) => t.isNotEmpty)
-              .toList();
-        } else if (line.startsWith('categories:')) {
-          // categories 是多行的，后面以 - 开头
-          // 这里简单处理：跳过，下面用循环收集
-        } else if (line.trimLeft().startsWith('- ') &&
-            categories.isEmpty == false) {
-          // 已在 categories 模式中
-        } else if (line.startsWith('permalink:')) {
-          permalink = line.substring(10).trim();
-        } else if (line.startsWith('top_img:')) {
-          topImg = line.substring(8).trim();
-        } else if (line.startsWith('cover:')) {
-          cover = line.substring(6).trim();
-        } else if (line.startsWith('excerpt:')) {
-          excerpt = line.substring(8).trim();
-        } else if (line.startsWith('description:')) {
-          description = line.substring(12).trim();
-        } else if (line.startsWith('author:')) {
-          author = line.substring(7).trim();
-        }
-      }
-
-      // tags / categories 的块状写法（key 下方以 `  - item` 多行列出）。
-      // tags 已在上面解析了行内写法（[a, b] / a, b），仅当行内为空时再按块状解析。
-      if (tags.isEmpty) {
-        tags = _parseBlockList(meta, 'tags');
-      }
-      categories = _parseBlockList(meta, 'categories');
-    }
+    String title = (meta['title'] ?? '').toString();
+    final date = FrontmatterHelper.parseDate((meta['date'] ?? '').toString()) ??
+        DateTime.now();
+    final tags = _toStringList(meta['tags']);
+    final categories = _toStringList(meta['categories']);
+    final permalink = meta['permalink']?.toString();
+    final topImg = (meta['top_img'] ?? meta['topImg'])?.toString();
+    final cover = meta['cover']?.toString();
+    final excerpt = meta['excerpt']?.toString();
+    final description = meta['description']?.toString();
+    final author = meta['author']?.toString();
 
     final slug = filePath.split('/').last.replaceAll('.md', '');
     title = title.isNotEmpty ? title : slug;
@@ -295,15 +248,16 @@ class SyncService {
     );
   }
 
-  /// 解析块状列表写法（key 下方以 `  - item` 多行列出），tags / categories 共用。
-  /// 行内写法（如 `tags: [a, b]`）不在此处理，返回空列表。
-  static List<String> _parseBlockList(String meta, String key) {
-    final match = RegExp(key + r':\s*\n((?:\s+-\s+.+\n?)*)').firstMatch(meta);
-    if (match == null) return [];
-    return RegExp(r'-\s+(.+)')
-        .allMatches(match.group(1)!)
-        .map((m) => m.group(1)!.trim())
-        .toList();
+  /// 将 YAML 值转为字符串列表（兼容行内 `[a, b]` 和块状列表写法）。
+  static List<String> _toStringList(Object? value) {
+    if (value is List) {
+      return value.map((e) => e.toString().trim()).where((s) => s.isNotEmpty).toList();
+    }
+    if (value is String && value.isNotEmpty) {
+      // 兼容旧的逗号分隔格式
+      return value.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+    }
+    return [];
   }
 }
 

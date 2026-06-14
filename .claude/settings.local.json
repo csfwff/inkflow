@@ -24,7 +24,8 @@
       "Bash(taskkill //F //IM dartaotruntime.exe)",
       "mcp__codegraph__codegraph_explore",
       "mcp__codegraph__codegraph_search",
-      "Bash(flutter --version)"
+      "Bash(flutter --version)",
+      "Bash(flutter test *)"
     ]
   }
 }
