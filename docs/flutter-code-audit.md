@@ -365,7 +365,7 @@
 - [x] AUDIT-001
 - [x] AUDIT-002
 - [x] AUDIT-003
-- [ ] AUDIT-004
+- [x] AUDIT-004
 - [x] AUDIT-005
 - [x] AUDIT-006
 - [x] AUDIT-007
