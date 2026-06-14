@@ -11,7 +11,7 @@ Future<QueryExecutor> openConnection() async {
     await dbDir.create(recursive: true);
   }
   final dbPath = p.join(dbDir.path, 'inkflow.db');
-  return SqfliteQueryExecutor.inDatabaseFolder(path: 'inkflow.db');
+  return SqfliteQueryExecutor(path: dbPath);
 }
 
 Future<Directory> _getDbDir() async {
