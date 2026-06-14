@@ -1085,7 +1085,7 @@ class _EditorPageState extends State<EditorPage> {
   }
 
   String _label(String zh, String en) {
-    return identical(AppStrings.current, AppStrings.zh) ? zh : en;
+    return AppStrings.isZh ? zh : en;
   }
 }
 

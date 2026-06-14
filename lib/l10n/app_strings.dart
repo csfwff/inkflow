@@ -1,4 +1,5 @@
 import 'dart:ui';
+import '../models/settings.dart';
 
 class AppStrings {
   final String appTitle;
@@ -389,9 +390,30 @@ class AppStrings {
     authorHint: '作者名称',
   );
 
-  static AppStrings get current => forLocale(
-        PlatformDispatcher.instance.locale,
-      );
+  /// 应用当前语言设置，默认跟随系统。
+  static AppLocale _locale = AppLocale.system;
+
+  /// 更新应用语言设置。
+  static void setLocale(AppLocale locale) {
+    _locale = locale;
+  }
+
+  /// 当前语言包，基于应用设置而非系统 locale。
+  static AppStrings get current => forLocale(_resolvedLocale);
+
+  /// 当前是否为中文。
+  static bool get isZh => identical(current, zh);
+
+  static Locale get _resolvedLocale {
+    switch (_locale) {
+      case AppLocale.zh:
+        return const Locale('zh');
+      case AppLocale.en:
+        return const Locale('en');
+      case AppLocale.system:
+        return PlatformDispatcher.instance.locale;
+    }
+  }
 
   static AppStrings forLocale(Locale locale) {
     if (locale.languageCode == 'zh') return zh;

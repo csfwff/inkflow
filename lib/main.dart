@@ -12,6 +12,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await articleService.init();
   await settingsService.init();
+  AppStrings.setLocale(settingsService.settings.locale);
   runApp(const MyApp());
 }
 
@@ -159,6 +160,7 @@ class _MyAppState extends State<MyApp> {
   }
 
   void _onSettingsChanged() {
+    AppStrings.setLocale(settingsService.settings.locale);
     setState(() {});
   }
 }
