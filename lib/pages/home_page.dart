@@ -125,7 +125,7 @@ class _HomePageState extends State<HomePage> {
     if (confirmed != true || article.id == null) return;
 
     // 如果有远程文件（synced 或 repoDraft），先删除远程
-    final remotePath = article.effectiveRemotePath;
+    final remotePath = article.remotePath;
     if (remotePath != null &&
         article.githubSha != null &&
         article.githubSha!.isNotEmpty &&

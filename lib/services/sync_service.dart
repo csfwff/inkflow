@@ -11,11 +11,11 @@ class SyncService {
   SyncService({required this.github, required this.articleService});
 
   Future<Article?> fetchRemoteArticle(Article local) async {
-    final remotePath = local.effectiveRemotePath;
+    final remotePath = local.remotePath;
     if (remotePath == null || remotePath.isEmpty) return null;
 
     final remoteKind =
-        local.effectiveRemoteKind ?? _remoteKindForPath(remotePath);
+        local.remoteKind ?? _remoteKindForPath(remotePath);
     if (remoteKind == null) return null;
 
     final fileData = await github.getFileContent(remotePath);
@@ -66,7 +66,7 @@ class SyncService {
       // 收集远程存在的完整路径，避免 posts/drafts 同名文件互相混淆。
       final remotePaths = <String>{};
       for (final a in remoteArticles) {
-        final remotePath = a.effectiveRemotePath;
+        final remotePath = a.remotePath;
         if (remotePath != null) remotePaths.add(remotePath);
       }
       debugPrint('[Sync] Remote paths: $remotePaths');
@@ -85,7 +85,7 @@ class SyncService {
           continue;
         }
 
-        final remotePath = local.effectiveRemotePath;
+        final remotePath = local.remotePath;
         if (remotePath == null || !remotePaths.contains(remotePath)) {
           debugPrint(
               '[Sync] Remote deleted: "${local.title}" (${remotePath ?? local.filePath})');
@@ -227,7 +227,7 @@ class SyncService {
     final tags = _toStringList(meta['tags']);
     final categories = _toStringList(meta['categories']);
     final permalink = meta['permalink']?.toString();
-    final topImg = (meta['top_img'] ?? meta['topImg'])?.toString();
+    final topImg = meta['top_img']?.toString();
     final cover = meta['cover']?.toString();
     final excerpt = meta['excerpt']?.toString();
     final description = meta['description']?.toString();
@@ -257,14 +257,10 @@ class SyncService {
     );
   }
 
-  /// 将 YAML 值转为字符串列表（兼容行内 `[a, b]` 和块状列表写法）。
+  /// 将 YAML 值转为字符串列表。
   static List<String> _toStringList(Object? value) {
     if (value is List) {
       return value.map((e) => e.toString().trim()).where((s) => s.isNotEmpty).toList();
-    }
-    if (value is String && value.isNotEmpty) {
-      // 兼容旧的逗号分隔格式
-      return value.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
     }
     return [];
   }

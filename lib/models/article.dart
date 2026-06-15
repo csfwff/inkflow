@@ -126,34 +126,6 @@ class Article {
     );
   }
 
-  String? get effectiveRemotePath {
-    if (remotePath != null && remotePath!.isNotEmpty) {
-      return remotePath;
-    }
-
-    final kind = remoteKind ?? remoteKindForStatus(status);
-    if (kind == null || filePath.isEmpty) return null;
-    return buildRemotePath(kind: kind, filePath: filePath);
-  }
-
-  ArticleRemoteKind? get effectiveRemoteKind {
-    return remoteKind ?? remoteKindForStatus(status);
-  }
-
-  static ArticleRemoteKind? remoteKindForStatus(ArticleStatus status) {
-    switch (status) {
-      case ArticleStatus.synced:
-        return ArticleRemoteKind.post;
-      case ArticleStatus.repoDraft:
-        return ArticleRemoteKind.repoDraft;
-      case ArticleStatus.pendingPublish:
-      case ArticleStatus.remoteDeleted:
-        return null;
-      case ArticleStatus.draft:
-        return null;
-    }
-  }
-
   static String buildRemotePath({
     required ArticleRemoteKind kind,
     required String filePath,

@@ -326,7 +326,7 @@ class _EditorPageState extends State<EditorPage> {
       kind: targetRemoteKind,
       filePath: fileName,
     );
-    final previousRemotePath = _editingArticle?.effectiveRemotePath;
+    final previousRemotePath = _editingArticle?.remotePath;
     final previousSha = _editingArticle?.githubSha;
     final commitPrefix = drafts ? 'draft' : 'post';
 
@@ -404,7 +404,7 @@ class _EditorPageState extends State<EditorPage> {
     final article = _editingArticle;
     if (article == null ||
         article.status != ArticleStatus.pendingPublish ||
-        article.effectiveRemotePath == null) {
+        article.remotePath == null) {
       return;
     }
 
@@ -572,7 +572,7 @@ class _EditorPageState extends State<EditorPage> {
 
     return [
       if (_editingArticle?.status == ArticleStatus.pendingPublish &&
-          _editingArticle?.effectiveRemotePath != null)
+          _editingArticle?.remotePath != null)
         IconButton(
           onPressed: _restoreFromRemote,
           icon: const Icon(Icons.cloud_download_outlined),

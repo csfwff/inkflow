@@ -43,40 +43,6 @@ class AppDatabase extends _$AppDatabase {
         onCreate: (Migrator m) async {
           await m.createAll();
         },
-        onUpgrade: (Migrator m, int from, int to) async {
-          if (from < 2) {
-            await m.addColumn(articleRows, articleRows.remotePath);
-            await m.addColumn(articleRows, articleRows.remoteKind);
-            await m.database.customStatement('''
-              UPDATE article_rows
-              SET
-                remote_path = CASE
-                  WHEN status = ${ArticleStatus.synced.index} AND file_path <> ''
-                    THEN 'source/_posts/' || file_path
-                  WHEN status = ${ArticleStatus.repoDraft.index} AND file_path <> ''
-                    THEN 'source/_drafts/' || file_path
-                  ELSE remote_path
-                END,
-                remote_kind = CASE
-                  WHEN status = ${ArticleStatus.synced.index}
-                    THEN ${ArticleRemoteKind.post.index}
-                  WHEN status = ${ArticleStatus.repoDraft.index}
-                    THEN ${ArticleRemoteKind.repoDraft.index}
-                  ELSE remote_kind
-                END
-              WHERE github_sha IS NOT NULL AND github_sha <> ''
-            ''');
-          }
-          if (from < 3) {
-            await m.database.customStatement('''
-              UPDATE article_rows
-              SET status = ${ArticleStatus.remoteDeleted.index}
-              WHERE status = ${ArticleStatus.draft.index}
-                AND github_sha IS NOT NULL
-                AND github_sha <> ''
-            ''');
-          }
-        },
       );
 
   static Future<AppDatabase> create() async {

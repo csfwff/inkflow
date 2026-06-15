@@ -111,7 +111,7 @@ class ArticleService {
   }
 
   Future<ArticleRow?> _findExistingRemoteArticle(Article article) async {
-    final remotePath = article.effectiveRemotePath;
+    final remotePath = article.remotePath;
     if (remotePath != null && remotePath.isNotEmpty) {
       final row = await (_db.select(_db.articleRows)
             ..where((t) => t.remotePath.equals(remotePath))

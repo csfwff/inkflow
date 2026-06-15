@@ -37,9 +37,9 @@ class SettingsService {
   }
 
   Future<Settings> _load() async {
-    // 读取敏感字段：安全存储 -> 回退 SharedPreferences -> 迁移
-    final githubToken = await _readSecureWithMigration(_secureGithubToken);
-    final upyunPassword = await _readSecureWithMigration(_secureUpyunPassword);
+    // 读取敏感字段：直接从安全存储读取
+    final githubToken = await _secure.read(key: _secureGithubToken) ?? '';
+    final upyunPassword = await _secure.read(key: _secureUpyunPassword) ?? '';
 
     return Settings(
       githubToken: githubToken,
@@ -100,21 +100,5 @@ class SettingsService {
   /// 清理路径：去除前导和尾部斜杠
   String _cleanPath(String path) {
     return path.replaceAll(RegExp(r'^/+|/+$'), '');
-  }
-
-  /// 从安全存储读取，若为空则尝试从 SharedPreferences 迁移旧值。
-  Future<String> _readSecureWithMigration(String key) async {
-    // 优先读安全存储
-    final secureValue = await _secure.read(key: key);
-    if (secureValue != null && secureValue.isNotEmpty) return secureValue;
-
-    // 回退：读 SharedPreferences 旧值
-    final oldValue = _prefs.getString(key) ?? '';
-    if (oldValue.isNotEmpty) {
-      // 迁移到安全存储并清理旧值
-      await _secure.write(key: key, value: oldValue);
-      await _prefs.remove(key);
-    }
-    return oldValue;
   }
 }
