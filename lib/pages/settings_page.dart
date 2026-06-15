@@ -578,17 +578,30 @@ class _SettingsPageState extends State<SettingsPage> {
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: TextField(
-        controller: controller,
-        decoration: InputDecoration(
-          isDense: true,
-          hintText: hint,
-          prefixText: prefixText,
-          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          border: OutlineInputBorder(),
-        ),
-        obscureText: obscure,
-        onChanged: onChanged,
+      child: Row(
+        children: [
+          if (prefixText != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Text(
+                prefixText,
+                style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+              ),
+            ),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: hint,
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: OutlineInputBorder(),
+              ),
+              obscureText: obscure,
+              onChanged: onChanged,
+            ),
+          ),
+        ],
       ),
     );
   }
