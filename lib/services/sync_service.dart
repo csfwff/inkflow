@@ -116,7 +116,16 @@ class SyncService {
     final List<Article> articles = [];
     final prefix = _prefixForRemoteKind(remoteKind);
 
-    await _traverseDirectory(dirPath, prefix, status, remoteKind, articles);
+    try {
+      await _traverseDirectory(dirPath, prefix, status, remoteKind, articles);
+    } on _SyncException catch (e) {
+      // 根目录（source/_posts、source/_drafts）不存在时允许跳过
+      if (e.message.contains('404')) {
+        debugPrint('[Sync] Directory not found (404), skipping: $dirPath');
+        return articles;
+      }
+      rethrow;
+    }
 
     debugPrint('[Sync] $dirPath -> ${articles.length} articles total');
     return articles;
