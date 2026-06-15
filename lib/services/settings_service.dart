@@ -53,13 +53,13 @@ class SettingsService {
       imageHostType:
           ImageHostType.values[_prefs.getInt(_keyImageHostType) ?? 0],
       imageGithubRepo: _prefs.getString(_keyImageGithubRepo) ?? '',
-      imageGithubPath: _prefs.getString(_keyImageGithubPath) ?? 'images',
+      imageGithubPath: _cleanPath(_prefs.getString(_keyImageGithubPath) ?? 'images'),
       imageGithubDomain: _prefs.getString(_keyImageGithubDomain) ?? '',
       upyunBucket: _prefs.getString(_keyUpyunBucket) ?? '',
       upyunOperator: _prefs.getString(_keyUpyunOperator) ?? '',
       upyunPassword: upyunPassword,
       upyunDomain: _prefs.getString(_keyUpyunDomain) ?? '',
-      upyunPath: _prefs.getString(_keyUpyunPath) ?? '/',
+      upyunPath: _cleanPath(_prefs.getString(_keyUpyunPath) ?? ''),
       imageUseDateFolder: _prefs.getBool(_keyImageUseDateFolder) ?? false,
       imageNamingMode:
           ImageNamingMode.values[_prefs.getInt(_keyImageNamingMode) ?? 0],
@@ -95,6 +95,11 @@ class SettingsService {
       _prefs.setInt(_keyThemeMode, settings.themeMode.index),
       _prefs.setInt(_keyLocale, settings.locale.index),
     ]);
+  }
+
+  /// 清理路径：去除前导和尾部斜杠
+  String _cleanPath(String path) {
+    return path.replaceAll(RegExp(r'^/+|/+$'), '');
   }
 
   /// 从安全存储读取，若为空则尝试从 SharedPreferences 迁移旧值。

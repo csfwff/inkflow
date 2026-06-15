@@ -470,8 +470,10 @@ class _SettingsPageState extends State<SettingsPage> {
             _sectionHeader(s.imageGithubPath),
             _inputRow(
               controller: _imageGithubPathCtrl,
+              prefixText: '/',
               onChanged: (v) {
-                setState(() => _settings.imageGithubPath = v);
+                final clean = v.replaceAll(RegExp(r'^/+'), '');
+                setState(() => _settings.imageGithubPath = clean);
                 _save();
               },
             ),
@@ -535,8 +537,10 @@ class _SettingsPageState extends State<SettingsPage> {
             _inputRow(
               controller: _upyunPathCtrl,
               hint: s.upyunPathHint,
+              prefixText: '/',
               onChanged: (v) {
-                setState(() => _settings.upyunPath = v);
+                final clean = v.replaceAll(RegExp(r'^/+'), '');
+                setState(() => _settings.upyunPath = clean);
                 _save();
               },
             ),
@@ -570,6 +574,7 @@ class _SettingsPageState extends State<SettingsPage> {
     required ValueChanged<String> onChanged,
     bool obscure = false,
     String? hint,
+    String? prefixText,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -578,6 +583,7 @@ class _SettingsPageState extends State<SettingsPage> {
         decoration: InputDecoration(
           isDense: true,
           hintText: hint,
+          prefixText: prefixText,
           contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           border: OutlineInputBorder(),
         ),

@@ -11,7 +11,7 @@ String buildRemoteImagePath(
   required ImageNamingMode namingMode,
 }) {
   final now = DateTime.now();
-  final cleanBase = basePath.replaceAll(RegExp(r'^/+|/+$'), '');
+  final cleanBase = basePath.replaceAll(RegExp(r'^/+|/+$'), '').replaceAll(RegExp(r'/+'), '/');
   final parts = <String>[
     if (cleanBase.isNotEmpty) cleanBase,
     if (useDateFolder) '${now.year}/${now.month.toString().padLeft(2, '0')}',

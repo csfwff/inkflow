@@ -51,7 +51,7 @@ class Settings {
     this.upyunOperator = '',
     this.upyunPassword = '',
     this.upyunDomain = '',
-    this.upyunPath = '/',
+    this.upyunPath = '',
     this.imageUseDateFolder = false,
     this.imageNamingMode = ImageNamingMode.timestamp,
     this.themeMode = AppThemeMode.system,
