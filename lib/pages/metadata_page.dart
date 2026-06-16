@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../l10n/app_strings.dart';
 import '../models/article.dart';
 import '../services/article_service.dart';
+import '../services/image_host/image_host_service.dart';
 import '../services/settings_service.dart';
 
 class MetadataPage extends StatefulWidget {
@@ -58,6 +60,9 @@ class _MetadataPageState extends State<MetadataPage> {
   /// 数据库中已有的标签和分类
   List<String> _allTags = [];
   List<String> _allCategories = [];
+
+  /// 上传中状态
+  bool _uploading = false;
 
   @override
   void initState() {
@@ -192,6 +197,7 @@ class _MetadataPageState extends State<MetadataPage> {
             _buildSectionTitle(s.tags, Icons.tag),
             const SizedBox(height: 8),
             _buildChipSelector(
+              controller: _tagsCtrl,
               selected: _selectedTags,
               allOptions: _allTags,
               onAdd: (value) {
@@ -214,6 +220,7 @@ class _MetadataPageState extends State<MetadataPage> {
             _buildSectionTitle(s.categories, Icons.folder_outlined),
             const SizedBox(height: 8),
             _buildChipSelector(
+              controller: _categoriesCtrl,
               selected: _selectedCategories,
               allOptions: _allCategories,
               onAdd: (value) {
@@ -256,7 +263,7 @@ class _MetadataPageState extends State<MetadataPage> {
             // Images
             _buildSectionTitle(s.topImg, Icons.image),
             const SizedBox(height: 8),
-            _buildTextField(
+            _buildImageField(
               controller: _topImgCtrl,
               hint: s.topImgHint,
             ),
@@ -264,7 +271,7 @@ class _MetadataPageState extends State<MetadataPage> {
 
             _buildSectionTitle(s.cover, Icons.image_outlined),
             const SizedBox(height: 8),
-            _buildTextField(
+            _buildImageField(
               controller: _coverCtrl,
               hint: s.coverHint,
             ),
@@ -353,6 +360,95 @@ class _MetadataPageState extends State<MetadataPage> {
     );
   }
 
+  Widget _buildImageField({
+    required TextEditingController controller,
+    required String hint,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildTextField(controller: controller, hint: hint),
+        ),
+        const SizedBox(width: 8),
+        IconButton(
+          onPressed: _uploading
+              ? null
+              : () => _showImagePicker(controller),
+          icon: Icon(
+            _uploading ? Icons.hourglass_top : Icons.image_outlined,
+            size: 20,
+          ),
+          tooltip: AppStrings.current.selectImage,
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showImagePicker(TextEditingController controller) async {
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return _ImagePickerSheet(
+          articleBody: widget.article.bodyContent,
+        );
+      },
+    );
+    if (result == null || result.isEmpty) return;
+
+    if (result == 'gallery' || result == 'camera') {
+      final source =
+          result == 'gallery' ? ImageSource.gallery : ImageSource.camera;
+      await _pickAndUploadImage(controller, source);
+    } else {
+      // 从文章选择的图片 URL
+      controller.text = result;
+    }
+  }
+
+  Future<void> _pickAndUploadImage(
+      TextEditingController controller, ImageSource source) async {
+    final s = AppStrings.current;
+    final imageHost =
+        ImageHostService(settings: widget.settingsService.settings);
+    if (!imageHost.isConfigured) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(s.imageHostNotConfigured)),
+        );
+      }
+      return;
+    }
+
+    final picker = ImagePicker();
+    final file = await picker.pickImage(source: source, maxWidth: 2048);
+    if (file == null) return;
+
+    setState(() => _uploading = true);
+    try {
+      final bytes = await file.readAsBytes();
+      final result = await imageHost.upload(bytes, file.name);
+      if (result.success && result.url != null) {
+        controller.text = result.url!;
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.error ?? s.imageUploadFailed),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(s.imageUploadFailed), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
   void _addCustomField() {
     setState(() {
       _customFields.add(_CustomFieldEntry(key: '', value: ''));
@@ -422,6 +518,7 @@ class _MetadataPageState extends State<MetadataPage> {
   }
 
   Widget _buildChipSelector({
+    required TextEditingController controller,
     required List<String> selected,
     required List<String> allOptions,
     required ValueChanged<String> onAdd,
@@ -452,6 +549,7 @@ class _MetadataPageState extends State<MetadataPage> {
         ),
         const SizedBox(height: 4),
         TextField(
+          controller: controller,
           decoration: InputDecoration(
             hintText: s.addNewHint,
             isDense: true,
@@ -468,6 +566,7 @@ class _MetadataPageState extends State<MetadataPage> {
             final trimmed = value.trim();
             if (trimmed.isNotEmpty) {
               onAdd(trimmed);
+              controller.clear();
             }
           },
         ),
@@ -606,6 +705,163 @@ class _SelectorSheetState extends State<_SelectorSheet> {
                     ),
             ),
           ],
+        );
+      },
+    );
+  }
+}
+
+/// 图片选择底部面板
+class _ImagePickerSheet extends StatefulWidget {
+  final String articleBody;
+
+  const _ImagePickerSheet({
+    required this.articleBody,
+  });
+
+  @override
+  State<_ImagePickerSheet> createState() => _ImagePickerSheetState();
+}
+
+class _ImagePickerSheetState extends State<_ImagePickerSheet>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+  List<String> _articleImages = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _extractArticleImages();
+  }
+
+  void _extractArticleImages() {
+    final regex = RegExp(r'!\[.*?\]\((https?://[^\)]+)\)');
+    _articleImages =
+        regex.allMatches(widget.articleBody).map((m) => m.group(1)!).toList();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppStrings.current;
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.3,
+      maxChildSize: 0.9,
+      expand: false,
+      builder: (ctx, scrollController) {
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  Text(
+                    s.selectImage,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+            TabBar(
+              controller: _tabController,
+              tabs: [
+                Tab(icon: const Icon(Icons.cloud_upload), text: s.uploadImage),
+                Tab(icon: const Icon(Icons.photo_library), text: s.fromArticle),
+              ],
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildUploadTab(scrollController),
+                  _buildArticleTab(scrollController),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildUploadTab(ScrollController scrollController) {
+    final s = AppStrings.current;
+    return ListView(
+      controller: scrollController,
+      padding: const EdgeInsets.all(16),
+      children: [
+        ListTile(
+          leading: const Icon(Icons.photo_library),
+          title: Text(s.uploadImage),
+          subtitle: const Text('Gallery'),
+          onTap: () => Navigator.pop(context, 'gallery'),
+        ),
+        ListTile(
+          leading: const Icon(Icons.camera_alt),
+          title: Text(s.uploadImage),
+          subtitle: const Text('Camera'),
+          onTap: () => Navigator.pop(context, 'camera'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildArticleTab(ScrollController scrollController) {
+    final s = AppStrings.current;
+    if (_articleImages.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.image_not_supported, size: 48, color: Colors.grey),
+            const SizedBox(height: 16),
+            Text(s.noImagesInArticle,
+                style: const TextStyle(color: Colors.grey)),
+          ],
+        ),
+      );
+    }
+
+    return GridView.builder(
+      controller: scrollController,
+      padding: const EdgeInsets.all(12),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+      ),
+      itemCount: _articleImages.length,
+      itemBuilder: (ctx, index) {
+        final url = _articleImages[index];
+        return GestureDetector(
+          onTap: () => Navigator.pop(context, url),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.network(
+              url,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                color: Colors.grey.shade200,
+                child: const Icon(Icons.broken_image, color: Colors.grey),
+              ),
+            ),
+          ),
         );
       },
     );

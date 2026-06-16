@@ -111,6 +111,15 @@ class AppStrings {
   final String selectCategories;
   final String noItemsAvailable;
 
+  // Image picker
+  final String selectImage;
+  final String uploadImage;
+  final String fromArticle;
+  final String inputUrl;
+  final String noImagesInArticle;
+  final String imageHostNotConfigured;
+  final String imageUploadFailed;
+
   const AppStrings._({
     required this.appTitle,
     required this.homeTitle,
@@ -206,6 +215,13 @@ class AppStrings {
     required this.selectTags,
     required this.selectCategories,
     required this.noItemsAvailable,
+    required this.selectImage,
+    required this.uploadImage,
+    required this.fromArticle,
+    required this.inputUrl,
+    required this.noImagesInArticle,
+    required this.imageHostNotConfigured,
+    required this.imageUploadFailed,
   });
 
   static const en = AppStrings._(
@@ -303,6 +319,13 @@ class AppStrings {
     selectTags: 'Select Tags',
     selectCategories: 'Select Categories',
     noItemsAvailable: 'No items available',
+    selectImage: 'Select Image',
+    uploadImage: 'Upload',
+    fromArticle: 'From Article',
+    inputUrl: 'Input URL',
+    noImagesInArticle: 'No images in article',
+    imageHostNotConfigured: 'Image host not configured',
+    imageUploadFailed: 'Upload failed',
   );
 
   static const zh = AppStrings._(
@@ -400,6 +423,13 @@ class AppStrings {
     selectTags: '选择标签',
     selectCategories: '选择分类',
     noItemsAvailable: '暂无可用项',
+    selectImage: '选择图片',
+    uploadImage: '上传图片',
+    fromArticle: '从文章选择',
+    inputUrl: '手动输入',
+    noImagesInArticle: '文章中没有图片',
+    imageHostNotConfigured: '图床未配置',
+    imageUploadFailed: '上传失败',
   );
 
   /// 应用当前语言设置，默认跟随系统。
