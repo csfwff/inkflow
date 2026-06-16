@@ -105,6 +105,11 @@ class AppStrings {
   final String addCustomField;
   final String customFieldKeyHint;
   final String customFieldValueHint;
+  final String selectFromExisting;
+  final String addNewHint;
+  final String selectTags;
+  final String selectCategories;
+  final String noItemsAvailable;
 
   const AppStrings._({
     required this.appTitle,
@@ -196,6 +201,11 @@ class AppStrings {
     required this.addCustomField,
     required this.customFieldKeyHint,
     required this.customFieldValueHint,
+    required this.selectFromExisting,
+    required this.addNewHint,
+    required this.selectTags,
+    required this.selectCategories,
+    required this.noItemsAvailable,
   });
 
   static const en = AppStrings._(
@@ -288,6 +298,11 @@ class AppStrings {
     addCustomField: 'Add Field',
     customFieldKeyHint: 'Key',
     customFieldValueHint: 'Value',
+    selectFromExisting: 'Select',
+    addNewHint: 'Type and press Enter to add',
+    selectTags: 'Select Tags',
+    selectCategories: 'Select Categories',
+    noItemsAvailable: 'No items available',
   );
 
   static const zh = AppStrings._(
@@ -380,6 +395,11 @@ class AppStrings {
     addCustomField: '添加字段',
     customFieldKeyHint: '字段名',
     customFieldValueHint: '字段值',
+    selectFromExisting: '从已有选择',
+    addNewHint: '输入后按回车添加',
+    selectTags: '选择标签',
+    selectCategories: '选择分类',
+    noItemsAvailable: '暂无可用项',
   );
 
   /// 应用当前语言设置，默认跟随系统。

@@ -76,6 +76,16 @@ class SyncService {
         await articleService.upsertFromGitHub(article);
       }
 
+      // 同步所有标签和分类到数据库
+      final allTags = <String>{};
+      final allCategories = <String>{};
+      for (final article in remoteArticles) {
+        allTags.addAll(article.tags);
+        allCategories.addAll(article.categories);
+      }
+      await articleService.ensureTags(allTags.toList());
+      await articleService.ensureCategories(allCategories.toList());
+
       // 检测远程已删除：本地 synced/repoDraft 但远程不存在的
       final localSynced = await articleService.getRemoteTracked();
       debugPrint('[Sync] Local synced/repoDraft count: ${localSynced.length}');

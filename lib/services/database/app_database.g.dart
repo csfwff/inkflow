@@ -952,15 +952,461 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
   }
 }
 
+class $TagRowsTable extends TagRows with TableInfo<$TagRowsTable, TagRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TagRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+      'name', aliasedName, false,
+      additionalChecks:
+          GeneratedColumn.checkTextLength(minTextLength: 1, maxTextLength: 100),
+      type: DriftSqlType.string,
+      requiredDuringInsert: true);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<String> createdAt = GeneratedColumn<String>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns => [id, name, createdAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'tag_rows';
+  @override
+  VerificationContext validateIntegrity(Insertable<TagRow> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+        {name},
+      ];
+  @override
+  TagRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TagRow(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      name: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $TagRowsTable createAlias(String alias) {
+    return $TagRowsTable(attachedDatabase, alias);
+  }
+}
+
+class TagRow extends DataClass implements Insertable<TagRow> {
+  final int id;
+  final String name;
+  final String createdAt;
+  const TagRow({required this.id, required this.name, required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['name'] = Variable<String>(name);
+    map['created_at'] = Variable<String>(createdAt);
+    return map;
+  }
+
+  TagRowsCompanion toCompanion(bool nullToAbsent) {
+    return TagRowsCompanion(
+      id: Value(id),
+      name: Value(name),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory TagRow.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TagRow(
+      id: serializer.fromJson<int>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      createdAt: serializer.fromJson<String>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'name': serializer.toJson<String>(name),
+      'createdAt': serializer.toJson<String>(createdAt),
+    };
+  }
+
+  TagRow copyWith({int? id, String? name, String? createdAt}) => TagRow(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  TagRow copyWithCompanion(TagRowsCompanion data) {
+    return TagRow(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TagRow(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TagRow &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.createdAt == this.createdAt);
+}
+
+class TagRowsCompanion extends UpdateCompanion<TagRow> {
+  final Value<int> id;
+  final Value<String> name;
+  final Value<String> createdAt;
+  const TagRowsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  TagRowsCompanion.insert({
+    this.id = const Value.absent(),
+    required String name,
+    required String createdAt,
+  })  : name = Value(name),
+        createdAt = Value(createdAt);
+  static Insertable<TagRow> custom({
+    Expression<int>? id,
+    Expression<String>? name,
+    Expression<String>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  TagRowsCompanion copyWith(
+      {Value<int>? id, Value<String>? name, Value<String>? createdAt}) {
+    return TagRowsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<String>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TagRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CategoryRowsTable extends CategoryRows
+    with TableInfo<$CategoryRowsTable, CategoryRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CategoryRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+      'name', aliasedName, false,
+      additionalChecks:
+          GeneratedColumn.checkTextLength(minTextLength: 1, maxTextLength: 100),
+      type: DriftSqlType.string,
+      requiredDuringInsert: true);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<String> createdAt = GeneratedColumn<String>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns => [id, name, createdAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'category_rows';
+  @override
+  VerificationContext validateIntegrity(Insertable<CategoryRow> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+        {name},
+      ];
+  @override
+  CategoryRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CategoryRow(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      name: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $CategoryRowsTable createAlias(String alias) {
+    return $CategoryRowsTable(attachedDatabase, alias);
+  }
+}
+
+class CategoryRow extends DataClass implements Insertable<CategoryRow> {
+  final int id;
+  final String name;
+  final String createdAt;
+  const CategoryRow(
+      {required this.id, required this.name, required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['name'] = Variable<String>(name);
+    map['created_at'] = Variable<String>(createdAt);
+    return map;
+  }
+
+  CategoryRowsCompanion toCompanion(bool nullToAbsent) {
+    return CategoryRowsCompanion(
+      id: Value(id),
+      name: Value(name),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory CategoryRow.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CategoryRow(
+      id: serializer.fromJson<int>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      createdAt: serializer.fromJson<String>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'name': serializer.toJson<String>(name),
+      'createdAt': serializer.toJson<String>(createdAt),
+    };
+  }
+
+  CategoryRow copyWith({int? id, String? name, String? createdAt}) =>
+      CategoryRow(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  CategoryRow copyWithCompanion(CategoryRowsCompanion data) {
+    return CategoryRow(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CategoryRow(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CategoryRow &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.createdAt == this.createdAt);
+}
+
+class CategoryRowsCompanion extends UpdateCompanion<CategoryRow> {
+  final Value<int> id;
+  final Value<String> name;
+  final Value<String> createdAt;
+  const CategoryRowsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  CategoryRowsCompanion.insert({
+    this.id = const Value.absent(),
+    required String name,
+    required String createdAt,
+  })  : name = Value(name),
+        createdAt = Value(createdAt);
+  static Insertable<CategoryRow> custom({
+    Expression<int>? id,
+    Expression<String>? name,
+    Expression<String>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  CategoryRowsCompanion copyWith(
+      {Value<int>? id, Value<String>? name, Value<String>? createdAt}) {
+    return CategoryRowsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<String>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CategoryRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $ArticleRowsTable articleRows = $ArticleRowsTable(this);
+  late final $TagRowsTable tagRows = $TagRowsTable(this);
+  late final $CategoryRowsTable categoryRows = $CategoryRowsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities => [articleRows];
+  List<DatabaseSchemaEntity> get allSchemaEntities =>
+      [articleRows, tagRows, categoryRows];
 }
 
 typedef $$ArticleRowsTableCreateCompanionBuilder = ArticleRowsCompanion
@@ -1370,10 +1816,280 @@ typedef $$ArticleRowsTableProcessedTableManager = ProcessedTableManager<
     (ArticleRow, BaseReferences<_$AppDatabase, $ArticleRowsTable, ArticleRow>),
     ArticleRow,
     PrefetchHooks Function()>;
+typedef $$TagRowsTableCreateCompanionBuilder = TagRowsCompanion Function({
+  Value<int> id,
+  required String name,
+  required String createdAt,
+});
+typedef $$TagRowsTableUpdateCompanionBuilder = TagRowsCompanion Function({
+  Value<int> id,
+  Value<String> name,
+  Value<String> createdAt,
+});
+
+class $$TagRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $TagRowsTable> {
+  $$TagRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$TagRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $TagRowsTable> {
+  $$TagRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$TagRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TagRowsTable> {
+  $$TagRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$TagRowsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $TagRowsTable,
+    TagRow,
+    $$TagRowsTableFilterComposer,
+    $$TagRowsTableOrderingComposer,
+    $$TagRowsTableAnnotationComposer,
+    $$TagRowsTableCreateCompanionBuilder,
+    $$TagRowsTableUpdateCompanionBuilder,
+    (TagRow, BaseReferences<_$AppDatabase, $TagRowsTable, TagRow>),
+    TagRow,
+    PrefetchHooks Function()> {
+  $$TagRowsTableTableManager(_$AppDatabase db, $TagRowsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TagRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TagRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TagRowsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<String> name = const Value.absent(),
+            Value<String> createdAt = const Value.absent(),
+          }) =>
+              TagRowsCompanion(
+            id: id,
+            name: name,
+            createdAt: createdAt,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required String name,
+            required String createdAt,
+          }) =>
+              TagRowsCompanion.insert(
+            id: id,
+            name: name,
+            createdAt: createdAt,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$TagRowsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $TagRowsTable,
+    TagRow,
+    $$TagRowsTableFilterComposer,
+    $$TagRowsTableOrderingComposer,
+    $$TagRowsTableAnnotationComposer,
+    $$TagRowsTableCreateCompanionBuilder,
+    $$TagRowsTableUpdateCompanionBuilder,
+    (TagRow, BaseReferences<_$AppDatabase, $TagRowsTable, TagRow>),
+    TagRow,
+    PrefetchHooks Function()>;
+typedef $$CategoryRowsTableCreateCompanionBuilder = CategoryRowsCompanion
+    Function({
+  Value<int> id,
+  required String name,
+  required String createdAt,
+});
+typedef $$CategoryRowsTableUpdateCompanionBuilder = CategoryRowsCompanion
+    Function({
+  Value<int> id,
+  Value<String> name,
+  Value<String> createdAt,
+});
+
+class $$CategoryRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $CategoryRowsTable> {
+  $$CategoryRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$CategoryRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CategoryRowsTable> {
+  $$CategoryRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$CategoryRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CategoryRowsTable> {
+  $$CategoryRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$CategoryRowsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $CategoryRowsTable,
+    CategoryRow,
+    $$CategoryRowsTableFilterComposer,
+    $$CategoryRowsTableOrderingComposer,
+    $$CategoryRowsTableAnnotationComposer,
+    $$CategoryRowsTableCreateCompanionBuilder,
+    $$CategoryRowsTableUpdateCompanionBuilder,
+    (
+      CategoryRow,
+      BaseReferences<_$AppDatabase, $CategoryRowsTable, CategoryRow>
+    ),
+    CategoryRow,
+    PrefetchHooks Function()> {
+  $$CategoryRowsTableTableManager(_$AppDatabase db, $CategoryRowsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CategoryRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CategoryRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CategoryRowsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<String> name = const Value.absent(),
+            Value<String> createdAt = const Value.absent(),
+          }) =>
+              CategoryRowsCompanion(
+            id: id,
+            name: name,
+            createdAt: createdAt,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required String name,
+            required String createdAt,
+          }) =>
+              CategoryRowsCompanion.insert(
+            id: id,
+            name: name,
+            createdAt: createdAt,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$CategoryRowsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $CategoryRowsTable,
+    CategoryRow,
+    $$CategoryRowsTableFilterComposer,
+    $$CategoryRowsTableOrderingComposer,
+    $$CategoryRowsTableAnnotationComposer,
+    $$CategoryRowsTableCreateCompanionBuilder,
+    $$CategoryRowsTableUpdateCompanionBuilder,
+    (
+      CategoryRow,
+      BaseReferences<_$AppDatabase, $CategoryRowsTable, CategoryRow>
+    ),
+    CategoryRow,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
   $$ArticleRowsTableTableManager get articleRows =>
       $$ArticleRowsTableTableManager(_db, _db.articleRows);
+  $$TagRowsTableTableManager get tagRows =>
+      $$TagRowsTableTableManager(_db, _db.tagRows);
+  $$CategoryRowsTableTableManager get categoryRows =>
+      $$CategoryRowsTableTableManager(_db, _db.categoryRows);
 }

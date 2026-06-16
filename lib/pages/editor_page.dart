@@ -237,7 +237,10 @@ class _EditorPageState extends State<EditorPage> {
       context,
       MaterialPageRoute(
         builder: (_) => MetadataPage(
-            article: _editingArticle!, settingsService: settingsService),
+          article: _editingArticle!,
+          settingsService: settingsService,
+          articleService: articleService,
+        ),
       ),
     );
 
@@ -269,6 +272,10 @@ class _EditorPageState extends State<EditorPage> {
       final id = await articleService.insert(article);
       _editingArticle = await articleService.getById(id);
     }
+
+    // 同步标签和分类到数据库
+    await articleService.ensureTags(article.tags);
+    await articleService.ensureCategories(article.categories);
 
     if (!mounted) return false;
     setState(() => _dirty = false);

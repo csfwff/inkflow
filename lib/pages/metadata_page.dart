@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_strings.dart';
 import '../models/article.dart';
+import '../services/article_service.dart';
 import '../services/settings_service.dart';
 
 class MetadataPage extends StatefulWidget {
   final Article article;
   final SettingsService settingsService;
+  final ArticleService articleService;
 
-  const MetadataPage({super.key, required this.article, required this.settingsService});
+  const MetadataPage({
+    super.key,
+    required this.article,
+    required this.settingsService,
+    required this.articleService,
+  });
 
   @override
   State<MetadataPage> createState() => _MetadataPageState();
@@ -44,6 +51,14 @@ class _MetadataPageState extends State<MetadataPage> {
   /// 自定义字段列表（key, value, keyCtrl, valueCtrl）
   late List<_CustomFieldEntry> _customFields;
 
+  /// 当前文章的标签和分类列表
+  late List<String> _selectedTags;
+  late List<String> _selectedCategories;
+
+  /// 数据库中已有的标签和分类
+  List<String> _allTags = [];
+  List<String> _allCategories = [];
+
   @override
   void initState() {
     super.initState();
@@ -58,6 +73,9 @@ class _MetadataPageState extends State<MetadataPage> {
     _descriptionCtrl = TextEditingController(text: article.description ?? '');
     _authorCtrl = TextEditingController(text: article.author ?? '');
 
+    _selectedTags = List.from(article.tags);
+    _selectedCategories = List.from(article.categories);
+
     // 初始化自定义字段
     _customFields = article.customFields.entries
         .map((e) => _CustomFieldEntry(
@@ -65,6 +83,20 @@ class _MetadataPageState extends State<MetadataPage> {
               value: e.value,
             ))
         .toList();
+
+    // 加载已有的标签和分类
+    _loadTagsAndCategories();
+  }
+
+  Future<void> _loadTagsAndCategories() async {
+    final tags = await widget.articleService.getAllTagNames();
+    final categories = await widget.articleService.getAllCategoryNames();
+    if (mounted) {
+      setState(() {
+        _allTags = tags;
+        _allCategories = categories;
+      });
+    }
   }
 
   @override
@@ -81,22 +113,6 @@ class _MetadataPageState extends State<MetadataPage> {
       field.dispose();
     }
     super.dispose();
-  }
-
-  List<String> _parseTags(String text) {
-    return text
-        .split(',')
-        .map((t) => t.trim())
-        .where((t) => t.isNotEmpty)
-        .toList();
-  }
-
-  List<String> _parseCategories(String text) {
-    return text
-        .split('\n')
-        .map((c) => c.trim())
-        .where((c) => c.isNotEmpty)
-        .toList();
   }
 
   String? _emptyToNull(String text) {
@@ -129,8 +145,8 @@ class _MetadataPageState extends State<MetadataPage> {
 
   void _save() {
     final article = widget.article;
-    article.tags = _parseTags(_tagsCtrl.text);
-    article.categories = _parseCategories(_categoriesCtrl.text);
+    article.tags = List.from(_selectedTags);
+    article.categories = List.from(_selectedCategories);
     article.permalink = _emptyToNull(_permalinkCtrl.text);
     article.topImg = _emptyToNull(_topImgCtrl.text);
     article.cover = _emptyToNull(_coverCtrl.text);
@@ -172,21 +188,47 @@ class _MetadataPageState extends State<MetadataPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Tags & Categories
+            // Tags
             _buildSectionTitle(s.tags, Icons.tag),
             const SizedBox(height: 8),
-            _buildTextField(
-              controller: _tagsCtrl,
-              hint: s.tagsHint,
+            _buildChipSelector(
+              selected: _selectedTags,
+              allOptions: _allTags,
+              onAdd: (value) {
+                setState(() {
+                  if (!_selectedTags.contains(value)) {
+                    _selectedTags.add(value);
+                  }
+                });
+              },
+              onRemove: (value) {
+                setState(() {
+                  _selectedTags.remove(value);
+                });
+              },
+              onShowAll: () => _showTagSelector(),
             ),
             const SizedBox(height: 16),
 
+            // Categories
             _buildSectionTitle(s.categories, Icons.folder_outlined),
             const SizedBox(height: 8),
-            _buildTextField(
-              controller: _categoriesCtrl,
-              hint: s.categoriesHint,
-              maxLines: 2,
+            _buildChipSelector(
+              selected: _selectedCategories,
+              allOptions: _allCategories,
+              onAdd: (value) {
+                setState(() {
+                  if (!_selectedCategories.contains(value)) {
+                    _selectedCategories.add(value);
+                  }
+                });
+              },
+              onRemove: (value) {
+                setState(() {
+                  _selectedCategories.remove(value);
+                });
+              },
+              onShowAll: () => _showCategorySelector(),
             ),
             const SizedBox(height: 16),
 
@@ -377,5 +419,195 @@ class _MetadataPageState extends State<MetadataPage> {
         ),
       );
     });
+  }
+
+  Widget _buildChipSelector({
+    required List<String> selected,
+    required List<String> allOptions,
+    required ValueChanged<String> onAdd,
+    required ValueChanged<String> onRemove,
+    required VoidCallback onShowAll,
+  }) {
+    final s = AppStrings.current;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            ...selected.map((tag) => Chip(
+                  label: Text(tag),
+                  deleteIcon: const Icon(Icons.close, size: 16),
+                  onDeleted: () => onRemove(tag),
+                  visualDensity: VisualDensity.compact,
+                )),
+            ActionChip(
+              avatar: const Icon(Icons.add, size: 16),
+              label: Text(s.selectFromExisting),
+              onPressed: onShowAll,
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        TextField(
+          decoration: InputDecoration(
+            hintText: s.addNewHint,
+            isDense: true,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            border: const OutlineInputBorder(),
+            filled: true,
+            fillColor:
+                Theme.of(context).colorScheme.surfaceContainerLowest,
+            suffixIcon: const Icon(Icons.add, size: 18),
+          ),
+          style: const TextStyle(fontSize: 14),
+          onSubmitted: (value) {
+            final trimmed = value.trim();
+            if (trimmed.isNotEmpty) {
+              onAdd(trimmed);
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  void _showTagSelector() {
+    final s = AppStrings.current;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return _SelectorSheet(
+          title: s.selectTags,
+          allOptions: _allTags,
+          selected: _selectedTags,
+          onChanged: (newSelected) {
+            setState(() {
+              _selectedTags = newSelected;
+            });
+          },
+        );
+      },
+    );
+  }
+
+  void _showCategorySelector() {
+    final s = AppStrings.current;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return _SelectorSheet(
+          title: s.selectCategories,
+          allOptions: _allCategories,
+          selected: _selectedCategories,
+          onChanged: (newSelected) {
+            setState(() {
+              _selectedCategories = newSelected;
+            });
+          },
+        );
+      },
+    );
+  }
+}
+
+class _SelectorSheet extends StatefulWidget {
+  final String title;
+  final List<String> allOptions;
+  final List<String> selected;
+  final ValueChanged<List<String>> onChanged;
+
+  const _SelectorSheet({
+    required this.title,
+    required this.allOptions,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  @override
+  State<_SelectorSheet> createState() => _SelectorSheetState();
+}
+
+class _SelectorSheetState extends State<_SelectorSheet> {
+  late List<String> _tempSelected;
+
+  @override
+  void initState() {
+    super.initState();
+    _tempSelected = List.from(widget.selected);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.3,
+      maxChildSize: 0.9,
+      expand: false,
+      builder: (ctx, scrollController) {
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Text(
+                    widget.title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () {
+                      widget.onChanged(_tempSelected);
+                      Navigator.pop(context);
+                    },
+                    child: Text(AppStrings.current.done),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: widget.allOptions.isEmpty
+                  ? Center(
+                      child: Text(
+                        AppStrings.current.noItemsAvailable,
+                        style: const TextStyle(color: Colors.grey),
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: scrollController,
+                      itemCount: widget.allOptions.length,
+                      itemBuilder: (ctx, index) {
+                        final option = widget.allOptions[index];
+                        final isSelected = _tempSelected.contains(option);
+                        return CheckboxListTile(
+                          title: Text(option),
+                          value: isSelected,
+                          onChanged: (value) {
+                            setState(() {
+                              if (value == true) {
+                                _tempSelected.add(option);
+                              } else {
+                                _tempSelected.remove(option);
+                              }
+                            });
+                          },
+                        );
+                      },
+                    ),
+            ),
+          ],
+        );
+      },
+    );
   }
 }

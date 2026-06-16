@@ -188,4 +188,88 @@ class ArticleService {
       ),
     );
   }
+
+  // --- Tag CRUD ---
+
+  Future<List<TagRow>> getAllTags() async {
+    return await (_db.select(_db.tagRows)
+          ..orderBy([(t) => OrderingTerm.asc(t.name)]))
+        .get();
+  }
+
+  Future<List<String>> getAllTagNames() async {
+    final rows = await getAllTags();
+    return rows.map((r) => r.name).toList();
+  }
+
+  Future<int> addTag(String name) async {
+    return await _db.into(_db.tagRows).insert(
+          TagRowsCompanion.insert(
+            name: name,
+            createdAt: DateTime.now().toIso8601String(),
+          ),
+        );
+  }
+
+  Future<void> addTagIfNotExists(String name) async {
+    final existing = await (_db.select(_db.tagRows)
+          ..where((t) => t.name.equals(name))
+          ..limit(1))
+        .getSingleOrNull();
+    if (existing == null) {
+      await addTag(name);
+    }
+  }
+
+  Future<void> deleteTag(int id) async {
+    await (_db.delete(_db.tagRows)..where((t) => t.id.equals(id))).go();
+  }
+
+  Future<void> ensureTags(List<String> names) async {
+    for (final name in names) {
+      await addTagIfNotExists(name);
+    }
+  }
+
+  // --- Category CRUD ---
+
+  Future<List<CategoryRow>> getAllCategories() async {
+    return await (_db.select(_db.categoryRows)
+          ..orderBy([(t) => OrderingTerm.asc(t.name)]))
+        .get();
+  }
+
+  Future<List<String>> getAllCategoryNames() async {
+    final rows = await getAllCategories();
+    return rows.map((r) => r.name).toList();
+  }
+
+  Future<int> addCategory(String name) async {
+    return await _db.into(_db.categoryRows).insert(
+          CategoryRowsCompanion.insert(
+            name: name,
+            createdAt: DateTime.now().toIso8601String(),
+          ),
+        );
+  }
+
+  Future<void> addCategoryIfNotExists(String name) async {
+    final existing = await (_db.select(_db.categoryRows)
+          ..where((t) => t.name.equals(name))
+          ..limit(1))
+        .getSingleOrNull();
+    if (existing == null) {
+      await addCategory(name);
+    }
+  }
+
+  Future<void> deleteCategory(int id) async {
+    await (_db.delete(_db.categoryRows)..where((t) => t.id.equals(id))).go();
+  }
+
+  Future<void> ensureCategories(List<String> names) async {
+    for (final name in names) {
+      await addCategoryIfNotExists(name);
+    }
+  }
 }

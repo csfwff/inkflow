@@ -30,12 +30,32 @@ class ArticleRows extends Table {
   TextColumn get customFields => text().withDefault(const Constant('{}'))();
 }
 
-@DriftDatabase(tables: [ArticleRows])
+/// 标签表
+class TagRows extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get name => text().withLength(min: 1, max: 100)();
+  TextColumn get createdAt => text()();
+
+  @override
+  List<Set<Column>> get uniqueKeys => [{name}];
+}
+
+/// 分类表
+class CategoryRows extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get name => text().withLength(min: 1, max: 100)();
+  TextColumn get createdAt => text()();
+
+  @override
+  List<Set<Column>> get uniqueKeys => [{name}];
+}
+
+@DriftDatabase(tables: [ArticleRows, TagRows, CategoryRows])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -47,6 +67,10 @@ class AppDatabase extends _$AppDatabase {
             await m.database.customStatement(
               'ALTER TABLE article_rows ADD COLUMN custom_fields TEXT NOT NULL DEFAULT \'{}\'',
             );
+          }
+          if (from < 5) {
+            await m.createTable(tagRows);
+            await m.createTable(categoryRows);
           }
         },
       );
