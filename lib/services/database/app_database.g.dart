@@ -119,27 +119,6 @@ class $ArticleRowsTable extends ArticleRows
   late final GeneratedColumn<String> cover = GeneratedColumn<String>(
       'cover', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _layoutMeta = const VerificationMeta('layout');
-  @override
-  late final GeneratedColumn<String> layout = GeneratedColumn<String>(
-      'layout', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _commentsMeta =
-      const VerificationMeta('comments');
-  @override
-  late final GeneratedColumn<int> comments = GeneratedColumn<int>(
-      'comments', aliasedName, false,
-      type: DriftSqlType.int,
-      requiredDuringInsert: false,
-      defaultValue: const Constant(1));
-  static const VerificationMeta _publishedMeta =
-      const VerificationMeta('published');
-  @override
-  late final GeneratedColumn<int> published = GeneratedColumn<int>(
-      'published', aliasedName, false,
-      type: DriftSqlType.int,
-      requiredDuringInsert: false,
-      defaultValue: const Constant(1));
   static const VerificationMeta _excerptMeta =
       const VerificationMeta('excerpt');
   @override
@@ -184,9 +163,6 @@ class $ArticleRowsTable extends ArticleRows
         permalink,
         topImg,
         cover,
-        layout,
-        comments,
-        published,
         excerpt,
         description,
         author,
@@ -271,18 +247,6 @@ class $ArticleRowsTable extends ArticleRows
       context.handle(
           _coverMeta, cover.isAcceptableOrUnknown(data['cover']!, _coverMeta));
     }
-    if (data.containsKey('layout')) {
-      context.handle(_layoutMeta,
-          layout.isAcceptableOrUnknown(data['layout']!, _layoutMeta));
-    }
-    if (data.containsKey('comments')) {
-      context.handle(_commentsMeta,
-          comments.isAcceptableOrUnknown(data['comments']!, _commentsMeta));
-    }
-    if (data.containsKey('published')) {
-      context.handle(_publishedMeta,
-          published.isAcceptableOrUnknown(data['published']!, _publishedMeta));
-    }
     if (data.containsKey('excerpt')) {
       context.handle(_excerptMeta,
           excerpt.isAcceptableOrUnknown(data['excerpt']!, _excerptMeta));
@@ -348,12 +312,6 @@ class $ArticleRowsTable extends ArticleRows
           .read(DriftSqlType.string, data['${effectivePrefix}top_img']),
       cover: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}cover']),
-      layout: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}layout']),
-      comments: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}comments'])!,
-      published: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}published'])!,
       excerpt: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}excerpt']),
       description: attachedDatabase.typeMapping
@@ -397,9 +355,6 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
   final String? permalink;
   final String? topImg;
   final String? cover;
-  final String? layout;
-  final int comments;
-  final int published;
   final String? excerpt;
   final String? description;
   final String? author;
@@ -422,9 +377,6 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
       this.permalink,
       this.topImg,
       this.cover,
-      this.layout,
-      required this.comments,
-      required this.published,
       this.excerpt,
       this.description,
       this.author,
@@ -465,11 +417,6 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
     if (!nullToAbsent || cover != null) {
       map['cover'] = Variable<String>(cover);
     }
-    if (!nullToAbsent || layout != null) {
-      map['layout'] = Variable<String>(layout);
-    }
-    map['comments'] = Variable<int>(comments);
-    map['published'] = Variable<int>(published);
     if (!nullToAbsent || excerpt != null) {
       map['excerpt'] = Variable<String>(excerpt);
     }
@@ -512,10 +459,6 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
           topImg == null && nullToAbsent ? const Value.absent() : Value(topImg),
       cover:
           cover == null && nullToAbsent ? const Value.absent() : Value(cover),
-      layout:
-          layout == null && nullToAbsent ? const Value.absent() : Value(layout),
-      comments: Value(comments),
-      published: Value(published),
       excerpt: excerpt == null && nullToAbsent
           ? const Value.absent()
           : Value(excerpt),
@@ -551,9 +494,6 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
       permalink: serializer.fromJson<String?>(json['permalink']),
       topImg: serializer.fromJson<String?>(json['topImg']),
       cover: serializer.fromJson<String?>(json['cover']),
-      layout: serializer.fromJson<String?>(json['layout']),
-      comments: serializer.fromJson<int>(json['comments']),
-      published: serializer.fromJson<int>(json['published']),
       excerpt: serializer.fromJson<String?>(json['excerpt']),
       description: serializer.fromJson<String?>(json['description']),
       author: serializer.fromJson<String?>(json['author']),
@@ -583,9 +523,6 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
       'permalink': serializer.toJson<String?>(permalink),
       'topImg': serializer.toJson<String?>(topImg),
       'cover': serializer.toJson<String?>(cover),
-      'layout': serializer.toJson<String?>(layout),
-      'comments': serializer.toJson<int>(comments),
-      'published': serializer.toJson<int>(published),
       'excerpt': serializer.toJson<String?>(excerpt),
       'description': serializer.toJson<String?>(description),
       'author': serializer.toJson<String?>(author),
@@ -611,9 +548,6 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
           Value<String?> permalink = const Value.absent(),
           Value<String?> topImg = const Value.absent(),
           Value<String?> cover = const Value.absent(),
-          Value<String?> layout = const Value.absent(),
-          int? comments,
-          int? published,
           Value<String?> excerpt = const Value.absent(),
           Value<String?> description = const Value.absent(),
           Value<String?> author = const Value.absent(),
@@ -636,9 +570,6 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
         permalink: permalink.present ? permalink.value : this.permalink,
         topImg: topImg.present ? topImg.value : this.topImg,
         cover: cover.present ? cover.value : this.cover,
-        layout: layout.present ? layout.value : this.layout,
-        comments: comments ?? this.comments,
-        published: published ?? this.published,
         excerpt: excerpt.present ? excerpt.value : this.excerpt,
         description: description.present ? description.value : this.description,
         author: author.present ? author.value : this.author,
@@ -666,9 +597,6 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
       permalink: data.permalink.present ? data.permalink.value : this.permalink,
       topImg: data.topImg.present ? data.topImg.value : this.topImg,
       cover: data.cover.present ? data.cover.value : this.cover,
-      layout: data.layout.present ? data.layout.value : this.layout,
-      comments: data.comments.present ? data.comments.value : this.comments,
-      published: data.published.present ? data.published.value : this.published,
       excerpt: data.excerpt.present ? data.excerpt.value : this.excerpt,
       description:
           data.description.present ? data.description.value : this.description,
@@ -699,9 +627,6 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
           ..write('permalink: $permalink, ')
           ..write('topImg: $topImg, ')
           ..write('cover: $cover, ')
-          ..write('layout: $layout, ')
-          ..write('comments: $comments, ')
-          ..write('published: $published, ')
           ..write('excerpt: $excerpt, ')
           ..write('description: $description, ')
           ..write('author: $author, ')
@@ -729,9 +654,6 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
         permalink,
         topImg,
         cover,
-        layout,
-        comments,
-        published,
         excerpt,
         description,
         author,
@@ -758,9 +680,6 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
           other.permalink == this.permalink &&
           other.topImg == this.topImg &&
           other.cover == this.cover &&
-          other.layout == this.layout &&
-          other.comments == this.comments &&
-          other.published == this.published &&
           other.excerpt == this.excerpt &&
           other.description == this.description &&
           other.author == this.author &&
@@ -785,9 +704,6 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
   final Value<String?> permalink;
   final Value<String?> topImg;
   final Value<String?> cover;
-  final Value<String?> layout;
-  final Value<int> comments;
-  final Value<int> published;
   final Value<String?> excerpt;
   final Value<String?> description;
   final Value<String?> author;
@@ -810,9 +726,6 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
     this.permalink = const Value.absent(),
     this.topImg = const Value.absent(),
     this.cover = const Value.absent(),
-    this.layout = const Value.absent(),
-    this.comments = const Value.absent(),
-    this.published = const Value.absent(),
     this.excerpt = const Value.absent(),
     this.description = const Value.absent(),
     this.author = const Value.absent(),
@@ -836,9 +749,6 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
     this.permalink = const Value.absent(),
     this.topImg = const Value.absent(),
     this.cover = const Value.absent(),
-    this.layout = const Value.absent(),
-    this.comments = const Value.absent(),
-    this.published = const Value.absent(),
     this.excerpt = const Value.absent(),
     this.description = const Value.absent(),
     this.author = const Value.absent(),
@@ -865,9 +775,6 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
     Expression<String>? permalink,
     Expression<String>? topImg,
     Expression<String>? cover,
-    Expression<String>? layout,
-    Expression<int>? comments,
-    Expression<int>? published,
     Expression<String>? excerpt,
     Expression<String>? description,
     Expression<String>? author,
@@ -891,9 +798,6 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
       if (permalink != null) 'permalink': permalink,
       if (topImg != null) 'top_img': topImg,
       if (cover != null) 'cover': cover,
-      if (layout != null) 'layout': layout,
-      if (comments != null) 'comments': comments,
-      if (published != null) 'published': published,
       if (excerpt != null) 'excerpt': excerpt,
       if (description != null) 'description': description,
       if (author != null) 'author': author,
@@ -919,9 +823,6 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
       Value<String?>? permalink,
       Value<String?>? topImg,
       Value<String?>? cover,
-      Value<String?>? layout,
-      Value<int>? comments,
-      Value<int>? published,
       Value<String?>? excerpt,
       Value<String?>? description,
       Value<String?>? author,
@@ -944,9 +845,6 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
       permalink: permalink ?? this.permalink,
       topImg: topImg ?? this.topImg,
       cover: cover ?? this.cover,
-      layout: layout ?? this.layout,
-      comments: comments ?? this.comments,
-      published: published ?? this.published,
       excerpt: excerpt ?? this.excerpt,
       description: description ?? this.description,
       author: author ?? this.author,
@@ -1010,15 +908,6 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
     if (cover.present) {
       map['cover'] = Variable<String>(cover.value);
     }
-    if (layout.present) {
-      map['layout'] = Variable<String>(layout.value);
-    }
-    if (comments.present) {
-      map['comments'] = Variable<int>(comments.value);
-    }
-    if (published.present) {
-      map['published'] = Variable<int>(published.value);
-    }
     if (excerpt.present) {
       map['excerpt'] = Variable<String>(excerpt.value);
     }
@@ -1054,9 +943,6 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
           ..write('permalink: $permalink, ')
           ..write('topImg: $topImg, ')
           ..write('cover: $cover, ')
-          ..write('layout: $layout, ')
-          ..write('comments: $comments, ')
-          ..write('published: $published, ')
           ..write('excerpt: $excerpt, ')
           ..write('description: $description, ')
           ..write('author: $author, ')
@@ -1096,9 +982,6 @@ typedef $$ArticleRowsTableCreateCompanionBuilder = ArticleRowsCompanion
   Value<String?> permalink,
   Value<String?> topImg,
   Value<String?> cover,
-  Value<String?> layout,
-  Value<int> comments,
-  Value<int> published,
   Value<String?> excerpt,
   Value<String?> description,
   Value<String?> author,
@@ -1123,9 +1006,6 @@ typedef $$ArticleRowsTableUpdateCompanionBuilder = ArticleRowsCompanion
   Value<String?> permalink,
   Value<String?> topImg,
   Value<String?> cover,
-  Value<String?> layout,
-  Value<int> comments,
-  Value<int> published,
   Value<String?> excerpt,
   Value<String?> description,
   Value<String?> author,
@@ -1195,15 +1075,6 @@ class $$ArticleRowsTableFilterComposer
 
   ColumnFilters<String> get cover => $composableBuilder(
       column: $table.cover, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get layout => $composableBuilder(
-      column: $table.layout, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<int> get comments => $composableBuilder(
-      column: $table.comments, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<int> get published => $composableBuilder(
-      column: $table.published, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get excerpt => $composableBuilder(
       column: $table.excerpt, builder: (column) => ColumnFilters(column));
@@ -1277,15 +1148,6 @@ class $$ArticleRowsTableOrderingComposer
 
   ColumnOrderings<String> get cover => $composableBuilder(
       column: $table.cover, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<String> get layout => $composableBuilder(
-      column: $table.layout, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<int> get comments => $composableBuilder(
-      column: $table.comments, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<int> get published => $composableBuilder(
-      column: $table.published, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get excerpt => $composableBuilder(
       column: $table.excerpt, builder: (column) => ColumnOrderings(column));
@@ -1362,15 +1224,6 @@ class $$ArticleRowsTableAnnotationComposer
   GeneratedColumn<String> get cover =>
       $composableBuilder(column: $table.cover, builder: (column) => column);
 
-  GeneratedColumn<String> get layout =>
-      $composableBuilder(column: $table.layout, builder: (column) => column);
-
-  GeneratedColumn<int> get comments =>
-      $composableBuilder(column: $table.comments, builder: (column) => column);
-
-  GeneratedColumn<int> get published =>
-      $composableBuilder(column: $table.published, builder: (column) => column);
-
   GeneratedColumn<String> get excerpt =>
       $composableBuilder(column: $table.excerpt, builder: (column) => column);
 
@@ -1424,9 +1277,6 @@ class $$ArticleRowsTableTableManager extends RootTableManager<
             Value<String?> permalink = const Value.absent(),
             Value<String?> topImg = const Value.absent(),
             Value<String?> cover = const Value.absent(),
-            Value<String?> layout = const Value.absent(),
-            Value<int> comments = const Value.absent(),
-            Value<int> published = const Value.absent(),
             Value<String?> excerpt = const Value.absent(),
             Value<String?> description = const Value.absent(),
             Value<String?> author = const Value.absent(),
@@ -1450,9 +1300,6 @@ class $$ArticleRowsTableTableManager extends RootTableManager<
             permalink: permalink,
             topImg: topImg,
             cover: cover,
-            layout: layout,
-            comments: comments,
-            published: published,
             excerpt: excerpt,
             description: description,
             author: author,
@@ -1476,9 +1323,6 @@ class $$ArticleRowsTableTableManager extends RootTableManager<
             Value<String?> permalink = const Value.absent(),
             Value<String?> topImg = const Value.absent(),
             Value<String?> cover = const Value.absent(),
-            Value<String?> layout = const Value.absent(),
-            Value<int> comments = const Value.absent(),
-            Value<int> published = const Value.absent(),
             Value<String?> excerpt = const Value.absent(),
             Value<String?> description = const Value.absent(),
             Value<String?> author = const Value.absent(),
@@ -1502,9 +1346,6 @@ class $$ArticleRowsTableTableManager extends RootTableManager<
             permalink: permalink,
             topImg: topImg,
             cover: cover,
-            layout: layout,
-            comments: comments,
-            published: published,
             excerpt: excerpt,
             description: description,
             author: author,

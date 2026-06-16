@@ -24,9 +24,6 @@ class ArticleRows extends Table {
   TextColumn get permalink => text().nullable()();
   TextColumn get topImg => text().nullable()();
   TextColumn get cover => text().nullable()();
-  TextColumn get layout => text().nullable()();
-  IntColumn get comments => integer().withDefault(const Constant(1))();
-  IntColumn get published => integer().withDefault(const Constant(1))();
   TextColumn get excerpt => text().nullable()();
   TextColumn get description => text().nullable()();
   TextColumn get author => text().nullable()();
@@ -80,9 +77,6 @@ ArticleRowsCompanion toCompanion(Article a) => ArticleRowsCompanion(
       permalink: Value(a.permalink),
       topImg: Value(a.topImg),
       cover: Value(a.cover),
-      layout: Value(a.layout),
-      comments: Value(a.comments == true ? 1 : 0),
-      published: Value(a.published == true ? 1 : 0),
       excerpt: Value(a.excerpt),
       description: Value(a.description),
       author: Value(a.author),
@@ -107,9 +101,6 @@ Article articleFromRow(ArticleRow row) => Article(
       permalink: row.permalink,
       topImg: row.topImg,
       cover: row.cover,
-      layout: row.layout,
-      comments: row.comments == 1,
-      published: row.published == 1,
       excerpt: row.excerpt,
       description: row.description,
       author: row.author,

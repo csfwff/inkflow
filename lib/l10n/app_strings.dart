@@ -95,12 +95,6 @@ class AppStrings {
   final String topImgHint;
   final String cover;
   final String coverHint;
-  final String layout;
-  final String layoutPost;
-  final String layoutDraft;
-  final String layoutPage;
-  final String comments;
-  final String published;
   final String excerpt;
   final String excerptHint;
   final String description;
@@ -192,12 +186,6 @@ class AppStrings {
     required this.topImgHint,
     required this.cover,
     required this.coverHint,
-    required this.layout,
-    required this.layoutPost,
-    required this.layoutDraft,
-    required this.layoutPage,
-    required this.comments,
-    required this.published,
     required this.excerpt,
     required this.excerptHint,
     required this.description,
@@ -290,12 +278,6 @@ class AppStrings {
     topImgHint: 'Header image URL',
     cover: 'Cover',
     coverHint: 'Cover image URL',
-    layout: 'Layout',
-    layoutPost: 'Post',
-    layoutDraft: 'Draft',
-    layoutPage: 'Page',
-    comments: 'Comments',
-    published: 'Published',
     excerpt: 'Excerpt',
     excerptHint: 'Article summary...',
     description: 'Description',
@@ -388,12 +370,6 @@ class AppStrings {
     topImgHint: '头图 URL',
     cover: '封面',
     coverHint: '封面图片 URL',
-    layout: '布局',
-    layoutPost: '文章',
-    layoutDraft: '草稿',
-    layoutPage: '页面',
-    comments: '评论',
-    published: '发布',
     excerpt: '摘要',
     excerptHint: '文章摘要...',
     description: '描述',

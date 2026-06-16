@@ -236,8 +236,7 @@ class SyncService {
     // 提取自定义字段（排除已知字段）
     final knownKeys = {
       'title', 'date', 'tags', 'categories', 'permalink',
-      'top_img', 'cover', 'layout', 'comments', 'published',
-      'excerpt', 'description', 'author',
+      'top_img', 'cover', 'excerpt', 'description', 'author',
     };
     final customFields = <String, String>{};
     for (final entry in meta.entries) {

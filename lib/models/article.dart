@@ -24,9 +24,6 @@ class Article {
   String? permalink;
   String? topImg;
   String? cover;
-  String? layout;
-  bool? comments;
-  bool? published;
   String? excerpt;
   String? description;
   String? author;
@@ -52,9 +49,6 @@ class Article {
     this.permalink,
     this.topImg,
     this.cover,
-    this.layout,
-    this.comments,
-    this.published,
     this.excerpt,
     this.description,
     this.author,
@@ -84,9 +78,6 @@ class Article {
       'permalink': permalink,
       'topImg': topImg,
       'cover': cover,
-      'layout': layout,
-      'comments': comments == true ? 1 : 0,
-      'published': published == true ? 1 : 0,
       'excerpt': excerpt,
       'description': description,
       'author': author,
@@ -123,9 +114,6 @@ class Article {
       permalink: map['permalink'] as String?,
       topImg: map['topImg'] as String?,
       cover: map['cover'] as String?,
-      layout: map['layout'] as String?,
-      comments: map['comments'] == 1,
-      published: map['published'] == 1,
       excerpt: map['excerpt'] as String?,
       description: map['description'] as String?,
       author: map['author'] as String?,
@@ -157,9 +145,6 @@ class Article {
       if (permalink != null && permalink!.isNotEmpty) 'permalink': permalink,
       if (topImg != null && topImg!.isNotEmpty) 'top_img': topImg,
       if (cover != null && cover!.isNotEmpty) 'cover': cover,
-      if (layout != null && layout!.isNotEmpty) 'layout': layout,
-      // comments / published 不主动写入：源数据没有时不应凭空添加。
-      // （已有的 comments/published 行由 updateFrontmatter 原样保留）
       if (excerpt != null && excerpt!.isNotEmpty) 'excerpt': excerpt,
       if (description != null && description!.isNotEmpty)
         'description': description,
@@ -184,8 +169,6 @@ class Article {
       'permalink': permalink,
       'top_img': topImg,
       'cover': cover,
-      'layout': layout,
-      // comments / published 不主动写入（见 buildFrontmatter 注释）
       'excerpt': excerpt,
       'description': description,
       'author': author,
