@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:drift/drift.dart';
 
 import '../../models/article.dart';
@@ -29,6 +30,7 @@ class ArticleRows extends Table {
   TextColumn get excerpt => text().nullable()();
   TextColumn get description => text().nullable()();
   TextColumn get author => text().nullable()();
+  TextColumn get customFields => text().withDefault(const Constant('{}'))();
 }
 
 @DriftDatabase(tables: [ArticleRows])
@@ -36,12 +38,19 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (Migrator m) async {
           await m.createAll();
+        },
+        onUpgrade: (Migrator m, int from, int to) async {
+          if (from < 4) {
+            await m.database.customStatement(
+              'ALTER TABLE article_rows ADD COLUMN custom_fields TEXT NOT NULL DEFAULT \'{}\'',
+            );
+          }
         },
       );
 
@@ -77,6 +86,7 @@ ArticleRowsCompanion toCompanion(Article a) => ArticleRowsCompanion(
       excerpt: Value(a.excerpt),
       description: Value(a.description),
       author: Value(a.author),
+      customFields: Value(jsonEncode(a.customFields)),
     );
 
 Article articleFromRow(ArticleRow row) => Article(
@@ -103,4 +113,17 @@ Article articleFromRow(ArticleRow row) => Article(
       excerpt: row.excerpt,
       description: row.description,
       author: row.author,
+      customFields: _parseCustomFields(row.customFields),
     );
+
+Map<String, String> _parseCustomFields(String json) {
+  try {
+    final decoded = jsonDecode(json);
+    if (decoded is Map) {
+      return decoded.map(
+        (key, value) => MapEntry(key.toString(), value.toString()),
+      );
+    }
+  } catch (_) {}
+  return {};
+}

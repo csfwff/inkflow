@@ -157,6 +157,14 @@ class $ArticleRowsTable extends ArticleRows
   late final GeneratedColumn<String> author = GeneratedColumn<String>(
       'author', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _customFieldsMeta =
+      const VerificationMeta('customFields');
+  @override
+  late final GeneratedColumn<String> customFields = GeneratedColumn<String>(
+      'custom_fields', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('{}'));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -181,7 +189,8 @@ class $ArticleRowsTable extends ArticleRows
         published,
         excerpt,
         description,
-        author
+        author,
+        customFields
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -288,6 +297,12 @@ class $ArticleRowsTable extends ArticleRows
       context.handle(_authorMeta,
           author.isAcceptableOrUnknown(data['author']!, _authorMeta));
     }
+    if (data.containsKey('custom_fields')) {
+      context.handle(
+          _customFieldsMeta,
+          customFields.isAcceptableOrUnknown(
+              data['custom_fields']!, _customFieldsMeta));
+    }
     return context;
   }
 
@@ -345,6 +360,8 @@ class $ArticleRowsTable extends ArticleRows
           .read(DriftSqlType.string, data['${effectivePrefix}description']),
       author: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}author']),
+      customFields: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}custom_fields'])!,
     );
   }
 
@@ -386,6 +403,7 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
   final String? excerpt;
   final String? description;
   final String? author;
+  final String customFields;
   const ArticleRow(
       {required this.id,
       required this.title,
@@ -409,7 +427,8 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
       required this.published,
       this.excerpt,
       this.description,
-      this.author});
+      this.author,
+      required this.customFields});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -460,6 +479,7 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
     if (!nullToAbsent || author != null) {
       map['author'] = Variable<String>(author);
     }
+    map['custom_fields'] = Variable<String>(customFields);
     return map;
   }
 
@@ -504,6 +524,7 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
           : Value(description),
       author:
           author == null && nullToAbsent ? const Value.absent() : Value(author),
+      customFields: Value(customFields),
     );
   }
 
@@ -536,6 +557,7 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
       excerpt: serializer.fromJson<String?>(json['excerpt']),
       description: serializer.fromJson<String?>(json['description']),
       author: serializer.fromJson<String?>(json['author']),
+      customFields: serializer.fromJson<String>(json['customFields']),
     );
   }
   @override
@@ -567,6 +589,7 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
       'excerpt': serializer.toJson<String?>(excerpt),
       'description': serializer.toJson<String?>(description),
       'author': serializer.toJson<String?>(author),
+      'customFields': serializer.toJson<String>(customFields),
     };
   }
 
@@ -593,7 +616,8 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
           int? published,
           Value<String?> excerpt = const Value.absent(),
           Value<String?> description = const Value.absent(),
-          Value<String?> author = const Value.absent()}) =>
+          Value<String?> author = const Value.absent(),
+          String? customFields}) =>
       ArticleRow(
         id: id ?? this.id,
         title: title ?? this.title,
@@ -618,6 +642,7 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
         excerpt: excerpt.present ? excerpt.value : this.excerpt,
         description: description.present ? description.value : this.description,
         author: author.present ? author.value : this.author,
+        customFields: customFields ?? this.customFields,
       );
   ArticleRow copyWithCompanion(ArticleRowsCompanion data) {
     return ArticleRow(
@@ -648,6 +673,9 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
       description:
           data.description.present ? data.description.value : this.description,
       author: data.author.present ? data.author.value : this.author,
+      customFields: data.customFields.present
+          ? data.customFields.value
+          : this.customFields,
     );
   }
 
@@ -676,7 +704,8 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
           ..write('published: $published, ')
           ..write('excerpt: $excerpt, ')
           ..write('description: $description, ')
-          ..write('author: $author')
+          ..write('author: $author, ')
+          ..write('customFields: $customFields')
           ..write(')'))
         .toString();
   }
@@ -705,7 +734,8 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
         published,
         excerpt,
         description,
-        author
+        author,
+        customFields
       ]);
   @override
   bool operator ==(Object other) =>
@@ -733,7 +763,8 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
           other.published == this.published &&
           other.excerpt == this.excerpt &&
           other.description == this.description &&
-          other.author == this.author);
+          other.author == this.author &&
+          other.customFields == this.customFields);
 }
 
 class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
@@ -760,6 +791,7 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
   final Value<String?> excerpt;
   final Value<String?> description;
   final Value<String?> author;
+  final Value<String> customFields;
   const ArticleRowsCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
@@ -784,6 +816,7 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
     this.excerpt = const Value.absent(),
     this.description = const Value.absent(),
     this.author = const Value.absent(),
+    this.customFields = const Value.absent(),
   });
   ArticleRowsCompanion.insert({
     this.id = const Value.absent(),
@@ -809,6 +842,7 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
     this.excerpt = const Value.absent(),
     this.description = const Value.absent(),
     this.author = const Value.absent(),
+    this.customFields = const Value.absent(),
   })  : date = Value(date),
         status = Value(status),
         createdAt = Value(createdAt),
@@ -837,6 +871,7 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
     Expression<String>? excerpt,
     Expression<String>? description,
     Expression<String>? author,
+    Expression<String>? customFields,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -862,6 +897,7 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
       if (excerpt != null) 'excerpt': excerpt,
       if (description != null) 'description': description,
       if (author != null) 'author': author,
+      if (customFields != null) 'custom_fields': customFields,
     });
   }
 
@@ -888,7 +924,8 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
       Value<int>? published,
       Value<String?>? excerpt,
       Value<String?>? description,
-      Value<String?>? author}) {
+      Value<String?>? author,
+      Value<String>? customFields}) {
     return ArticleRowsCompanion(
       id: id ?? this.id,
       title: title ?? this.title,
@@ -913,6 +950,7 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
       excerpt: excerpt ?? this.excerpt,
       description: description ?? this.description,
       author: author ?? this.author,
+      customFields: customFields ?? this.customFields,
     );
   }
 
@@ -990,6 +1028,9 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
     if (author.present) {
       map['author'] = Variable<String>(author.value);
     }
+    if (customFields.present) {
+      map['custom_fields'] = Variable<String>(customFields.value);
+    }
     return map;
   }
 
@@ -1018,7 +1059,8 @@ class ArticleRowsCompanion extends UpdateCompanion<ArticleRow> {
           ..write('published: $published, ')
           ..write('excerpt: $excerpt, ')
           ..write('description: $description, ')
-          ..write('author: $author')
+          ..write('author: $author, ')
+          ..write('customFields: $customFields')
           ..write(')'))
         .toString();
   }
@@ -1060,6 +1102,7 @@ typedef $$ArticleRowsTableCreateCompanionBuilder = ArticleRowsCompanion
   Value<String?> excerpt,
   Value<String?> description,
   Value<String?> author,
+  Value<String> customFields,
 });
 typedef $$ArticleRowsTableUpdateCompanionBuilder = ArticleRowsCompanion
     Function({
@@ -1086,6 +1129,7 @@ typedef $$ArticleRowsTableUpdateCompanionBuilder = ArticleRowsCompanion
   Value<String?> excerpt,
   Value<String?> description,
   Value<String?> author,
+  Value<String> customFields,
 });
 
 class $$ArticleRowsTableFilterComposer
@@ -1169,6 +1213,9 @@ class $$ArticleRowsTableFilterComposer
 
   ColumnFilters<String> get author => $composableBuilder(
       column: $table.author, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get customFields => $composableBuilder(
+      column: $table.customFields, builder: (column) => ColumnFilters(column));
 }
 
 class $$ArticleRowsTableOrderingComposer
@@ -1248,6 +1295,10 @@ class $$ArticleRowsTableOrderingComposer
 
   ColumnOrderings<String> get author => $composableBuilder(
       column: $table.author, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get customFields => $composableBuilder(
+      column: $table.customFields,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$ArticleRowsTableAnnotationComposer
@@ -1328,6 +1379,9 @@ class $$ArticleRowsTableAnnotationComposer
 
   GeneratedColumn<String> get author =>
       $composableBuilder(column: $table.author, builder: (column) => column);
+
+  GeneratedColumn<String> get customFields => $composableBuilder(
+      column: $table.customFields, builder: (column) => column);
 }
 
 class $$ArticleRowsTableTableManager extends RootTableManager<
@@ -1376,6 +1430,7 @@ class $$ArticleRowsTableTableManager extends RootTableManager<
             Value<String?> excerpt = const Value.absent(),
             Value<String?> description = const Value.absent(),
             Value<String?> author = const Value.absent(),
+            Value<String> customFields = const Value.absent(),
           }) =>
               ArticleRowsCompanion(
             id: id,
@@ -1401,6 +1456,7 @@ class $$ArticleRowsTableTableManager extends RootTableManager<
             excerpt: excerpt,
             description: description,
             author: author,
+            customFields: customFields,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -1426,6 +1482,7 @@ class $$ArticleRowsTableTableManager extends RootTableManager<
             Value<String?> excerpt = const Value.absent(),
             Value<String?> description = const Value.absent(),
             Value<String?> author = const Value.absent(),
+            Value<String> customFields = const Value.absent(),
           }) =>
               ArticleRowsCompanion.insert(
             id: id,
@@ -1451,6 +1508,7 @@ class $$ArticleRowsTableTableManager extends RootTableManager<
             excerpt: excerpt,
             description: description,
             author: author,
+            customFields: customFields,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

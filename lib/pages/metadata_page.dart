@@ -13,6 +13,24 @@ class MetadataPage extends StatefulWidget {
   State<MetadataPage> createState() => _MetadataPageState();
 }
 
+/// 自定义字段条目
+class _CustomFieldEntry {
+  String key;
+  String value;
+  late final TextEditingController keyCtrl;
+  late final TextEditingController valueCtrl;
+
+  _CustomFieldEntry({required this.key, required this.value}) {
+    keyCtrl = TextEditingController(text: key);
+    valueCtrl = TextEditingController(text: value);
+  }
+
+  void dispose() {
+    keyCtrl.dispose();
+    valueCtrl.dispose();
+  }
+}
+
 class _MetadataPageState extends State<MetadataPage> {
   late final TextEditingController _tagsCtrl;
   late final TextEditingController _categoriesCtrl;
@@ -22,6 +40,9 @@ class _MetadataPageState extends State<MetadataPage> {
   late final TextEditingController _excerptCtrl;
   late final TextEditingController _descriptionCtrl;
   late final TextEditingController _authorCtrl;
+
+  /// 自定义字段列表（key, value, keyCtrl, valueCtrl）
+  late List<_CustomFieldEntry> _customFields;
 
   @override
   void initState() {
@@ -36,6 +57,14 @@ class _MetadataPageState extends State<MetadataPage> {
     _excerptCtrl = TextEditingController(text: article.excerpt ?? '');
     _descriptionCtrl = TextEditingController(text: article.description ?? '');
     _authorCtrl = TextEditingController(text: article.author ?? '');
+
+    // 初始化自定义字段
+    _customFields = article.customFields.entries
+        .map((e) => _CustomFieldEntry(
+              key: e.key,
+              value: e.value,
+            ))
+        .toList();
   }
 
   @override
@@ -48,6 +77,9 @@ class _MetadataPageState extends State<MetadataPage> {
     _excerptCtrl.dispose();
     _descriptionCtrl.dispose();
     _authorCtrl.dispose();
+    for (final field in _customFields) {
+      field.dispose();
+    }
     super.dispose();
   }
 
@@ -105,6 +137,17 @@ class _MetadataPageState extends State<MetadataPage> {
     article.excerpt = _emptyToNull(_excerptCtrl.text);
     article.description = _emptyToNull(_descriptionCtrl.text);
     article.author = _emptyToNull(_authorCtrl.text);
+
+    // 保存自定义字段
+    final customFields = <String, String>{};
+    for (final field in _customFields) {
+      final k = field.keyCtrl.text.trim();
+      final v = field.valueCtrl.text.trim();
+      if (k.isNotEmpty) {
+        customFields[k] = v;
+      }
+    }
+    article.customFields = customFields;
 
     Navigator.pop(context, article);
   }
@@ -211,6 +254,18 @@ class _MetadataPageState extends State<MetadataPage> {
               controller: _authorCtrl,
               hint: s.authorHint,
             ),
+            const SizedBox(height: 24),
+
+            // 自定义字段
+            _buildSectionTitle(s.customFields, Icons.tune),
+            const SizedBox(height: 8),
+            ..._buildCustomFieldRows(),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _addCustomField,
+              icon: const Icon(Icons.add, size: 18),
+              label: Text(s.addCustomField),
+            ),
             const SizedBox(height: 32),
           ],
         ),
@@ -254,5 +309,73 @@ class _MetadataPageState extends State<MetadataPage> {
       ),
       style: const TextStyle(fontSize: 14),
     );
+  }
+
+  void _addCustomField() {
+    setState(() {
+      _customFields.add(_CustomFieldEntry(key: '', value: ''));
+    });
+  }
+
+  void _removeCustomField(int index) {
+    setState(() {
+      _customFields[index].dispose();
+      _customFields.removeAt(index);
+    });
+  }
+
+  List<Widget> _buildCustomFieldRows() {
+    final s = AppStrings.current;
+    return List.generate(_customFields.length, (index) {
+      final field = _customFields[index];
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: TextField(
+                controller: field.keyCtrl,
+                decoration: InputDecoration(
+                  hintText: s.customFieldKeyHint,
+                  isDense: true,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  border: const OutlineInputBorder(),
+                  filled: true,
+                  fillColor:
+                      Theme.of(context).colorScheme.surfaceContainerLowest,
+                ),
+                style: const TextStyle(fontSize: 14),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 3,
+              child: TextField(
+                controller: field.valueCtrl,
+                decoration: InputDecoration(
+                  hintText: s.customFieldValueHint,
+                  isDense: true,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  border: const OutlineInputBorder(),
+                  filled: true,
+                  fillColor:
+                      Theme.of(context).colorScheme.surfaceContainerLowest,
+                ),
+                style: const TextStyle(fontSize: 14),
+              ),
+            ),
+            const SizedBox(width: 4),
+            IconButton(
+              onPressed: () => _removeCustomField(index),
+              icon: const Icon(Icons.close, size: 18),
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
+        ),
+      );
+    });
   }
 }

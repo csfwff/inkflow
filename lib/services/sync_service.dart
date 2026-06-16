@@ -233,6 +233,19 @@ class SyncService {
     final description = meta['description']?.toString();
     final author = meta['author']?.toString();
 
+    // 提取自定义字段（排除已知字段）
+    final knownKeys = {
+      'title', 'date', 'tags', 'categories', 'permalink',
+      'top_img', 'cover', 'layout', 'comments', 'published',
+      'excerpt', 'description', 'author',
+    };
+    final customFields = <String, String>{};
+    for (final entry in meta.entries) {
+      if (!knownKeys.contains(entry.key)) {
+        customFields[entry.key] = entry.value.toString();
+      }
+    }
+
     final slug = filePath.split('/').last.replaceAll('.md', '');
     title = title.isNotEmpty ? title : slug;
 
@@ -254,6 +267,7 @@ class SyncService {
       excerpt: excerpt,
       description: description,
       author: author,
+      customFields: customFields,
     );
   }
 

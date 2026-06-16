@@ -107,6 +107,10 @@ class AppStrings {
   final String descriptionHint;
   final String author;
   final String authorHint;
+  final String customFields;
+  final String addCustomField;
+  final String customFieldKeyHint;
+  final String customFieldValueHint;
 
   const AppStrings._({
     required this.appTitle,
@@ -200,6 +204,10 @@ class AppStrings {
     required this.descriptionHint,
     required this.author,
     required this.authorHint,
+    required this.customFields,
+    required this.addCustomField,
+    required this.customFieldKeyHint,
+    required this.customFieldValueHint,
   });
 
   static const en = AppStrings._(
@@ -294,6 +302,10 @@ class AppStrings {
     descriptionHint: 'Article description...',
     author: 'Author',
     authorHint: 'Author name',
+    customFields: 'Custom Fields',
+    addCustomField: 'Add Field',
+    customFieldKeyHint: 'Key',
+    customFieldValueHint: 'Value',
   );
 
   static const zh = AppStrings._(
@@ -388,6 +400,10 @@ class AppStrings {
     descriptionHint: '文章描述...',
     author: '作者',
     authorHint: '作者名称',
+    customFields: '自定义字段',
+    addCustomField: '添加字段',
+    customFieldKeyHint: '字段名',
+    customFieldValueHint: '字段值',
   );
 
   /// 应用当前语言设置，默认跟随系统。

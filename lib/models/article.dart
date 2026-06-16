@@ -31,6 +31,9 @@ class Article {
   String? description;
   String? author;
 
+  /// 自定义元数据字段（非内置字段）
+  Map<String, String> customFields;
+
   Article({
     this.id,
     required this.title,
@@ -55,10 +58,12 @@ class Article {
     this.excerpt,
     this.description,
     this.author,
+    Map<String, String>? customFields,
   })  : createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now(),
         tags = tags ?? [],
-        categories = categories ?? [];
+        categories = categories ?? [],
+        customFields = customFields ?? {};
 
   Map<String, dynamic> toMap() {
     return {
@@ -85,6 +90,7 @@ class Article {
       'excerpt': excerpt,
       'description': description,
       'author': author,
+      'customFields': customFields,
     };
   }
 
@@ -123,6 +129,11 @@ class Article {
       excerpt: map['excerpt'] as String?,
       description: map['description'] as String?,
       author: map['author'] as String?,
+      customFields: map['customFields'] is Map
+          ? (map['customFields'] as Map).map(
+              (key, value) => MapEntry(key.toString(), value.toString()),
+            )
+          : {},
     );
   }
 
@@ -153,6 +164,7 @@ class Article {
       if (description != null && description!.isNotEmpty)
         'description': description,
       if (author != null && author!.isNotEmpty) 'author': author,
+      ...customFields,
     });
   }
 
@@ -177,6 +189,7 @@ class Article {
       'excerpt': excerpt,
       'description': description,
       'author': author,
+      ...customFields,
     });
   }
 
