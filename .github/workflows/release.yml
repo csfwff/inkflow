@@ -194,34 +194,6 @@ jobs:
           path: inkflow-macos-arm.zip
 
   # ──────────────────────────────────────────────
-  # macOS x86_64 (Intel)
-  # ──────────────────────────────────────────────
-  build-macos-x64:
-    runs-on: macos-13       # Intel runner
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.44.1'
-          cache: true
-
-      - run: flutter config --enable-macos-desktop
-      - run: flutter pub get
-      - run: flutter build macos --release
-
-      - name: Zip macOS x86 build
-        run: |
-          cd build/macos/Build/Products/Release
-          zip -r ../../../../../inkflow-macos-x64.zip *.app
-
-      - name: Upload macOS x86 artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-x64
-          path: inkflow-macos-x64.zip
-
-  # ──────────────────────────────────────────────
   # GitHub Release
   # ──────────────────────────────────────────────
   release:
@@ -230,7 +202,6 @@ jobs:
       - build-windows
       - build-linux
       - build-macos-arm
-      - build-macos-x64
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -254,4 +225,3 @@ jobs:
             artifacts/windows/inkflow-windows.zip
             artifacts/linux/inkflow-linux.tar.gz
             artifacts/macos-arm/inkflow-macos-arm.zip
-            artifacts/macos-x64/inkflow-macos-x64.zip
