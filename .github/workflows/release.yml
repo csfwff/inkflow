@@ -28,7 +28,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.0'
+          flutter-version: '3.44.1'
           cache: true
 
       - run: flutter pub get
@@ -65,7 +65,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.0'
+          flutter-version: '3.44.1'
           cache: true
 
       - run: flutter pub get
@@ -114,7 +114,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.0'
+          flutter-version: '3.44.1'
           cache: true
 
       - run: flutter config --enable-windows-desktop
@@ -142,7 +142,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.0'
+          flutter-version: '3.44.1'
           cache: true
 
       - name: Install Linux build dependencies
@@ -175,7 +175,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.0'
+          flutter-version: '3.44.1'
           cache: true
 
       - run: flutter config --enable-macos-desktop
@@ -203,7 +203,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.0'
+          flutter-version: '3.44.1'
           cache: true
 
       - run: flutter config --enable-macos-desktop
