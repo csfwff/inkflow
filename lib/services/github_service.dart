@@ -261,6 +261,178 @@ class GitHubService {
       );
     }
   }
+
+  /// 获取指定路径下某个时间之后的 commit 记录（带分页）
+  Future<List<GitHubCommit>> getCommitsSince({
+    required String path,
+    required DateTime since,
+    int perPage = 100,
+  }) async {
+    final List<GitHubCommit> allCommits = [];
+    int page = 1;
+
+    while (true) {
+      final uri = Uri.parse(
+        'https://api.github.com/repos/$owner/$repo/commits',
+      ).replace(queryParameters: {
+        'sha': branch,
+        'path': path,
+        'since': since.toUtc().toIso8601String(),
+        'per_page': perPage.toString(),
+        'page': page.toString(),
+      });
+
+      debugPrint('[GitHub] GET commits $path since=$since page=$page');
+
+      try {
+        final response = await http.get(uri, headers: _headers);
+        debugPrint('[GitHub] commits ${response.statusCode} $path');
+
+        if (response.statusCode != 200) {
+          debugPrint('[GitHub] commits ERROR: ${response.statusCode}');
+          break;
+        }
+
+        final data = jsonDecode(response.body);
+        if (data is! List || data.isEmpty) break;
+
+        for (final commitJson in data) {
+          final commit = _parseCommit(commitJson);
+          if (commit != null) {
+            allCommits.add(commit);
+          }
+        }
+
+        // 如果返回的数据少于 per_page，说明没有更多了
+        if (data.length < perPage) break;
+        page++;
+      } catch (e) {
+        debugPrint('[GitHub] commits EXCEPTION: $e');
+        break;
+      }
+    }
+
+    debugPrint('[GitHub] Total commits for $path: ${allCommits.length}');
+    return allCommits;
+  }
+
+  /// 列出用户的仓库列表
+  Future<List<GitHubRepo>> listRepositories({
+    int perPage = 100,
+    int page = 1,
+  }) async {
+    final uri = Uri.parse('https://api.github.com/user/repos').replace(
+      queryParameters: {
+        'per_page': perPage.toString(),
+        'page': page.toString(),
+        'sort': 'updated',
+        'direction': 'desc',
+      },
+    );
+
+    debugPrint('[GitHub] GET repos page=$page');
+
+    try {
+      final response = await http.get(uri, headers: _headers);
+      debugPrint('[GitHub] repos ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is List) {
+          return data
+              .map((e) => GitHubRepo.fromJson(e))
+              .toList();
+        }
+      }
+      debugPrint('[GitHub] repos ERROR: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('[GitHub] repos EXCEPTION: $e');
+    }
+    return [];
+  }
+
+  /// 列出仓库的分支列表
+  Future<List<String>> listBranches({
+    int perPage = 100,
+    int page = 1,
+  }) async {
+    final uri = Uri.parse(
+      'https://api.github.com/repos/$owner/$repo/branches',
+    ).replace(
+      queryParameters: {
+        'per_page': perPage.toString(),
+        'page': page.toString(),
+      },
+    );
+
+    debugPrint('[GitHub] GET branches page=$page');
+
+    try {
+      final response = await http.get(uri, headers: _headers);
+      debugPrint('[GitHub] branches ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is List) {
+          return data.map((e) => e['name'] as String).toList();
+        }
+      }
+      debugPrint('[GitHub] branches ERROR: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('[GitHub] branches EXCEPTION: $e');
+    }
+    return [];
+  }
+
+  GitHubCommit? _parseCommit(Map<String, dynamic> json) {
+    try {
+      final sha = json['sha'] ?? '';
+      final commitInfo = json['commit'];
+      final dateStr = commitInfo?['committer']?['date'];
+      if (dateStr == null) return null;
+
+      final date = DateTime.parse(dateStr);
+      final files = <GitHubCommitFile>[];
+
+      if (json['files'] != null) {
+        for (final fileJson in json['files']) {
+          files.add(GitHubCommitFile.fromJson(fileJson));
+        }
+      }
+
+      return GitHubCommit(sha: sha, date: date, files: files);
+    } catch (e) {
+      debugPrint('[GitHub] parseCommit error: $e');
+      return null;
+    }
+  }
+}
+
+/// GitHub 仓库信息
+class GitHubRepo {
+  final String name;
+  final String fullName;
+  final String defaultBranch;
+  final String? description;
+  final bool private;
+
+  GitHubRepo({
+    required this.name,
+    required this.fullName,
+    required this.defaultBranch,
+    this.description,
+    this.private = false,
+  });
+
+  factory GitHubRepo.fromJson(Map<String, dynamic> json) {
+    return GitHubRepo(
+      name: json['name'] ?? '',
+      fullName: json['full_name'] ?? '',
+      defaultBranch: json['default_branch'] ?? 'main',
+      description: json['description'],
+      private: json['private'] ?? false,
+    );
+  }
 }
 
 class GitHubResult {
@@ -322,4 +494,49 @@ class GitHubFileContent {
   final String sha;
 
   GitHubFileContent({required this.content, required this.sha});
+}
+
+/// commit 中的文件变更信息
+class GitHubCommitFile {
+  final String filename;
+  final String status; // added, modified, removed, renamed
+
+  GitHubCommitFile({required this.filename, required this.status});
+
+  factory GitHubCommitFile.fromJson(Map<String, dynamic> json) {
+    return GitHubCommitFile(
+      filename: json['filename'] ?? '',
+      status: json['status'] ?? '',
+    );
+  }
+}
+
+/// commit 记录
+class GitHubCommit {
+  final String sha;
+  final DateTime date;
+  final List<GitHubCommitFile> files;
+
+  GitHubCommit({
+    required this.sha,
+    required this.date,
+    required this.files,
+  });
+}
+
+/// 增量同步结果
+class IncrementalSyncResult {
+  final bool success;
+  final List<String> addedOrModified;
+  final List<String> removed;
+  final DateTime? latestCommitDate;
+  final String? error;
+
+  IncrementalSyncResult({
+    required this.success,
+    this.addedOrModified = const [],
+    this.removed = const [],
+    this.latestCommitDate,
+    this.error,
+  });
 }

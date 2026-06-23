@@ -451,7 +451,11 @@ class _EditorPageState extends State<EditorPage> {
       repo: settings.githubRepo,
       branch: settings.githubBranch,
     );
-    final sync = SyncService(github: github, articleService: articleService);
+    final sync = SyncService(
+      github: github,
+      articleService: articleService,
+      settingsService: settingsService,
+    );
     final remoteArticle = await sync.fetchRemoteArticle(article);
 
     if (!mounted) return;

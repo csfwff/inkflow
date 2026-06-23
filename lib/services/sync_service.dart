@@ -3,12 +3,18 @@ import '../models/article.dart';
 import 'frontmatter_helper.dart';
 import 'github_service.dart';
 import 'article_service.dart';
+import 'settings_service.dart';
 
 class SyncService {
   final GitHubService github;
   final ArticleService articleService;
+  final SettingsService settingsService;
 
-  SyncService({required this.github, required this.articleService});
+  SyncService({
+    required this.github,
+    required this.articleService,
+    required this.settingsService,
+  });
 
   Future<Article?> fetchRemoteArticle(Article local) async {
     final remotePath = local.remotePath;
@@ -115,6 +121,218 @@ class SyncService {
       debugPrint('[Sync] STACK: $stack');
       return SyncResult(success: false, error: e.toString());
     }
+  }
+
+  /// 增量同步：基于 commit 记录只拉取变更文件
+  Future<SyncResult> syncIncremental() async {
+    try {
+      debugPrint('[Sync] === syncIncremental START ===');
+
+      final lastSyncTime = settingsService.settings.lastSyncTime;
+      if (lastSyncTime == null) {
+        debugPrint('[Sync] No lastSyncTime, falling back to full sync');
+        return syncFromGitHub();
+      }
+
+      debugPrint('[Sync] lastSyncTime: $lastSyncTime');
+
+      // 获取两个目录的 commit 记录
+      final postsCommits = await github.getCommitsSince(
+        path: 'source/_posts',
+        since: lastSyncTime,
+      );
+      final draftsCommits = await github.getCommitsSince(
+        path: 'source/_drafts',
+        since: lastSyncTime,
+      );
+
+      debugPrint(
+          '[Sync] Commits: posts=${postsCommits.length}, drafts=${draftsCommits.length}');
+
+      // 提取变更文件
+      final postsChanges = _extractChanges(postsCommits, 'source/_posts/');
+      final draftsChanges = _extractChanges(draftsCommits, 'source/_drafts/');
+
+      debugPrint(
+          '[Sync] Changes: posts added/modified=${postsChanges.addedOrModified.length}, removed=${postsChanges.removed.length}');
+      debugPrint(
+          '[Sync] Changes: drafts added/modified=${draftsChanges.addedOrModified.length}, removed=${draftsChanges.removed.length}');
+
+      // 如果变更太多（>200个文件），降级到全量同步
+      final totalChanges = postsChanges.addedOrModified.length +
+          postsChanges.removed.length +
+          draftsChanges.addedOrModified.length +
+          draftsChanges.removed.length;
+      if (totalChanges > 200) {
+        debugPrint(
+            '[Sync] Too many changes ($totalChanges), falling back to full sync');
+        return syncFromGitHub();
+      }
+
+      // 拉取 added/modified 文件内容
+      int syncedCount = 0;
+
+      for (final filePath in postsChanges.addedOrModified) {
+        final article = await _fetchAndParseFile(
+          filePath,
+          ArticleStatus.synced,
+          ArticleRemoteKind.post,
+        );
+        if (article != null) {
+          await articleService.upsertFromGitHub(article);
+          syncedCount++;
+        }
+      }
+
+      for (final filePath in draftsChanges.addedOrModified) {
+        final article = await _fetchAndParseFile(
+          filePath,
+          ArticleStatus.repoDraft,
+          ArticleRemoteKind.repoDraft,
+        );
+        if (article != null) {
+          await articleService.upsertFromGitHub(article);
+          syncedCount++;
+        }
+      }
+
+      // 标记 removed 文件
+      int deletedCount = 0;
+      for (final filePath in postsChanges.removed) {
+        deletedCount += await _markRemoteDeleted(filePath);
+      }
+      for (final filePath in draftsChanges.removed) {
+        deletedCount += await _markRemoteDeleted(filePath);
+      }
+
+      // 同步标签和分类
+      final allArticles = await articleService.getRemoteTracked();
+      final allTags = <String>{};
+      final allCategories = <String>{};
+      for (final article in allArticles) {
+        allTags.addAll(article.tags);
+        allCategories.addAll(article.categories);
+      }
+      await articleService.ensureTags(allTags.toList());
+      await articleService.ensureCategories(allCategories.toList());
+
+      // 更新 lastSyncTime
+      final latestDate = _getLatestDate(postsCommits, draftsCommits);
+      if (latestDate != null) {
+        settingsService.settings.lastSyncTime = latestDate;
+        await settingsService.save();
+        debugPrint('[Sync] Updated lastSyncTime: $latestDate');
+      }
+
+      debugPrint(
+          '[Sync] === syncIncremental DONE: $syncedCount synced, $deletedCount deleted ===');
+      return SyncResult(success: true, count: syncedCount);
+    } catch (e, stack) {
+      debugPrint('[Sync] Incremental sync EXCEPTION: $e');
+      debugPrint('[Sync] STACK: $stack');
+      // 增量同步失败，降级到全量同步
+      debugPrint('[Sync] Falling back to full sync');
+      return syncFromGitHub();
+    }
+  }
+
+  /// 从 commit 列表中提取变更文件（added/modified 和 removed）
+  _ChangeSet _extractChanges(List<GitHubCommit> commits, String prefix) {
+    final addedOrModified = <String>{};
+    final removed = <String>{};
+
+    // 从旧到新遍历，这样后面的 commit 会覆盖前面的状态
+    for (final commit in commits.reversed) {
+      for (final file in commit.files) {
+        if (!file.filename.startsWith(prefix)) continue;
+        if (!file.filename.endsWith('.md')) continue;
+
+        final relativePath =
+            file.filename.substring(prefix.length);
+
+        switch (file.status) {
+          case 'added':
+          case 'modified':
+            addedOrModified.add(relativePath);
+            removed.remove(relativePath);
+            break;
+          case 'removed':
+            addedOrModified.remove(relativePath);
+            removed.add(relativePath);
+            break;
+          case 'renamed':
+            // renamed 的 old_filename 可能需要特殊处理
+            // 简单起见，把新文件当作 added
+            addedOrModified.add(relativePath);
+            break;
+        }
+      }
+    }
+
+    return _ChangeSet(
+      addedOrModified: addedOrModified.toList(),
+      removed: removed.toList(),
+    );
+  }
+
+  /// 获取单个文件并解析
+  Future<Article?> _fetchAndParseFile(
+    String relativePath,
+    ArticleStatus status,
+    ArticleRemoteKind remoteKind,
+  ) async {
+    final prefix = _prefixForRemoteKind(remoteKind);
+    final remotePath = '$prefix$relativePath';
+
+    debugPrint('[Sync] Fetching: $remotePath');
+    final fileData = await github.getFileContent(remotePath);
+    if (fileData == null) {
+      debugPrint('[Sync] Failed to fetch: $remotePath');
+      return null;
+    }
+
+    return _parseFrontmatter(
+      fileData.content,
+      filePath: relativePath,
+      remotePath: remotePath,
+      remoteKind: remoteKind,
+      sha: fileData.sha,
+      status: status,
+    );
+  }
+
+  /// 根据 remotePath 查找并标记为 remoteDeleted
+  Future<int> _markRemoteDeleted(String relativePath) async {
+    final articles = await articleService.getRemoteTracked();
+    int count = 0;
+    for (final article in articles) {
+      if (article.remotePath != null &&
+          article.remotePath!.endsWith('/$relativePath')) {
+        await articleService.markAsRemoteDeleted(article.id!);
+        count++;
+        debugPrint('[Sync] Marked remote deleted: "${article.title}"');
+      }
+    }
+    return count;
+  }
+
+  /// 获取最新的 commit 时间
+  DateTime? _getLatestDate(
+    List<GitHubCommit> postsCommits,
+    List<GitHubCommit> draftsCommits,
+  ) {
+    DateTime? latest;
+    for (final commit in postsCommits) {
+      if (latest == null || commit.date.isAfter(latest)) {
+        latest = commit.date;
+      }
+    }
+    for (final commit in draftsCommits) {
+      if (latest == null || commit.date.isAfter(latest)) {
+        latest = commit.date;
+      }
+    }
+    return latest;
   }
 
   Future<List<Article>> _syncDirectory(
@@ -304,4 +522,15 @@ class _SyncException implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// 增量同步的变更集
+class _ChangeSet {
+  final List<String> addedOrModified;
+  final List<String> removed;
+
+  _ChangeSet({
+    required this.addedOrModified,
+    required this.removed,
+  });
 }

@@ -120,6 +120,12 @@ class AppStrings {
   final String imageHostNotConfigured;
   final String imageUploadFailed;
 
+  // Sync
+  final String incrementalSync;
+  final String incrementalSyncDesc;
+  final String fullSync;
+  final String fullSyncDesc;
+
   const AppStrings._({
     required this.appTitle,
     required this.homeTitle,
@@ -222,6 +228,10 @@ class AppStrings {
     required this.noImagesInArticle,
     required this.imageHostNotConfigured,
     required this.imageUploadFailed,
+    required this.incrementalSync,
+    required this.incrementalSyncDesc,
+    required this.fullSync,
+    required this.fullSyncDesc,
   });
 
   static const en = AppStrings._(
@@ -326,6 +336,10 @@ class AppStrings {
     noImagesInArticle: 'No images in article',
     imageHostNotConfigured: 'Image host not configured',
     imageUploadFailed: 'Upload failed',
+    incrementalSync: 'Incremental Sync',
+    incrementalSyncDesc: 'Only sync changed files since last sync',
+    fullSync: 'Full Sync',
+    fullSyncDesc: 'Sync all files from remote',
   );
 
   static const zh = AppStrings._(
@@ -430,6 +444,10 @@ class AppStrings {
     noImagesInArticle: '文章中没有图片',
     imageHostNotConfigured: '图床未配置',
     imageUploadFailed: '上传失败',
+    incrementalSync: '增量同步',
+    incrementalSyncDesc: '只同步上次同步后变更的文件',
+    fullSync: '全量同步',
+    fullSyncDesc: '同步远程所有文件',
   );
 
   /// 应用当前语言设置，默认跟随系统。

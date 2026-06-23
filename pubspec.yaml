@@ -53,6 +53,23 @@ dev_dependencies:
   flutter_lints: ^5.0.0
   drift_dev: ^2.34.0
   build_runner: ^2.15.0
+  flutter_launcher_icons: ^0.14.3
+
+# 应用图标配置
+flutter_launcher_icons:
+  image_path: "assets/icon.jpg"
+  android: true
+  ios: true
+  web:
+    generate: true
+  windows:
+    generate: true
+    icon_size: 48
+  macos:
+    generate: true
+  linux:
+    generate: true
+    icon_size: 48
 
 # sqlite3 native hook 配置：使用本地 .so 文件，跳过 GitHub 下载
 hooks:

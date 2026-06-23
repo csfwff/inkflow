@@ -21,6 +21,7 @@ class SettingsService {
   static const _keyImageNamingMode = 'image_naming_mode';
   static const _keyThemeMode = 'theme_mode';
   static const _keyLocale = 'locale';
+  static const _keyLastSyncTime = 'last_sync_time';
 
   // ── Secure storage keys (敏感凭据) ──
   static const _secureGithubToken = 'github_token';
@@ -65,6 +66,7 @@ class SettingsService {
           ImageNamingMode.values[_prefs.getInt(_keyImageNamingMode) ?? 0],
       themeMode: AppThemeMode.values[_prefs.getInt(_keyThemeMode) ?? 0],
       locale: AppLocale.values[_prefs.getInt(_keyLocale) ?? 0],
+      lastSyncTime: _loadDateTime(_prefs.getString(_keyLastSyncTime)),
     );
   }
 
@@ -94,11 +96,21 @@ class SettingsService {
       _prefs.setInt(_keyImageNamingMode, settings.imageNamingMode.index),
       _prefs.setInt(_keyThemeMode, settings.themeMode.index),
       _prefs.setInt(_keyLocale, settings.locale.index),
+      _prefs.setString(
+        _keyLastSyncTime,
+        settings.lastSyncTime?.toIso8601String() ?? '',
+      ),
     ]);
   }
 
   /// 清理路径：去除前导和尾部斜杠
   String _cleanPath(String path) {
     return path.replaceAll(RegExp(r'^/+|/+$'), '');
+  }
+
+  /// 解析 ISO8601 日期字符串，失败返回 null
+  DateTime? _loadDateTime(String? value) {
+    if (value == null || value.isEmpty) return null;
+    return DateTime.tryParse(value);
   }
 }

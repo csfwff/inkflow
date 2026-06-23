@@ -36,6 +36,9 @@ class Settings {
   AppThemeMode themeMode;
   AppLocale locale;
 
+  // Sync
+  DateTime? lastSyncTime;
+
   Settings({
     this.githubToken = '',
     this.githubOwner = '',
@@ -56,5 +59,6 @@ class Settings {
     this.imageNamingMode = ImageNamingMode.timestamp,
     this.themeMode = AppThemeMode.system,
     this.locale = AppLocale.system,
+    this.lastSyncTime,
   });
 }

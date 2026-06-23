@@ -3,6 +3,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../l10n/app_strings.dart';
 import '../main.dart';
 import '../models/settings.dart';
+import '../services/github_service.dart';
 import '../services/image_host/image_path_builder.dart';
 import '../widgets/responsive.dart';
 
@@ -21,6 +22,14 @@ class _SettingsPageState extends State<SettingsPage> {
   _Tab _selectedTab = _Tab.general;
   late Settings _settings;
   String _version = '';
+
+  // GitHub 仓库和分支列表
+  List<GitHubRepo> _repos = [];
+  List<String> _branches = [];
+  bool _loadingRepos = false;
+  bool _loadingBranches = false;
+  String? _repoError;
+  String? _branchError;
 
   // TextEditingControllers — created once, reused across rebuilds
   late final TextEditingController _githubTokenCtrl;
@@ -85,6 +94,76 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() {
       _version = '${info.version}+${info.buildNumber}';
     });
+  }
+
+  /// 加载仓库列表
+  Future<void> _loadRepositories() async {
+    if (_settings.githubToken.isEmpty || _settings.githubOwner.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _loadingRepos = true;
+      _repoError = null;
+    });
+
+    try {
+      final github = GitHubService(
+        token: _settings.githubToken,
+        owner: _settings.githubOwner,
+        repo: _settings.githubRepo,
+      );
+      final repos = await github.listRepositories();
+      if (mounted) {
+        setState(() {
+          _repos = repos;
+          _loadingRepos = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loadingRepos = false;
+          _repoError = e.toString();
+        });
+      }
+    }
+  }
+
+  /// 加载分支列表
+  Future<void> _loadBranches() async {
+    if (_settings.githubToken.isEmpty ||
+        _settings.githubOwner.isEmpty ||
+        _settings.githubRepo.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _loadingBranches = true;
+      _branchError = null;
+    });
+
+    try {
+      final github = GitHubService(
+        token: _settings.githubToken,
+        owner: _settings.githubOwner,
+        repo: _settings.githubRepo,
+      );
+      final branches = await github.listBranches();
+      if (mounted) {
+        setState(() {
+          _branches = branches;
+          _loadingBranches = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loadingBranches = false;
+          _branchError = e.toString();
+        });
+      }
+    }
   }
 
   /// Save settings without triggering a rebuild of this page.
@@ -301,6 +380,7 @@ class _SettingsPageState extends State<SettingsPage> {
   // ── GitHub tab ──
 
   Widget _buildGithubTab(AppStrings s) {
+    final zh = identical(s, AppStrings.zh);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -324,24 +404,12 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         _divider(),
         _sectionHeader(s.githubRepo),
-        _inputRow(
-          controller: _githubRepoCtrl,
-          onChanged: (v) {
-            _settings.githubRepo = v;
-            _save();
-          },
-        ),
+        _buildRepoSelector(s),
         _divider(),
         _sectionHeader(s.githubBranch),
-        _inputRow(
-          controller: _githubBranchCtrl,
-          onChanged: (v) {
-            _settings.githubBranch = v;
-            _save();
-          },
-        ),
+        _buildBranchSelector(s),
         _divider(),
-        _sectionHeader(identical(s, AppStrings.zh) ? '文章目录格式' : 'Post directory pattern'),
+        _sectionHeader(zh ? '文章目录格式' : 'Post directory pattern'),
         _inputRow(
           controller: _githubPathPatternCtrl,
           hint: '{year}/{month}',
@@ -353,7 +421,7 @@ class _SettingsPageState extends State<SettingsPage> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
           child: Text(
-            identical(s, AppStrings.zh)
+            zh
                 ? '可用占位符：{year} 年 · {month} 月 · {day} 日 · {category} 分类（取第一个）\n示例：{year}/{month} → 2026/06/my-post.md'
                 : 'Placeholders: {year} · {month} · {day} · {category} (first tag)\nExample: {year}/{month} → 2026/06/my-post.md',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -362,6 +430,247 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ),
       ],
+    );
+  }
+
+  /// 仓库选择器：支持下拉选择 + 手动输入
+  Widget _buildRepoSelector(AppStrings s) {
+    final zh = identical(s, AppStrings.zh);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _repos.isEmpty
+                    ? TextField(
+                        controller: _githubRepoCtrl,
+                        decoration: InputDecoration(
+                          isDense: true,
+                          hintText: zh ? '输入仓库名' : 'Enter repo name',
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (v) {
+                          _settings.githubRepo = v;
+                          _save();
+                        },
+                      )
+                    : InputDecorator(
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 4),
+                          border: OutlineInputBorder(),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _repos.any((r) => r.name == _settings.githubRepo)
+                                ? _settings.githubRepo
+                                : null,
+                            isExpanded: true,
+                            hint: Text(zh ? '选择仓库' : 'Select repository'),
+                            items: _repos
+                                .map((repo) => DropdownMenuItem(
+                                      value: repo.name,
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            repo.private
+                                                ? Icons.lock_outline
+                                                : Icons.folder_outlined,
+                                            size: 16,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              repo.name,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ))
+                                .toList(),
+                            onChanged: (v) {
+                              if (v != null) {
+                                setState(() {
+                                  _settings.githubRepo = v;
+                                  _githubRepoCtrl.text = v;
+                                  // 选择仓库后自动加载分支
+                                  _branches = [];
+                                  _settings.githubBranch = 'main';
+                                  _githubBranchCtrl.text = 'main';
+                                });
+                                _save();
+                                _loadBranches();
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: _loadingRepos ? null : _loadRepositories,
+                icon: _loadingRepos
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh),
+                tooltip: zh ? '加载仓库列表' : 'Load repositories',
+              ),
+            ],
+          ),
+          if (_repoError != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                _repoError!,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+            ),
+          if (_repos.isEmpty && !_loadingRepos && _repoError == null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                zh
+                    ? '填入 Token 和 Owner 后点击刷新加载仓库列表'
+                    : 'Enter Token and Owner, then refresh to load repositories',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// 分支选择器：支持下拉选择 + 手动输入
+  Widget _buildBranchSelector(AppStrings s) {
+    final zh = identical(s, AppStrings.zh);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _branches.isEmpty
+                    ? TextField(
+                        controller: _githubBranchCtrl,
+                        decoration: InputDecoration(
+                          isDense: true,
+                          hintText: zh ? '输入分支名' : 'Enter branch name',
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (v) {
+                          _settings.githubBranch = v;
+                          _save();
+                        },
+                      )
+                    : InputDecorator(
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 4),
+                          border: OutlineInputBorder(),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _branches.contains(_settings.githubBranch)
+                                ? _settings.githubBranch
+                                : null,
+                            isExpanded: true,
+                            hint: Text(zh ? '选择分支' : 'Select branch'),
+                            items: _branches
+                                .map((branch) => DropdownMenuItem(
+                                      value: branch,
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.fork_right,
+                                            size: 16,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(branch),
+                                        ],
+                                      ),
+                                    ))
+                                .toList(),
+                            onChanged: (v) {
+                              if (v != null) {
+                                setState(() {
+                                  _settings.githubBranch = v;
+                                  _githubBranchCtrl.text = v;
+                                });
+                                _save();
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: _loadingBranches ? null : _loadBranches,
+                icon: _loadingBranches
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh),
+                tooltip: zh ? '加载分支列表' : 'Load branches',
+              ),
+            ],
+          ),
+          if (_branchError != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                _branchError!,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+            ),
+          if (_branches.isEmpty &&
+              !_loadingBranches &&
+              _branchError == null &&
+              _settings.githubRepo.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                zh ? '点击刷新加载分支列表' : 'Click refresh to load branches',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 

@@ -55,7 +55,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _syncFromGitHub() async {
+  Future<void> _syncFromGitHub({bool incremental = false}) async {
     if (_syncing) return;
 
     final s = AppStrings.current;
@@ -77,8 +77,14 @@ class _HomePageState extends State<HomePage> {
       repo: settings.githubRepo,
       branch: settings.githubBranch,
     );
-    final sync = SyncService(github: github, articleService: articleService);
-    final result = await sync.syncFromGitHub();
+    final sync = SyncService(
+      github: github,
+      articleService: articleService,
+      settingsService: settingsService,
+    );
+    final result = incremental
+        ? await sync.syncIncremental()
+        : await sync.syncFromGitHub();
 
     if (!mounted) return;
     setState(() => _syncing = false);
@@ -210,10 +216,41 @@ class _HomePageState extends State<HomePage> {
               ),
             )
           else
-            IconButton(
+            PopupMenuButton<String>(
               icon: const Icon(Icons.sync),
               tooltip: s.syncFromGitHub,
-              onPressed: _syncFromGitHub,
+              onSelected: (value) {
+                switch (value) {
+                  case 'incremental':
+                    _syncFromGitHub(incremental: true);
+                    break;
+                  case 'full':
+                    _syncFromGitHub(incremental: false);
+                    break;
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'incremental',
+                  child: ListTile(
+                    leading: const Icon(Icons.update),
+                    title: Text(s.incrementalSync),
+                    subtitle: Text(s.incrementalSyncDesc),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'full',
+                  child: ListTile(
+                    leading: const Icon(Icons.sync),
+                    title: Text(s.fullSync),
+                    subtitle: Text(s.fullSyncDesc),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ],
             ),
           IconButton(
             icon: const Icon(Icons.settings),
