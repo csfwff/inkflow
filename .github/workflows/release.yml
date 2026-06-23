@@ -163,7 +163,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: linux
-          path: build/linux/x64/inkflow-linux.tar.gz
+          path: build/linux/inkflow-linux.tar.gz
 
   # ──────────────────────────────────────────────
   # macOS ARM (Apple Silicon)
