@@ -333,18 +333,19 @@ class _SettingsPageState extends State<SettingsPage> {
         _sectionHeader(identical(s, AppStrings.zh) ? '永久链接格式' : 'Permalink pattern'),
         _inputRow(
           controller: _permalinkPatternCtrl,
-          hint: 'articles/{year}/{month}/{day}/{timestamp}.html',
+          hint: identical(s, AppStrings.zh)
+              ? '点击下方按钮插入占位符'
+              : 'Tap buttons below to insert placeholders',
           onChanged: (v) {
             _settings.permalinkPattern = v;
             _save();
           },
         ),
+        _permalinkQuickButtons(s),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
           child: Text(
-            identical(s, AppStrings.zh)
-                ? '可用占位符：{year} 年 · {month} 月 · {day} 日 · {timestamp} 秒级时间戳 · {slug} 标题别名 · {category} 分类（取第一个）\n示例：articles/{year}/{month}/{day}/{timestamp}.html'
-                : 'Placeholders: {year} · {month} · {day} · {timestamp} (unix seconds) · {slug} · {category} (first tag)\nExample: articles/{year}/{month}/{day}/{timestamp}.html',
+            _buildPermalinkExample(s),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -412,18 +413,17 @@ class _SettingsPageState extends State<SettingsPage> {
         _sectionHeader(zh ? '文章目录格式' : 'Post directory pattern'),
         _inputRow(
           controller: _githubPathPatternCtrl,
-          hint: '{year}/{month}',
+          hint: zh ? '点击下方按钮插入占位符' : 'Tap buttons below to insert placeholders',
           onChanged: (v) {
             _settings.githubPathPattern = v;
             _save();
           },
         ),
+        _pathPatternQuickButtons(s),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
           child: Text(
-            zh
-                ? '可用占位符：{year} 年 · {month} 月 · {day} 日 · {category} 分类（取第一个）\n示例：{year}/{month} → 2026/06/my-post.md'
-                : 'Placeholders: {year} · {month} · {day} · {category} (first tag)\nExample: {year}/{month} → 2026/06/my-post.md',
+            _buildPathPatternExample(s),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -700,16 +700,22 @@ class _SettingsPageState extends State<SettingsPage> {
         _buildImageHostFields(s),
         _divider(),
         _sectionHeader(zh ? '按日期分目录' : 'Date subfolders'),
-        _dropdownRow<bool>(
-          value: _settings.imageUseDateFolder,
+        _dropdownRow<ImageDateFolderMode>(
+          value: _settings.imageDateFolderMode,
           items: [
-            DropdownMenuItem(value: false, child: Text(zh ? '不使用' : 'None')),
             DropdownMenuItem(
-                value: true, child: Text(zh ? '年 / 月' : 'Year / Month')),
+                value: ImageDateFolderMode.none,
+                child: Text(zh ? '不使用' : 'None')),
+            DropdownMenuItem(
+                value: ImageDateFolderMode.year,
+                child: Text(zh ? '年' : 'Year')),
+            DropdownMenuItem(
+                value: ImageDateFolderMode.yearMonth,
+                child: Text(zh ? '年 / 月' : 'Year / Month')),
           ],
           onChanged: (v) {
             if (v == null) return;
-            setState(() => _settings.imageUseDateFolder = v);
+            setState(() => _settings.imageDateFolderMode = v);
             _save();
           },
         ),
@@ -735,7 +741,7 @@ class _SettingsPageState extends State<SettingsPage> {
           },
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
           child: Text(
             '${zh ? '示例：' : 'Example: '}${_imagePathPreview()}',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -755,7 +761,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final remotePath = buildRemoteImagePath(
       basePath,
       'example.png',
-      useDateFolder: _settings.imageUseDateFolder,
+      dateFolderMode: _settings.imageDateFolderMode,
       namingMode: _settings.imageNamingMode,
     );
     return '/$remotePath';
@@ -872,6 +878,125 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       ),
     );
+  }
+
+  /// 向指定输入框的光标位置插入文本
+  void _insertToken(TextEditingController ctrl, String token, ValueChanged<String> setter) {
+    final sel = ctrl.selection;
+    final text = ctrl.text;
+    final start = sel.start >= 0 ? sel.start : text.length;
+    final newText = text.substring(0, start) + token + text.substring(sel.end >= 0 ? sel.end : text.length);
+    ctrl.text = newText;
+    ctrl.selection = TextSelection.collapsed(offset: start + token.length);
+    setter(newText);
+    _save();
+  }
+
+  /// 删除光标左侧内容：若左侧是占位符（如 {year}）则整体删除，否则删一个字符
+  void _deleteToken(TextEditingController ctrl, ValueChanged<String> setter) {
+    final sel = ctrl.selection;
+    final text = ctrl.text;
+    final pos = sel.start;
+    if (pos <= 0) return;
+
+    final placeholderRe = RegExp(r'\{[a-zA-Z]+\}$');
+    final before = text.substring(0, pos);
+    final match = placeholderRe.firstMatch(before);
+
+    int deleteFrom;
+    if (match != null) {
+      deleteFrom = match.start;
+    } else {
+      deleteFrom = pos - 1;
+    }
+
+    final newText = text.substring(0, deleteFrom) + text.substring(pos);
+    ctrl.text = newText;
+    ctrl.selection = TextSelection.collapsed(offset: deleteFrom);
+    setter(newText);
+    _save();
+  }
+
+  Widget _buildQuickButtons(AppStrings s, TextEditingController ctrl, ValueChanged<String> setter, List<(String, String)> tokens) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        children: [
+          ...tokens.map((t) {
+            return ActionChip(
+              label: Text(t.$1, style: const TextStyle(fontSize: 12)),
+              visualDensity: VisualDensity.compact,
+              onPressed: () => _insertToken(ctrl, t.$2, setter),
+            );
+          }),
+          ActionChip(
+            label: Icon(Icons.backspace_outlined, size: 16),
+            visualDensity: VisualDensity.compact,
+            onPressed: () => _deleteToken(ctrl, setter),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _permalinkQuickButtons(AppStrings s) {
+    return _buildQuickButtons(s, _permalinkPatternCtrl, (v) => _settings.permalinkPattern = v, [
+      ('/', '/'),
+      ('{year}', '{year}'),
+      ('{month}', '{month}'),
+      ('{day}', '{day}'),
+      ('{timestamp}', '{timestamp}'),
+      ('{slug}', '{slug}'),
+      ('{category}', '{category}'),
+      ('.html', '.html'),
+    ]);
+  }
+
+  Widget _pathPatternQuickButtons(AppStrings s) {
+    return _buildQuickButtons(s, _githubPathPatternCtrl, (v) => _settings.githubPathPattern = v, [
+      ('/', '/'),
+      ('{year}', '{year}'),
+      ('{month}', '{month}'),
+      ('{day}', '{day}'),
+      ('{category}', '{category}'),
+    ]);
+  }
+
+  String _buildPathPatternExample(AppStrings s) {
+    final pattern = _githubPathPatternCtrl.text.trim();
+    if (pattern.isEmpty) {
+      return identical(s, AppStrings.zh)
+          ? '示例：输入 {year}/{month} → 2026/06'
+          : 'Example: {year}/{month} → 2026/06';
+    }
+    final now = DateTime.now();
+    final example = pattern
+        .replaceAll('{year}', now.year.toString())
+        .replaceAll('{month}', now.month.toString().padLeft(2, '0'))
+        .replaceAll('{day}', now.day.toString().padLeft(2, '0'))
+        .replaceAll('{category}', 'tech');
+    return identical(s, AppStrings.zh) ? '示例：$example' : 'Example: $example';
+  }
+
+  String _buildPermalinkExample(AppStrings s) {
+    final pattern = _permalinkPatternCtrl.text.trim();
+    if (pattern.isEmpty) {
+      return identical(s, AppStrings.zh)
+          ? '示例：输入 articles/{year}/{month}/{day}/{slug}.html → articles/2024/06/15/hello-world.html'
+          : 'Example: articles/{year}/{month}/{day}/{slug}.html → articles/2024/06/15/hello-world.html';
+    }
+    // 用示例数据替换占位符
+    final now = DateTime.now();
+    final example = pattern
+        .replaceAll('{year}', now.year.toString())
+        .replaceAll('{month}', now.month.toString().padLeft(2, '0'))
+        .replaceAll('{day}', now.day.toString().padLeft(2, '0'))
+        .replaceAll('{timestamp}', (now.millisecondsSinceEpoch ~/ 1000).toString())
+        .replaceAll('{slug}', 'hello-world')
+        .replaceAll('{category}', 'tech');
+    return identical(s, AppStrings.zh) ? '示例：$example' : 'Example: $example';
   }
 
   Widget _divider() {

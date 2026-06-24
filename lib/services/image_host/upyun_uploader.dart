@@ -11,7 +11,7 @@ class UpyunUploader implements ImageUploader {
   final String password;
   final String domain;
   final String path;
-  final bool useDateFolder;
+  final ImageDateFolderMode dateFolderMode;
   final ImageNamingMode namingMode;
 
   UpyunUploader({
@@ -20,7 +20,7 @@ class UpyunUploader implements ImageUploader {
     required this.password,
     required this.domain,
     this.path = 'images/',
-    this.useDateFolder = false,
+    this.dateFolderMode = ImageDateFolderMode.none,
     this.namingMode = ImageNamingMode.timestamp,
   });
 
@@ -36,7 +36,7 @@ class UpyunUploader implements ImageUploader {
     final remotePath = buildRemoteImagePath(
       path,
       filename,
-      useDateFolder: useDateFolder,
+      dateFolderMode: dateFolderMode,
       namingMode: namingMode,
     );
     final url = '$_baseUrl/$remotePath';

@@ -17,7 +17,7 @@ class SettingsService {
   static const _keyUpyunOperator = 'upyun_operator';
   static const _keyUpyunDomain = 'upyun_domain';
   static const _keyUpyunPath = 'upyun_path';
-  static const _keyImageUseDateFolder = 'image_use_date_folder';
+  static const _keyImageDateFolderMode = 'image_date_folder_mode';
   static const _keyImageNamingMode = 'image_naming_mode';
   static const _keyThemeMode = 'theme_mode';
   static const _keyLocale = 'locale';
@@ -48,9 +48,8 @@ class SettingsService {
       githubRepo: _prefs.getString(_keyGithubRepo) ?? '',
       githubBranch: _prefs.getString(_keyGithubBranch) ?? 'main',
       githubPathPattern:
-          _prefs.getString(_keyGithubPathPattern) ?? '{year}/{month}',
-      permalinkPattern: _prefs.getString(_keyPermalinkPattern) ??
-          'articles/{year}/{month}/{day}/{timestamp}.html',
+          _prefs.getString(_keyGithubPathPattern) ?? '',
+      permalinkPattern: _prefs.getString(_keyPermalinkPattern) ?? '',
       imageHostType:
           ImageHostType.values[_prefs.getInt(_keyImageHostType) ?? 0],
       imageGithubRepo: _prefs.getString(_keyImageGithubRepo) ?? '',
@@ -61,7 +60,8 @@ class SettingsService {
       upyunPassword: upyunPassword,
       upyunDomain: _prefs.getString(_keyUpyunDomain) ?? '',
       upyunPath: _cleanPath(_prefs.getString(_keyUpyunPath) ?? ''),
-      imageUseDateFolder: _prefs.getBool(_keyImageUseDateFolder) ?? false,
+      imageDateFolderMode:
+          ImageDateFolderMode.values[_prefs.getInt(_keyImageDateFolderMode) ?? 0],
       imageNamingMode:
           ImageNamingMode.values[_prefs.getInt(_keyImageNamingMode) ?? 0],
       themeMode: AppThemeMode.values[_prefs.getInt(_keyThemeMode) ?? 0],
@@ -92,7 +92,7 @@ class SettingsService {
       _prefs.setString(_keyUpyunOperator, settings.upyunOperator),
       _prefs.setString(_keyUpyunDomain, settings.upyunDomain),
       _prefs.setString(_keyUpyunPath, settings.upyunPath),
-      _prefs.setBool(_keyImageUseDateFolder, settings.imageUseDateFolder),
+      _prefs.setInt(_keyImageDateFolderMode, settings.imageDateFolderMode.index),
       _prefs.setInt(_keyImageNamingMode, settings.imageNamingMode.index),
       _prefs.setInt(_keyThemeMode, settings.themeMode.index),
       _prefs.setInt(_keyLocale, settings.locale.index),

@@ -2,6 +2,8 @@ enum ImageHostType { github, upyun }
 
 enum ImageNamingMode { timestamp, original, timestampOriginal }
 
+enum ImageDateFolderMode { none, year, yearMonth }
+
 enum AppThemeMode { system, light, dark }
 
 enum AppLocale { system, zh, en }
@@ -29,7 +31,7 @@ class Settings {
   String upyunPath;
 
   // Image upload path / naming (shared across hosts)
-  bool imageUseDateFolder;
+  ImageDateFolderMode imageDateFolderMode;
   ImageNamingMode imageNamingMode;
 
   // App
@@ -44,8 +46,8 @@ class Settings {
     this.githubOwner = '',
     this.githubRepo = '',
     this.githubBranch = 'main',
-    this.githubPathPattern = '{year}/{month}',
-    this.permalinkPattern = 'articles/{year}/{month}/{day}/{timestamp}.html',
+    this.githubPathPattern = '',
+    this.permalinkPattern = '',
     this.imageHostType = ImageHostType.github,
     this.imageGithubRepo = '',
     this.imageGithubPath = 'images',
@@ -55,7 +57,7 @@ class Settings {
     this.upyunPassword = '',
     this.upyunDomain = '',
     this.upyunPath = '',
-    this.imageUseDateFolder = false,
+    this.imageDateFolderMode = ImageDateFolderMode.none,
     this.imageNamingMode = ImageNamingMode.timestamp,
     this.themeMode = AppThemeMode.system,
     this.locale = AppLocale.system,

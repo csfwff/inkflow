@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'l10n/app_strings.dart';
 import 'models/settings.dart';
 import 'pages/home_page.dart';
@@ -10,6 +12,11 @@ final articleService = ArticleService();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // 桌面平台需要初始化 sqflite FFI
+  if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
   await articleService.init();
   await settingsService.init();
   AppStrings.setLocale(settingsService.settings.locale);

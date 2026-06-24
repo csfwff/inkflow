@@ -12,7 +12,7 @@ class GitHubImageUploader implements ImageUploader {
   final String branch;
   final String path;
   final String? domain;
-  final bool useDateFolder;
+  final ImageDateFolderMode dateFolderMode;
   final ImageNamingMode namingMode;
 
   GitHubImageUploader({
@@ -22,7 +22,7 @@ class GitHubImageUploader implements ImageUploader {
     this.branch = 'main',
     this.path = 'images',
     this.domain,
-    this.useDateFolder = false,
+    this.dateFolderMode = ImageDateFolderMode.none,
     this.namingMode = ImageNamingMode.timestamp,
   });
 
@@ -39,7 +39,7 @@ class GitHubImageUploader implements ImageUploader {
     final remotePath = buildRemoteImagePath(
       path,
       filename,
-      useDateFolder: useDateFolder,
+      dateFolderMode: dateFolderMode,
       namingMode: namingMode,
     );
     final encodedContent = base64Encode(bytes);

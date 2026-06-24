@@ -20,7 +20,7 @@ class ImageHostService {
           branch: settings.githubBranch,
           path: settings.imageGithubPath,
           domain: settings.imageGithubDomain.isNotEmpty ? settings.imageGithubDomain : null,
-          useDateFolder: settings.imageUseDateFolder,
+          dateFolderMode: settings.imageDateFolderMode,
           namingMode: settings.imageNamingMode,
         );
       case ImageHostType.upyun:
@@ -36,7 +36,7 @@ class ImageHostService {
           password: settings.upyunPassword,
           domain: settings.upyunDomain,
           path: settings.upyunPath,
-          useDateFolder: settings.imageUseDateFolder,
+          dateFolderMode: settings.imageDateFolderMode,
           namingMode: settings.imageNamingMode,
         );
     }
