@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
+import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/settings.dart';
@@ -101,6 +105,61 @@ class SettingsService {
         settings.lastSyncTime?.toIso8601String() ?? '',
       ),
     ]);
+  }
+
+  /// 导出配置为 base64 字符串
+  /// - 不含敏感信息：纯 base64(JSON)，无需密码
+  /// - 含敏感信息：base64(IV + AES 密文)，需要密码
+  String exportConfig({bool includeSensitive = false, String? password}) {
+    final json = settings.toExportJson(includeSensitive: includeSensitive);
+    final plainText = jsonEncode(json);
+
+    if (!includeSensitive) {
+      // 不含敏感信息：直接 base64 编码
+      return base64Encode(utf8.encode(plainText));
+    }
+
+    // 含敏感信息：AES-CBC 加密
+    final keyBytes = sha256.convert(utf8.encode(password!)).bytes;
+    final key = encrypt.Key(Uint8List.fromList(keyBytes));
+    final iv = encrypt.IV.fromSecureRandom(16);
+    final encrypter = encrypt.Encrypter(encrypt.AES(key, mode: encrypt.AESMode.cbc));
+    final encrypted = encrypter.encrypt(plainText, iv: iv);
+    final combined = Uint8List.fromList(iv.bytes + encrypted.bytes);
+    return base64Encode(combined);
+  }
+
+  /// 尝试导入配置（不需要密码），成功返回 true
+  Future<bool> importConfigPlain(String data) async {
+    try {
+      final plainText = utf8.decode(base64Decode(data));
+      final json = jsonDecode(plainText) as Map<String, dynamic>;
+      settings.applyExportJson(json);
+      await save();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// 用密码解密导入配置（AES 加密格式），成功返回 true
+  Future<bool> importConfigEncrypted(String data, String password) async {
+    try {
+      final combined = base64Decode(data);
+      if (combined.length < 17) return false;
+      final iv = encrypt.IV(Uint8List.fromList(combined.sublist(0, 16)));
+      final cipherBytes = Uint8List.fromList(combined.sublist(16));
+      final keyBytes = sha256.convert(utf8.encode(password)).bytes;
+      final key = encrypt.Key(Uint8List.fromList(keyBytes));
+      final encrypter = encrypt.Encrypter(encrypt.AES(key, mode: encrypt.AESMode.cbc));
+      final plainText = encrypter.decrypt(encrypt.Encrypted(cipherBytes), iv: iv);
+      final json = jsonDecode(plainText) as Map<String, dynamic>;
+      settings.applyExportJson(json);
+      await save();
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// 清理路径：去除前导和尾部斜杠

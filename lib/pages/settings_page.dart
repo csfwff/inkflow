@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../l10n/app_strings.dart';
 import '../main.dart';
@@ -354,9 +355,212 @@ class _SettingsPageState extends State<SettingsPage> {
         _divider(),
         _infoRow(s.version, _version),
         _divider(),
+        _buildImportExport(s),
+        _divider(),
         _buildDangerZone(s),
       ],
     );
+  }
+
+  // ── Import / Export ──
+
+  Widget _buildImportExport(AppStrings s) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionHeader(s.exportConfig),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.upload),
+                  label: Text(s.exportConfig),
+                  onPressed: () => _showExportDialog(s),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.download),
+                  label: Text(s.importConfig),
+                  onPressed: () => _showImportDialog(s),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showExportDialog(AppStrings s) {
+    bool includeSensitive = false;
+    final passwordCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(s.exportConfig),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CheckboxListTile(
+                value: includeSensitive,
+                onChanged: (v) => setDialogState(() => includeSensitive = v ?? false),
+                title: Text(s.includeSensitive, style: const TextStyle(fontSize: 13)),
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                dense: true,
+              ),
+              if (includeSensitive) ...[
+                const SizedBox(height: 8),
+                TextField(
+                  controller: passwordCtrl,
+                  decoration: InputDecoration(
+                    labelText: s.enterPassword,
+                    hintText: s.passwordHint,
+                  ),
+                  obscureText: true,
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(s.cancel),
+            ),
+            FilledButton(
+              onPressed: () {
+                final password = includeSensitive ? passwordCtrl.text.trim() : null;
+                if (includeSensitive && (password == null || password.isEmpty)) return;
+                final encoded = settingsService.exportConfig(
+                  includeSensitive: includeSensitive,
+                  password: password,
+                );
+                Navigator.of(ctx).pop();
+                _copyToClipboard(encoded);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(s.exportSuccess)),
+                );
+              },
+              child: Text(s.exportConfig),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showImportDialog(AppStrings s) {
+    final dataCtrl = TextEditingController();
+    final passwordCtrl = TextEditingController();
+    bool needPassword = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(s.importConfig),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: dataCtrl,
+                decoration: InputDecoration(
+                  labelText: s.importConfigHint,
+                ),
+                maxLines: 3,
+              ),
+              if (needPassword) ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: passwordCtrl,
+                  decoration: InputDecoration(
+                    labelText: s.enterPassword,
+                    hintText: s.passwordHint,
+                  ),
+                  obscureText: true,
+                  autofocus: true,
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(s.cancel),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final data = dataCtrl.text.trim();
+                if (data.isEmpty) return;
+
+                bool success;
+                if (!needPassword) {
+                  // 先尝试无密码导入（纯 base64 格式）
+                  success = await settingsService.importConfigPlain(data);
+                  if (!success) {
+                    // 失败 → 可能是加密格式，显示密码输入框
+                    setDialogState(() => needPassword = true);
+                    return;
+                  }
+                } else {
+                  // 用密码解密导入
+                  final password = passwordCtrl.text.trim();
+                  if (password.isEmpty) return;
+                  success = await settingsService.importConfigEncrypted(data, password);
+                }
+
+                if (success) {
+                  Navigator.of(ctx).pop();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(s.importSuccess)),
+                    );
+                    _refreshCtrlsFromSettings();
+                    widget.onSettingsChanged?.call();
+                  }
+                } else if (needPassword) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(s.importFailed)),
+                    );
+                  }
+                }
+              },
+              child: Text(needPassword ? s.importConfigConfirm : s.importConfig),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _refreshCtrlsFromSettings() {
+    final st = settingsService.settings;
+    _githubTokenCtrl.text = st.githubToken;
+    _githubOwnerCtrl.text = st.githubOwner;
+    _githubRepoCtrl.text = st.githubRepo;
+    _githubBranchCtrl.text = st.githubBranch;
+    _githubPathPatternCtrl.text = st.githubPathPattern;
+    _permalinkPatternCtrl.text = st.permalinkPattern;
+    _imageGithubRepoCtrl.text = st.imageGithubRepo;
+    _imageGithubPathCtrl.text = st.imageGithubPath;
+    _imageGithubDomainCtrl.text = st.imageGithubDomain;
+    _upyunBucketCtrl.text = st.upyunBucket;
+    _upyunOperatorCtrl.text = st.upyunOperator;
+    _upyunPasswordCtrl.text = st.upyunPassword;
+    _upyunDomainCtrl.text = st.upyunDomain;
+    _upyunPathCtrl.text = st.upyunPath;
+    setState(() => _settings = st);
+  }
+
+  Future<void> _copyToClipboard(String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
   }
 
   Widget _buildDangerZone(AppStrings s) {

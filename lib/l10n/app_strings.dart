@@ -133,6 +133,18 @@ class AppStrings {
   final String clearArticleDataWarning;
   final String clearArticleDataConfirm;
 
+  // Import / Export
+  final String exportConfig;
+  final String importConfig;
+  final String exportSuccess;
+  final String importSuccess;
+  final String importFailed;
+  final String includeSensitive;
+  final String enterPassword;
+  final String passwordHint;
+  final String importConfigHint;
+  final String importConfigConfirm;
+
   const AppStrings._({
     required this.appTitle,
     required this.homeTitle,
@@ -244,6 +256,16 @@ class AppStrings {
     required this.clearArticleDataDesc,
     required this.clearArticleDataWarning,
     required this.clearArticleDataConfirm,
+    required this.exportConfig,
+    required this.importConfig,
+    required this.exportSuccess,
+    required this.importSuccess,
+    required this.importFailed,
+    required this.includeSensitive,
+    required this.enterPassword,
+    required this.passwordHint,
+    required this.importConfigHint,
+    required this.importConfigConfirm,
   });
 
   static const en = AppStrings._(
@@ -357,6 +379,16 @@ class AppStrings {
     clearArticleDataDesc: 'Delete all local articles, tags, and categories',
     clearArticleDataWarning: 'This will permanently delete all local article data and cannot be undone. Remote articles will not be affected.',
     clearArticleDataConfirm: 'Clear All',
+    exportConfig: 'Export Config',
+    importConfig: 'Import Config',
+    exportSuccess: 'Config exported to clipboard',
+    importSuccess: 'Config imported successfully',
+    importFailed: 'Import failed, please check the data and password',
+    includeSensitive: 'Include sensitive credentials (Token, Password)',
+    enterPassword: 'Enter Password',
+    passwordHint: 'Password for encryption/decryption',
+    importConfigHint: 'Paste the exported config string',
+    importConfigConfirm: 'Decrypt & Import',
   );
 
   static const zh = AppStrings._(
@@ -470,6 +502,16 @@ class AppStrings {
     clearArticleDataDesc: '删除本地所有文章、标签和分类数据',
     clearArticleDataWarning: '此操作将永久删除本地所有文章数据，且无法恢复。远程仓库中的文章不会受到影响。',
     clearArticleDataConfirm: '确认清除',
+    exportConfig: '导出配置',
+    importConfig: '导入配置',
+    exportSuccess: '配置已复制到剪贴板',
+    importSuccess: '配置导入成功',
+    importFailed: '导入失败，请检查数据和密码',
+    includeSensitive: '包含敏感凭据（Token、密码）',
+    enterPassword: '输入密码',
+    passwordHint: '用于加密/解密配置',
+    importConfigHint: '粘贴导出的配置字符串',
+    importConfigConfirm: '解密导入',
   );
 
   /// 应用当前语言设置，默认跟随系统。
