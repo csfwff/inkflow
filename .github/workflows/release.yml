@@ -32,7 +32,10 @@ jobs:
           cache: true
 
       - run: flutter pub get
-      - run: flutter build web --release --base-href /inkflow/
+      - run: flutter build web --release --base-href /
+
+      - name: Add CNAME for custom domain
+        run: echo 'inkflow.sszsj.com' > build/web/CNAME
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

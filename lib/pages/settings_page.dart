@@ -353,7 +353,83 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         _divider(),
         _infoRow(s.version, _version),
+        _divider(),
+        _buildDangerZone(s),
       ],
+    );
+  }
+
+  Widget _buildDangerZone(AppStrings s) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+          child: Text(
+            s.dangerZone,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.error,
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: OutlinedButton.icon(
+            icon: Icon(Icons.delete_forever, color: Theme.of(context).colorScheme.error),
+            label: Text(
+              s.clearArticleData,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: Theme.of(context).colorScheme.error),
+            ),
+            onPressed: () => _showClearDataDialog(s),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Text(
+            s.clearArticleDataDesc,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showClearDataDialog(AppStrings s) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: Icon(Icons.warning_amber_rounded, color: Theme.of(ctx).colorScheme.error, size: 40),
+        title: Text(s.clearArticleData),
+        content: Text(s.clearArticleDataWarning),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(s.cancel),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await articleService.clearAll();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(s.clearArticleDataDesc)),
+                );
+              }
+            },
+            child: Text(s.clearArticleDataConfirm),
+          ),
+        ],
+      ),
     );
   }
 

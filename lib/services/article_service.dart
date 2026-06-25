@@ -22,6 +22,13 @@ class ArticleService {
     await (_db.delete(_db.articleRows)..where((t) => t.id.equals(id))).go();
   }
 
+  /// 清空所有本地文章、标签和分类数据
+  Future<void> clearAll() async {
+    await _db.delete(_db.articleRows).go();
+    await _db.delete(_db.tagRows).go();
+    await _db.delete(_db.categoryRows).go();
+  }
+
   Future<Article?> getById(int id) async {
     final row = await (_db.select(_db.articleRows)
           ..where((t) => t.id.equals(id)))

@@ -126,6 +126,13 @@ class AppStrings {
   final String fullSync;
   final String fullSyncDesc;
 
+  // Danger zone
+  final String dangerZone;
+  final String clearArticleData;
+  final String clearArticleDataDesc;
+  final String clearArticleDataWarning;
+  final String clearArticleDataConfirm;
+
   const AppStrings._({
     required this.appTitle,
     required this.homeTitle,
@@ -232,6 +239,11 @@ class AppStrings {
     required this.incrementalSyncDesc,
     required this.fullSync,
     required this.fullSyncDesc,
+    required this.dangerZone,
+    required this.clearArticleData,
+    required this.clearArticleDataDesc,
+    required this.clearArticleDataWarning,
+    required this.clearArticleDataConfirm,
   });
 
   static const en = AppStrings._(
@@ -340,6 +352,11 @@ class AppStrings {
     incrementalSyncDesc: 'Only sync changed files since last sync',
     fullSync: 'Full Sync',
     fullSyncDesc: 'Sync all files from remote',
+    dangerZone: 'Danger Zone',
+    clearArticleData: 'Clear Article Data',
+    clearArticleDataDesc: 'Delete all local articles, tags, and categories',
+    clearArticleDataWarning: 'This will permanently delete all local article data and cannot be undone. Remote articles will not be affected.',
+    clearArticleDataConfirm: 'Clear All',
   );
 
   static const zh = AppStrings._(
@@ -448,6 +465,11 @@ class AppStrings {
     incrementalSyncDesc: '只同步上次同步后变更的文件',
     fullSync: '全量同步',
     fullSyncDesc: '同步远程所有文件',
+    dangerZone: '危险操作',
+    clearArticleData: '清除文章数据',
+    clearArticleDataDesc: '删除本地所有文章、标签和分类数据',
+    clearArticleDataWarning: '此操作将永久删除本地所有文章数据，且无法恢复。远程仓库中的文章不会受到影响。',
+    clearArticleDataConfirm: '确认清除',
   );
 
   /// 应用当前语言设置，默认跟随系统。
