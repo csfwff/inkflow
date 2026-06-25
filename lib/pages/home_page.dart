@@ -264,6 +264,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               );
+              _loadArticles();
             },
           ),
         ],
@@ -594,6 +595,8 @@ class _ArticleListItem extends StatelessWidget {
     required this.onDelete,
   });
 
+  bool get _hasCover => article.cover != null && article.cover!.isNotEmpty;
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -601,101 +604,135 @@ class _ArticleListItem extends StatelessWidget {
         '${article.date.year}-${article.date.month.toString().padLeft(2, '0')}-${article.date.day.toString().padLeft(2, '0')}';
 
     return Card(
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(8),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
+        child: IntrinsicHeight(
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            article.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
+              if (_hasCover)
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      article.cover!,
+                      width: 180,
+                      height: 100,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        width: 140,
+                        height: 90,
+                        color: colorScheme.surfaceContainerLow,
+                        child: Center(
+                          child: Icon(
+                            Icons.image_not_supported_outlined,
+                            size: 24,
+                            color: colorScheme.onSurfaceVariant,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        _StatusPill(article: article),
-                      ],
+                      ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      excerpt,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                            height: 1.35,
-                          ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        _MetaPill(icon: Icons.calendar_today, text: dateStr),
-                        if (article.tags.isNotEmpty)
-                          ...article.tags.take(3).map(
-                                (tag) => _MetaPill(
-                                  icon: Icons.tag,
-                                  text: tag,
-                                  dense: true,
-                                ),
-                              ),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-              PopupMenuButton<_ArticleAction>(
-                tooltip: MaterialLocalizations.of(context).showMenuTooltip,
-                onSelected: (action) {
-                  switch (action) {
-                    case _ArticleAction.edit:
-                      onTap();
-                    case _ArticleAction.delete:
-                      onDelete();
-                  }
-                },
-                itemBuilder: (context) {
-                  final s = AppStrings.current;
-                  return [
-                    PopupMenuItem(
-                      value: _ArticleAction.edit,
-                      child: ListTile(
-                        leading: const Icon(Icons.edit_outlined),
-                        title: Text(s.editorTitle),
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 14, 8, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              article.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _StatusPill(article: article),
+                          PopupMenuButton<_ArticleAction>(
+                            tooltip: MaterialLocalizations.of(context)
+                                .showMenuTooltip,
+                            onSelected: (action) {
+                              switch (action) {
+                                case _ArticleAction.edit:
+                                  onTap();
+                                case _ArticleAction.delete:
+                                  onDelete();
+                              }
+                            },
+                            itemBuilder: (context) {
+                              final s = AppStrings.current;
+                              return [
+                                PopupMenuItem(
+                                  value: _ArticleAction.edit,
+                                  child: ListTile(
+                                    leading:
+                                        const Icon(Icons.edit_outlined),
+                                    title: Text(s.editorTitle),
+                                    dense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                ),
+                                PopupMenuItem(
+                                  value: _ArticleAction.delete,
+                                  child: ListTile(
+                                    leading:
+                                        const Icon(Icons.delete_outline),
+                                    title: Text(s.deleteArticle),
+                                    dense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                ),
+                              ];
+                            },
+                          ),
+                        ],
                       ),
-                    ),
-                    PopupMenuItem(
-                      value: _ArticleAction.delete,
-                      child: ListTile(
-                        leading: const Icon(Icons.delete_outline),
-                        title: Text(s.deleteArticle),
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: Text(
+                          excerpt,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                    height: 1.35,
+                                  ),
+                        ),
                       ),
-                    ),
-                  ];
-                },
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          _MetaPill(
+                              icon: Icons.calendar_today, text: dateStr),
+                          if (article.tags.isNotEmpty)
+                            ...article.tags.take(3).map(
+                                  (tag) => _MetaPill(
+                                    icon: Icons.tag,
+                                    text: tag,
+                                    dense: true,
+                                  ),
+                                ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),

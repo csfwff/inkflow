@@ -424,6 +424,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     hintText: s.passwordHint,
                   ),
                   obscureText: true,
+                  keyboardType: TextInputType.visiblePassword,
                 ),
               ],
             ],
@@ -485,6 +486,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   obscureText: true,
                   autofocus: true,
+                  keyboardType: TextInputType.visiblePassword,
                 ),
               ],
             ],
@@ -624,6 +626,8 @@ class _SettingsPageState extends State<SettingsPage> {
             onPressed: () async {
               Navigator.of(ctx).pop();
               await articleService.clearAll();
+              _settings.lastSyncTime = null;
+              _save();
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text(s.clearArticleDataDesc)),

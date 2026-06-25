@@ -55,23 +55,12 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 1;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (Migrator m) async {
           await m.createAll();
-        },
-        onUpgrade: (Migrator m, int from, int to) async {
-          if (from < 4) {
-            await m.database.customStatement(
-              'ALTER TABLE article_rows ADD COLUMN custom_fields TEXT NOT NULL DEFAULT \'{}\'',
-            );
-          }
-          if (from < 5) {
-            await m.createTable(tagRows);
-            await m.createTable(categoryRows);
-          }
         },
       );
 

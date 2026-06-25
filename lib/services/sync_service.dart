@@ -113,6 +113,11 @@ class SyncService {
         debugPrint('[Sync] Marked $deletedCount articles as remote deleted');
       }
 
+      // 更新 lastSyncTime
+      settingsService.settings.lastSyncTime = DateTime.now();
+      await settingsService.save();
+      debugPrint('[Sync] Updated lastSyncTime: ${settingsService.settings.lastSyncTime}');
+
       debugPrint(
           '[Sync] === syncFromGitHub DONE: ${remoteArticles.length} synced, $deletedCount remote deleted ===');
       return SyncResult(success: true, count: remoteArticles.length);
