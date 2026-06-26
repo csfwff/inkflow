@@ -111,6 +111,11 @@ class AppStrings {
   final String selectCategories;
   final String noItemsAvailable;
 
+  // Unsaved changes
+  final String unsavedChanges;
+  final String unsavedChangesDesc;
+  final String discard;
+
   // Image picker
   final String selectImage;
   final String uploadImage;
@@ -266,6 +271,9 @@ class AppStrings {
     required this.passwordHint,
     required this.importConfigHint,
     required this.importConfigConfirm,
+    required this.unsavedChanges,
+    required this.unsavedChangesDesc,
+    required this.discard,
   });
 
   static const en = AppStrings._(
@@ -389,6 +397,9 @@ class AppStrings {
     passwordHint: 'Password for encryption/decryption',
     importConfigHint: 'Paste the exported config string',
     importConfigConfirm: 'Decrypt & Import',
+    unsavedChanges: 'Unsaved Changes',
+    unsavedChangesDesc: 'You have unsaved changes. Are you sure you want to leave?',
+    discard: 'Discard',
   );
 
   static const zh = AppStrings._(
@@ -512,6 +523,9 @@ class AppStrings {
     passwordHint: '用于加密/解密配置',
     importConfigHint: '粘贴导出的配置字符串',
     importConfigConfirm: '解密导入',
+    unsavedChanges: '未保存的更改',
+    unsavedChangesDesc: '你有未保存的更改，确定要离开吗？',
+    discard: '放弃',
   );
 
   /// 应用当前语言设置，默认跟随系统。

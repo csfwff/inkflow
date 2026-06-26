@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'l10n/app_strings.dart';
@@ -12,8 +12,8 @@ final articleService = ArticleService();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // 桌面平台需要初始化 sqflite FFI
-  if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
+  // 桌面平台需要初始化 sqflite FFI（Web 不需要）
+  if (!kIsWeb) {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   }

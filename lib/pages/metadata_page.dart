@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../l10n/app_strings.dart';
@@ -64,6 +65,17 @@ class _MetadataPageState extends State<MetadataPage> {
   /// 上传中状态
   bool _uploading = false;
 
+  /// 初始状态快照，用于检测是否有改动
+  late final List<String> _initialTags;
+  late final List<String> _initialCategories;
+  late final String _initialPermalink;
+  late final String _initialTopImg;
+  late final String _initialCover;
+  late final String _initialExcerpt;
+  late final String _initialDescription;
+  late final String _initialAuthor;
+  late final Map<String, String> _initialCustomFields;
+
   @override
   void initState() {
     super.initState();
@@ -81,6 +93,16 @@ class _MetadataPageState extends State<MetadataPage> {
     _selectedTags = List.from(article.tags);
     _selectedCategories = List.from(article.categories);
 
+    // 记录初始状态快照
+    _initialTags = List.from(article.tags);
+    _initialCategories = List.from(article.categories);
+    _initialPermalink = article.permalink ?? '';
+    _initialTopImg = article.topImg ?? '';
+    _initialCover = article.cover ?? '';
+    _initialExcerpt = article.excerpt ?? '';
+    _initialDescription = article.description ?? '';
+    _initialAuthor = article.author ?? '';
+
     // 初始化自定义字段
     _customFields = article.customFields.entries
         .map((e) => _CustomFieldEntry(
@@ -88,6 +110,7 @@ class _MetadataPageState extends State<MetadataPage> {
               value: e.value,
             ))
         .toList();
+    _initialCustomFields = Map.from(article.customFields);
 
     // 加载已有的标签和分类
     _loadTagsAndCategories();
@@ -148,6 +171,50 @@ class _MetadataPageState extends State<MetadataPage> {
     _permalinkCtrl.text = permalink;
   }
 
+  bool _hasChanges() {
+    if (!listEquals(_selectedTags, _initialTags)) return true;
+    if (!listEquals(_selectedCategories, _initialCategories)) return true;
+    if (_permalinkCtrl.text.trim() != _initialPermalink) return true;
+    if (_topImgCtrl.text.trim() != _initialTopImg) return true;
+    if (_coverCtrl.text.trim() != _initialCover) return true;
+    if (_excerptCtrl.text.trim() != _initialExcerpt) return true;
+    if (_descriptionCtrl.text.trim() != _initialDescription) return true;
+    if (_authorCtrl.text.trim() != _initialAuthor) return true;
+
+    // 检测自定义字段改动
+    final currentCustom = <String, String>{};
+    for (final field in _customFields) {
+      final k = field.keyCtrl.text.trim();
+      final v = field.valueCtrl.text.trim();
+      if (k.isNotEmpty) currentCustom[k] = v;
+    }
+    if (!mapEquals(currentCustom, _initialCustomFields)) return true;
+
+    return false;
+  }
+
+  Future<bool> _showDiscardDialog() async {
+    final s = AppStrings.current;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(s.unsavedChanges),
+        content: Text(s.unsavedChangesDesc),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(s.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(s.discard),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
   void _save() {
     final article = widget.article;
     article.tags = List.from(_selectedTags);
@@ -177,7 +244,20 @@ class _MetadataPageState extends State<MetadataPage> {
   Widget build(BuildContext context) {
     final s = AppStrings.current;
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        if (_hasChanges()) {
+          final discard = await _showDiscardDialog();
+          if (discard && context.mounted) {
+            Navigator.pop(context);
+          }
+        } else {
+          Navigator.pop(context);
+        }
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: Text(s.metadata),
         actions: [
@@ -318,6 +398,7 @@ class _MetadataPageState extends State<MetadataPage> {
             const SizedBox(height: 32),
           ],
         ),
+      ),
       ),
     );
   }
