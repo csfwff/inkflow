@@ -76,6 +76,7 @@ class AppStrings {
   final String noArticles;
   final String deleteArticle;
   final String deleteConfirm;
+  final String deleteConfirmRemote;
   final String cancel;
   final String pushToDraft;
   final String repoDraft;
@@ -213,6 +214,7 @@ class AppStrings {
     required this.noArticles,
     required this.deleteArticle,
     required this.deleteConfirm,
+    required this.deleteConfirmRemote,
     required this.cancel,
     required this.pushToDraft,
     required this.repoDraft,
@@ -339,6 +341,7 @@ class AppStrings {
     noArticles: 'No articles yet',
     deleteArticle: 'Delete',
     deleteConfirm: 'Are you sure you want to delete this article?',
+    deleteConfirmRemote: 'This article is synced to the remote repository. Deleting will also remove the remote file. Continue?',
     cancel: 'Cancel',
     pushToDraft: 'Save as Draft',
     repoDraft: 'Repo Draft',
@@ -465,6 +468,7 @@ class AppStrings {
     noArticles: '暂无文章',
     deleteArticle: '删除',
     deleteConfirm: '确认删除这篇文章？',
+    deleteConfirmRemote: '此文章已同步到远程仓库，删除后远程文件也会被一并删除。是否继续？',
     cancel: '取消',
     pushToDraft: '存为草稿',
     repoDraft: '仓库草稿',

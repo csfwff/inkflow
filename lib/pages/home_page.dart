@@ -107,11 +107,16 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _deleteArticle(Article article) async {
     final s = AppStrings.current;
+    final hasRemote = article.remotePath != null &&
+        article.githubSha != null &&
+        article.githubSha!.isNotEmpty &&
+        article.status != ArticleStatus.draft &&
+        article.status != ArticleStatus.remoteDeleted;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(s.deleteArticle),
-        content: Text(s.deleteConfirm),
+        content: Text(hasRemote ? s.deleteConfirmRemote : s.deleteConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -132,7 +137,7 @@ class _HomePageState extends State<HomePage> {
 
     // 如果有远程文件（synced 或 repoDraft），先删除远程
     final remotePath = article.remotePath;
-    if (remotePath != null &&
+    if (hasRemote && remotePath != null &&
         article.githubSha != null &&
         article.githubSha!.isNotEmpty &&
         article.status != ArticleStatus.draft &&
@@ -600,6 +605,10 @@ class _ArticleListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    // 窄屏(<600)图片缩小，宽屏保持原尺寸
+    final imgWidth = screenWidth < 400 ? 80.0 : (screenWidth < 600 ? 110.0 : 180.0);
+    final imgHeight = screenWidth < 400 ? 56.0 : (screenWidth < 600 ? 70.0 : 100.0);
     final dateStr =
         '${article.date.year}-${article.date.month.toString().padLeft(2, '0')}-${article.date.day.toString().padLeft(2, '0')}';
 
@@ -609,31 +618,40 @@ class _ArticleListItem extends StatelessWidget {
         onTap: onTap,
         child: IntrinsicHeight(
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: screenWidth < 600 ? CrossAxisAlignment.start : CrossAxisAlignment.stretch,
             children: [
               if (_hasCover)
                 Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      article.cover!,
-                      width: 180,
-                      height: 100,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        width: 140,
-                        height: 90,
-                        color: colorScheme.surfaceContainerLow,
-                        child: Center(
-                          child: Icon(
-                            Icons.image_not_supported_outlined,
-                            size: 24,
-                            color: colorScheme.onSurfaceVariant,
+                  padding: EdgeInsets.all(screenWidth < 400 ? 8 : 12),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          article.cover!,
+                          width: imgWidth,
+                          height: imgHeight,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: imgWidth,
+                            height: imgHeight,
+                            color: colorScheme.surfaceContainerLow,
+                            child: Center(
+                              child: Icon(
+                                Icons.image_not_supported_outlined,
+                                size: 24,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                      if (screenWidth < 600) ...[
+                        const SizedBox(height: 6),
+                        _StatusPill(article: article),
+                      ],
+                    ],
                   ),
                 ),
               Expanded(
@@ -658,8 +676,10 @@ class _ArticleListItem extends StatelessWidget {
                                   ),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          _StatusPill(article: article),
+                          if (screenWidth >= 600) ...[
+                            const SizedBox(width: 8),
+                            _StatusPill(article: article),
+                          ],
                           PopupMenuButton<_ArticleAction>(
                             tooltip: MaterialLocalizations.of(context)
                                 .showMenuTooltip,
