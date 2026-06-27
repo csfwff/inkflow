@@ -230,14 +230,18 @@ class _EditorPageState extends State<EditorPage> {
   }
 
   Future<void> _openMetadata() async {
-    final saved = await _saveDraft(showMessage: false);
-    if (!saved || !mounted || _editingArticle == null) return;
+    if (_editingArticle == null) {
+      // 新文章需要先保存一次，拿到 id
+      final saved = await _saveDraft(showMessage: false);
+      if (!saved || !mounted) return;
+    }
 
+    final old = _editingArticle!;
     final result = await Navigator.push<Article>(
       context,
       MaterialPageRoute(
         builder: (_) => MetadataPage(
-          article: _editingArticle!,
+          article: old,
           settingsService: settingsService,
           articleService: articleService,
         ),
@@ -245,9 +249,18 @@ class _EditorPageState extends State<EditorPage> {
     );
 
     if (result != null && mounted) {
+      final changed = !_listEquals(result.tags, old.tags) ||
+          !_listEquals(result.categories, old.categories) ||
+          _neq(result.permalink, old.permalink) ||
+          _neq(result.topImg, old.topImg) ||
+          _neq(result.cover, old.cover) ||
+          _neq(result.excerpt, old.excerpt) ||
+          _neq(result.description, old.description) ||
+          _neq(result.author, old.author) ||
+          !_mapEquals(result.customFields, old.customFields);
       setState(() {
         _editingArticle = result;
-        _dirty = true;
+        if (changed) _dirty = true;
       });
     }
   }
@@ -1094,6 +1107,25 @@ class _EditorPageState extends State<EditorPage> {
 
   String _label(String zh, String en) {
     return AppStrings.isZh ? zh : en;
+  }
+
+  /// null 与空字符串视为相等
+  bool _neq(String? a, String? b) => (a ?? '') != (b ?? '');
+
+  bool _listEquals(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  bool _mapEquals(Map<String, String> a, Map<String, String> b) {
+    if (a.length != b.length) return false;
+    for (final entry in a.entries) {
+      if (b[entry.key] != entry.value) return false;
+    }
+    return true;
   }
 }
 
