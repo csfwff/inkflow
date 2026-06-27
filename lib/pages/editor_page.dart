@@ -564,17 +564,50 @@ class _EditorPageState extends State<EditorPage> {
     }
   }
 
+  Future<bool> _confirmDiscard() async {
+    if (!_dirty) return true;
+    final s = AppStrings.current;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(s.unsavedChanges),
+        content: Text('${s.unsavedChangesDesc}\n\n${AppStrings.isZh ? '离开将丢失这些未保存的改动' : 'Leaving will discard unsaved changes'}'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(s.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(AppStrings.isZh ? '确认' : 'Confirm'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final wide = Responsive.isWide(context);
     final s = AppStrings.current;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_editingArticle == null ? s.newArticle : s.editorTitle),
-        actions: _buildAppBarActions(wide),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final discard = await _confirmDiscard();
+        if (discard && context.mounted) {
+          Navigator.pop(context);
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(_editingArticle == null ? s.newArticle : s.editorTitle),
+          actions: _buildAppBarActions(wide),
+        ),
+        body: SafeArea(child: wide ? _buildWide() : _buildNarrow()),
       ),
-      body: SafeArea(child: wide ? _buildWide() : _buildNarrow()),
     );
   }
 
