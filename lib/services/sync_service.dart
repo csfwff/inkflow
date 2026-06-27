@@ -1,14 +1,16 @@
-import 'package:flutter/foundation.dart';
 import '../models/article.dart';
 import 'frontmatter_helper.dart';
 import 'github_service.dart';
 import 'article_service.dart';
+import 'log_service.dart';
 import 'settings_service.dart';
 
 class SyncService {
   final GitHubService github;
   final ArticleService articleService;
   final SettingsService settingsService;
+
+  static final _log = LogService.instance;
 
   SyncService({
     required this.github,
@@ -44,30 +46,30 @@ class SyncService {
 
   Future<SyncResult> syncFromGitHub() async {
     try {
-      debugPrint('[Sync] === syncFromGitHub START ===');
+      _log.write('=== syncFromGitHub START ===', tag: 'Sync');
       final List<Article> remoteArticles = [];
 
       // 同步已发布文章 (source/_posts)
-      debugPrint('[Sync] Syncing source/_posts ...');
+      _log.write('Syncing source/_posts ...', tag: 'Sync');
       final posts = await _syncDirectory(
         'source/_posts',
         ArticleStatus.synced,
         ArticleRemoteKind.post,
       );
-      debugPrint('[Sync] source/_posts -> ${posts.length} articles');
+      _log.write('source/_posts -> ${posts.length} articles', tag: 'Sync');
       remoteArticles.addAll(posts);
 
       // 同步仓库草稿 (source/_drafts)
-      debugPrint('[Sync] Syncing source/_drafts ...');
+      _log.write('Syncing source/_drafts ...', tag: 'Sync');
       final drafts = await _syncDirectory(
         'source/_drafts',
         ArticleStatus.repoDraft,
         ArticleRemoteKind.repoDraft,
       );
-      debugPrint('[Sync] source/_drafts -> ${drafts.length} articles');
+      _log.write('source/_drafts -> ${drafts.length} articles', tag: 'Sync');
       remoteArticles.addAll(drafts);
 
-      debugPrint('[Sync] Total remote articles: ${remoteArticles.length}');
+      _log.write('Total remote articles: ${remoteArticles.length}', tag: 'Sync');
 
       // 收集远程存在的完整路径，避免 posts/drafts 同名文件互相混淆。
       final remotePaths = <String>{};
@@ -75,7 +77,7 @@ class SyncService {
         final remotePath = a.remotePath;
         if (remotePath != null) remotePaths.add(remotePath);
       }
-      debugPrint('[Sync] Remote paths: $remotePaths');
+      _log.write('Remote paths: $remotePaths', tag: 'Sync');
 
       // upsert 远程文章
       for (final article in remoteArticles) {
@@ -94,7 +96,7 @@ class SyncService {
 
       // 检测远程已删除：本地 synced/repoDraft 但远程不存在的
       final localSynced = await articleService.getRemoteTracked();
-      debugPrint('[Sync] Local synced/repoDraft count: ${localSynced.length}');
+      _log.write('Local synced/repoDraft count: ${localSynced.length}', tag: 'Sync');
       int deletedCount = 0;
       for (final local in localSynced) {
         if (local.status == ArticleStatus.pendingPublish) {
@@ -103,27 +105,25 @@ class SyncService {
 
         final remotePath = local.remotePath;
         if (remotePath == null || !remotePaths.contains(remotePath)) {
-          debugPrint(
-              '[Sync] Remote deleted: "${local.title}" (${remotePath ?? local.filePath})');
+          _log.write('Remote deleted: "${local.title}" (${remotePath ?? local.filePath})', tag: 'Sync');
           await articleService.markAsRemoteDeleted(local.id!);
           deletedCount++;
         }
       }
       if (deletedCount > 0) {
-        debugPrint('[Sync] Marked $deletedCount articles as remote deleted');
+        _log.write('Marked $deletedCount articles as remote deleted', tag: 'Sync');
       }
 
       // 更新 lastSyncTime
       settingsService.settings.lastSyncTime = DateTime.now();
       await settingsService.save();
-      debugPrint('[Sync] Updated lastSyncTime: ${settingsService.settings.lastSyncTime}');
+      _log.write('Updated lastSyncTime: ${settingsService.settings.lastSyncTime}', tag: 'Sync');
 
-      debugPrint(
-          '[Sync] === syncFromGitHub DONE: ${remoteArticles.length} synced, $deletedCount remote deleted ===');
+      _log.write('=== syncFromGitHub DONE: ${remoteArticles.length} synced, $deletedCount remote deleted ===', tag: 'Sync');
       return SyncResult(success: true, count: remoteArticles.length);
     } catch (e, stack) {
-      debugPrint('[Sync] EXCEPTION: $e');
-      debugPrint('[Sync] STACK: $stack');
+      _log.write('EXCEPTION: $e', tag: 'Sync');
+      _log.write('STACK: $stack', tag: 'Sync');
       return SyncResult(success: false, error: e.toString());
     }
   }
@@ -131,15 +131,15 @@ class SyncService {
   /// 增量同步：基于 commit 记录只拉取变更文件
   Future<SyncResult> syncIncremental() async {
     try {
-      debugPrint('[Sync] === syncIncremental START ===');
+      _log.write('=== syncIncremental START ===', tag: 'Sync');
 
       final lastSyncTime = settingsService.settings.lastSyncTime;
       if (lastSyncTime == null) {
-        debugPrint('[Sync] No lastSyncTime, falling back to full sync');
+        _log.write('No lastSyncTime, falling back to full sync', tag: 'Sync');
         return syncFromGitHub();
       }
 
-      debugPrint('[Sync] lastSyncTime: $lastSyncTime');
+      _log.write('lastSyncTime: $lastSyncTime', tag: 'Sync');
 
       // 获取两个目录的 commit 记录
       final postsCommits = await github.getCommitsSince(
@@ -151,16 +151,14 @@ class SyncService {
         since: lastSyncTime,
       );
 
-      debugPrint(
-          '[Sync] Commits: posts=${postsCommits.length}, drafts=${draftsCommits.length}');
+      _log.write('Commits: posts=${postsCommits.length}, drafts=${draftsCommits.length}', tag: 'Sync');
 
       // commit 太多时 getCommitsSince 会跳过详情获取（files 为空），降级到全量同步
       final hasEmptyFiles = postsCommits.any((c) => c.files.isEmpty) ||
           draftsCommits.any((c) => c.files.isEmpty);
       if (hasEmptyFiles &&
           (postsCommits.isNotEmpty || draftsCommits.isNotEmpty)) {
-        debugPrint(
-            '[Sync] Commits missing file details (too many?), falling back to full sync');
+        _log.write('Commits missing file details (too many?), falling back to full sync', tag: 'Sync');
         return syncFromGitHub();
       }
 
@@ -168,10 +166,8 @@ class SyncService {
       final postsChanges = _extractChanges(postsCommits, 'source/_posts/');
       final draftsChanges = _extractChanges(draftsCommits, 'source/_drafts/');
 
-      debugPrint(
-          '[Sync] Changes: posts added/modified=${postsChanges.addedOrModified.length}, removed=${postsChanges.removed.length}');
-      debugPrint(
-          '[Sync] Changes: drafts added/modified=${draftsChanges.addedOrModified.length}, removed=${draftsChanges.removed.length}');
+      _log.write('Changes: posts added/modified=${postsChanges.addedOrModified.length}, removed=${postsChanges.removed.length}', tag: 'Sync');
+      _log.write('Changes: drafts added/modified=${draftsChanges.addedOrModified.length}, removed=${draftsChanges.removed.length}', tag: 'Sync');
 
       // 如果变更太多（>200个文件），降级到全量同步
       final totalChanges = postsChanges.addedOrModified.length +
@@ -179,8 +175,7 @@ class SyncService {
           draftsChanges.addedOrModified.length +
           draftsChanges.removed.length;
       if (totalChanges > 200) {
-        debugPrint(
-            '[Sync] Too many changes ($totalChanges), falling back to full sync');
+        _log.write('Too many changes ($totalChanges), falling back to full sync', tag: 'Sync');
         return syncFromGitHub();
       }
 
@@ -236,17 +231,16 @@ class SyncService {
       if (latestDate != null) {
         settingsService.settings.lastSyncTime = latestDate;
         await settingsService.save();
-        debugPrint('[Sync] Updated lastSyncTime: $latestDate');
+        _log.write('Updated lastSyncTime: $latestDate', tag: 'Sync');
       }
 
-      debugPrint(
-          '[Sync] === syncIncremental DONE: $syncedCount synced, $deletedCount deleted ===');
+      _log.write('=== syncIncremental DONE: $syncedCount synced, $deletedCount deleted ===', tag: 'Sync');
       return SyncResult(success: true, count: syncedCount);
     } catch (e, stack) {
-      debugPrint('[Sync] Incremental sync EXCEPTION: $e');
-      debugPrint('[Sync] STACK: $stack');
+      _log.write('Incremental sync EXCEPTION: $e', tag: 'Sync');
+      _log.write('STACK: $stack', tag: 'Sync');
       // 增量同步失败，降级到全量同步
-      debugPrint('[Sync] Falling back to full sync');
+      _log.write('Falling back to full sync', tag: 'Sync');
       return syncFromGitHub();
     }
   }
@@ -299,10 +293,10 @@ class SyncService {
     final prefix = _prefixForRemoteKind(remoteKind);
     final remotePath = '$prefix$relativePath';
 
-    debugPrint('[Sync] Fetching: $remotePath');
+    _log.write('Fetching: $remotePath', tag: 'Sync');
     final fileData = await github.getFileContent(remotePath);
     if (fileData == null) {
-      debugPrint('[Sync] Failed to fetch: $remotePath');
+      _log.write('Failed to fetch: $remotePath', tag: 'Sync');
       return null;
     }
 
@@ -325,7 +319,7 @@ class SyncService {
           article.remotePath!.endsWith('/$relativePath')) {
         await articleService.markAsRemoteDeleted(article.id!);
         count++;
-        debugPrint('[Sync] Marked remote deleted: "${article.title}"');
+        _log.write('Marked remote deleted: "${article.title}"', tag: 'Sync');
       }
     }
     return count;
@@ -355,7 +349,7 @@ class SyncService {
     ArticleStatus status,
     ArticleRemoteKind remoteKind,
   ) async {
-    debugPrint('[Sync] _syncDirectory: $dirPath');
+    _log.write('_syncDirectory: $dirPath', tag: 'Sync');
     final List<Article> articles = [];
     final prefix = _prefixForRemoteKind(remoteKind);
 
@@ -364,13 +358,13 @@ class SyncService {
     } on _SyncException catch (e) {
       // 根目录（source/_posts、source/_drafts）不存在时允许跳过
       if (e.message.contains('404')) {
-        debugPrint('[Sync] Directory not found (404), skipping: $dirPath');
+        _log.write('Directory not found (404), skipping: $dirPath', tag: 'Sync');
         return articles;
       }
       rethrow;
     }
 
-    debugPrint('[Sync] $dirPath -> ${articles.length} articles total');
+    _log.write('$dirPath -> ${articles.length} articles total', tag: 'Sync');
     return articles;
   }
 
@@ -413,8 +407,7 @@ class SyncService {
     }
 
     final entries = result.entries;
-    debugPrint(
-        '[Sync] $currentPath -> ${entries.length} entries: ${entries.map((e) => '${e.name}(${e.type})').join(', ')}');
+    _log.write('$currentPath -> ${entries.length} entries: ${entries.map((e) => '${e.name}(${e.type})').join(', ')}', tag: 'Sync');
 
     for (final entry in entries) {
       // entry.path 是 API 返回的完整路径，如 source/_posts/2026/05/test.md
@@ -427,7 +420,7 @@ class SyncService {
           articles,
         );
       } else if (entry.name.endsWith('.md')) {
-        debugPrint('[Sync]   reading: ${entry.path}');
+        _log.write('  reading: ${entry.path}', tag: 'Sync');
         final fileData = await github.getFileContent(entry.path);
         if (fileData == null) {
           throw _SyncException('Failed to read ${entry.path}');
@@ -445,10 +438,10 @@ class SyncService {
           status: status,
         );
         if (article != null) {
-          debugPrint('[Sync]   parsed: "${article.title}" ($filePath)');
+          _log.write('  parsed: "${article.title}" ($filePath)', tag: 'Sync');
           articles.add(article);
         } else {
-          debugPrint('[Sync]   FAILED to parse frontmatter: ${entry.path}');
+          _log.write('  FAILED to parse frontmatter: ${entry.path}', tag: 'Sync');
         }
       }
     }
