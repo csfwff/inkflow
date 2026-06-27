@@ -1,6 +1,10 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../l10n/app_strings.dart';
 import '../main.dart';
 import '../models/settings.dart';
@@ -8,7 +12,7 @@ import '../services/github_service.dart';
 import '../services/image_host/image_path_builder.dart';
 import '../widgets/responsive.dart';
 
-enum _Tab { general, github, imageHost }
+enum _Tab { general, github, imageHost, about }
 
 class SettingsPage extends StatefulWidget {
   final VoidCallback? onSettingsChanged;
@@ -23,6 +27,8 @@ class _SettingsPageState extends State<SettingsPage> {
   _Tab _selectedTab = _Tab.general;
   late Settings _settings;
   String _version = '';
+
+  bool _checkingUpdate = false;
 
   // GitHub 仓库和分支列表
   List<GitHubRepo> _repos = [];
@@ -95,6 +101,92 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() {
       _version = '${info.version}+${info.buildNumber}';
     });
+  }
+
+  Future<void> _checkUpdate(bool zh) async {
+    setState(() => _checkingUpdate = true);
+    try {
+      final resp = await http.get(
+        Uri.parse('https://api.github.com/repos/csfwff/inkflow/releases/latest'),
+        headers: {'Accept': 'application/vnd.github.v3+json'},
+      );
+      if (resp.statusCode != 200) {
+        _showUpdateError(zh);
+        return;
+      }
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      final tagName = (data['tag_name'] as String?) ?? '';
+      final remoteVersion = tagName.replaceFirst('v', '');
+      final localVersion = _version.split('+').first;
+      final body = (data['body'] as String?) ?? '';
+      final htmlUrl = (data['html_url'] as String?) ?? '';
+
+      if (_isNewerVersion(remoteVersion, localVersion)) {
+        _showUpdateDialog(zh, remoteVersion, body, htmlUrl);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(zh ? '已是最新版本' : 'Already up to date')),
+          );
+        }
+      }
+    } catch (_) {
+      _showUpdateError(zh);
+    } finally {
+      if (mounted) setState(() => _checkingUpdate = false);
+    }
+  }
+
+  bool _isNewerVersion(String remote, String local) {
+    final r = remote.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+    final l = local.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+    for (var i = 0; i < 3; i++) {
+      final rv = i < r.length ? r[i] : 0;
+      final lv = i < l.length ? l[i] : 0;
+      if (rv > lv) return true;
+      if (rv < lv) return false;
+    }
+    return false;
+  }
+
+  void _showUpdateDialog(bool zh, String version, String body, String url) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: Icon(Icons.system_update, color: Theme.of(ctx).colorScheme.primary, size: 40),
+        title: Text(zh ? '发现新版本 v$version' : 'New version v$version'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Text(
+              body.isNotEmpty ? body : (zh ? '有新版本可用' : 'A new version is available'),
+              style: const TextStyle(fontSize: 13),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(zh ? '稍后再说' : 'Later'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+            },
+            child: Text(zh ? '前往下载' : 'Download'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showUpdateError(bool zh) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(zh ? '检查更新失败，请稍后重试' : 'Update check failed, please try later')),
+      );
+    }
   }
 
   /// 加载仓库列表
@@ -210,6 +302,7 @@ class _SettingsPageState extends State<SettingsPage> {
             _sidebarItem(_Tab.general, Icons.tune, s.tabGeneral),
             _sidebarItem(_Tab.github, Icons.code, s.tabGithub),
             _sidebarItem(_Tab.imageHost, Icons.image, s.tabImageHost),
+            _sidebarItem(_Tab.about, Icons.info_outline, AppStrings.isZh ? '关于' : 'About'),
           ],
         ),
       ),
@@ -251,6 +344,7 @@ class _SettingsPageState extends State<SettingsPage> {
       (_Tab.general, Icons.tune, s.tabGeneral),
       (_Tab.github, Icons.code, s.tabGithub),
       (_Tab.imageHost, Icons.image, s.tabImageHost),
+      (_Tab.about, Icons.info_outline, identical(s, AppStrings.zh) ? '关于' : 'About'),
     ];
 
     return Container(
@@ -301,6 +395,7 @@ class _SettingsPageState extends State<SettingsPage> {
           _Tab.general => _buildGeneralTab(s),
           _Tab.github => _buildGithubTab(s),
           _Tab.imageHost => _buildImageHostTab(s),
+          _Tab.about => _buildAboutTab(s),
         },
       ],
     );
@@ -352,8 +447,6 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
           ),
         ),
-        _divider(),
-        _infoRow(s.version, _version),
         _divider(),
         _buildImportExport(s),
         _divider(),
@@ -601,6 +694,190 @@ class _SettingsPageState extends State<SettingsPage> {
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAboutTab(AppStrings s) {
+    final zh = identical(s, AppStrings.zh);
+    const blogName = '鼠鼠在碎觉';
+    const blogLink = 'https://sszsj.com';
+    const blogAvatar = 'https://tmx.fishpi.cn/image/head.jpg';
+    const blogDesc = '我是不慎落入世界的一滴水墨';
+    const authorName = '唐墨夏';
+
+    const friendLinkYaml = '''
+- name: 鼠鼠在碎觉
+  link: https://sszsj.com
+  avatar: https://tmx.fishpi.cn/image/head.jpg
+  descr: 我是不慎落入世界的一滴水墨''';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionHeader(s.version),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Text(
+                _version,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              if (!kIsWeb) ...[
+                const SizedBox(width: 12),
+                FilledButton.tonal(
+                  onPressed: _checkingUpdate ? null : () => _checkUpdate(zh),
+                  child: _checkingUpdate
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(zh ? '检查更新' : 'Check Update'),
+                ),
+              ],
+            ],
+          ),
+        ),
+        _divider(),
+        _sectionHeader(zh ? '作者' : 'Author'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: () => launchUrl(Uri.parse(blogLink)),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: Image.network(
+                    blogAvatar,
+                    width: 48,
+                    height: 48,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => CircleAvatar(
+                      radius: 24,
+                      child: Icon(Icons.person),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    GestureDetector(
+                      onTap: () => launchUrl(Uri.parse(blogLink)),
+                      child: Text(
+                        blogName,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$authorName · $blogDesc',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        _divider(),
+        _sectionHeader(zh ? '友链信息（点击复制）' : 'Friend Link (tap to copy)'),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+          child: GestureDetector(
+            onTap: () {
+              _copyToClipboard(friendLinkYaml);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(zh ? '已复制友链 YAML' : 'Friend link YAML copied')),
+                );
+              }
+            },
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+              ),
+              child: Text(
+                friendLinkYaml,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontFamily: 'monospace',
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+        ),
+        _divider(),
+        _sectionHeader(zh ? '问题反馈' : 'Feedback'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                children: [
+                  Text(
+                    zh
+                        ? '请在摸鱼派发帖并 @csfwff'
+                        : 'Post on FishPi and mention @csfwff',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  FilledButton.tonalIcon(
+                    icon: const Icon(Icons.feedback_outlined, size: 16),
+                    label: Text(zh ? '前往反馈' : 'Go'),
+                    onPressed: () => launchUrl(
+                      Uri.parse('https://fishpi.cn'),
+                      mode: LaunchMode.externalApplication,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  zh ? '没有账号？点此注册' : 'No account? Register here',
+                  style: TextStyle(fontSize: 12),
+                ),
+                onPressed: () => launchUrl(
+                  Uri.parse('https://fishpi.cn/register?r=csfwff'),
+                  mode: LaunchMode.externalApplication,
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -1349,22 +1626,4 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _infoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: TextStyle(fontSize: 14)),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
