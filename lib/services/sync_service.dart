@@ -154,6 +154,16 @@ class SyncService {
       debugPrint(
           '[Sync] Commits: posts=${postsCommits.length}, drafts=${draftsCommits.length}');
 
+      // commit 太多时 getCommitsSince 会跳过详情获取（files 为空），降级到全量同步
+      final hasEmptyFiles = postsCommits.any((c) => c.files.isEmpty) ||
+          draftsCommits.any((c) => c.files.isEmpty);
+      if (hasEmptyFiles &&
+          (postsCommits.isNotEmpty || draftsCommits.isNotEmpty)) {
+        debugPrint(
+            '[Sync] Commits missing file details (too many?), falling back to full sync');
+        return syncFromGitHub();
+      }
+
       // 提取变更文件
       final postsChanges = _extractChanges(postsCommits, 'source/_posts/');
       final draftsChanges = _extractChanges(draftsCommits, 'source/_drafts/');

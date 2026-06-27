@@ -262,11 +262,36 @@ class GitHubService {
     }
   }
 
+  /// 获取单个 commit 的详细信息（含 files 列表）
+  Future<GitHubCommit?> getCommitDetail(String sha) async {
+    final uri = Uri.parse(
+      'https://api.github.com/repos/$owner/$repo/commits/$sha',
+    );
+
+    debugPrint('[GitHub] GET commit detail $sha');
+
+    try {
+      final response = await http.get(uri, headers: _headers);
+      debugPrint('[GitHub] commit detail ${response.statusCode} $sha');
+
+      if (response.statusCode == 200) {
+        return _parseCommit(jsonDecode(response.body));
+      }
+      debugPrint('[GitHub] commit detail ERROR: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('[GitHub] commit detail EXCEPTION: $e');
+    }
+    return null;
+  }
+
   /// 获取指定路径下某个时间之后的 commit 记录（带分页）
+  /// 列表 API 不返回 files，需逐个获取 commit 详情。
+  /// commit 数量超过 [maxDetailFetches] 时跳过详情获取，返回的 commit 不含 files。
   Future<List<GitHubCommit>> getCommitsSince({
     required String path,
     required DateTime since,
     int perPage = 100,
+    int maxDetailFetches = 20,
   }) async {
     final List<GitHubCommit> allCommits = [];
     int page = 1;
@@ -312,8 +337,27 @@ class GitHubService {
       }
     }
 
-    debugPrint('[GitHub] Total commits for $path: ${allCommits.length}');
-    return allCommits;
+    // commit 太多时跳过详情获取，让调用方降级到全量同步
+    if (allCommits.length > maxDetailFetches) {
+      debugPrint(
+          '[GitHub] Too many commits (${allCommits.length} > $maxDetailFetches), skipping detail fetch');
+      return allCommits;
+    }
+
+    // 列表 API 不含 files，逐个获取详情以拿到变更文件列表
+    final List<GitHubCommit> detailedCommits = [];
+    for (final commit in allCommits) {
+      final detail = await getCommitDetail(commit.sha);
+      if (detail != null) {
+        detailedCommits.add(detail);
+      } else {
+        // 详情获取失败，保留无 files 的原始 commit
+        detailedCommits.add(commit);
+      }
+    }
+
+    debugPrint('[GitHub] Total commits for $path: ${detailedCommits.length}');
+    return detailedCommits;
   }
 
   /// 列出用户的仓库列表
