@@ -763,26 +763,29 @@ class _SelectorSheetState extends State<_SelectorSheet> {
                         style: const TextStyle(color: Colors.grey),
                       ),
                     )
-                  : ListView.builder(
+                  : SingleChildScrollView(
                       controller: scrollController,
-                      itemCount: widget.allOptions.length,
-                      itemBuilder: (ctx, index) {
-                        final option = widget.allOptions[index];
-                        final isSelected = _tempSelected.contains(option);
-                        return CheckboxListTile(
-                          title: Text(option),
-                          value: isSelected,
-                          onChanged: (value) {
-                            setState(() {
-                              if (value == true) {
-                                _tempSelected.add(option);
-                              } else {
-                                _tempSelected.remove(option);
-                              }
-                            });
-                          },
-                        );
-                      },
+                      padding: const EdgeInsets.all(16),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: widget.allOptions.map((option) {
+                          final isSelected = _tempSelected.contains(option);
+                          return FilterChip(
+                            label: Text(option),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              setState(() {
+                                if (selected) {
+                                  _tempSelected.add(option);
+                                } else {
+                                  _tempSelected.remove(option);
+                                }
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
                     ),
             ),
           ],
