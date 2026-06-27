@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import '../l10n/app_strings.dart';
 import '../main.dart';
@@ -808,6 +810,11 @@ class _EditorPageState extends State<EditorPage> {
                   tooltip: _label('插入图片', 'Insert image'),
                   onPressed: _uploading ? null : () => _pickAndUploadImage(),
                 ),
+                _ToolButton(
+                  icon: Icons.music_note,
+                  tooltip: _label('插入音乐', 'Insert music'),
+                  onPressed: () => _showMusicSearch(),
+                ),
               ],
             ),
           ),
@@ -1105,6 +1112,17 @@ class _EditorPageState extends State<EditorPage> {
     };
   }
 
+  Future<void> _showMusicSearch() async {
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const _MusicSearchSheet(),
+    );
+    if (result != null && result.isNotEmpty) {
+      _insertBlock(result);
+    }
+  }
+
   String _label(String zh, String en) {
     return AppStrings.isZh ? zh : en;
   }
@@ -1398,6 +1416,328 @@ class _HeadingButton extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 网易云音乐搜索面板
+class _MusicSearchSheet extends StatefulWidget {
+  const _MusicSearchSheet();
+
+  @override
+  State<_MusicSearchSheet> createState() => _MusicSearchSheetState();
+}
+
+class _MusicSearchSheetState extends State<_MusicSearchSheet> {
+  final _searchCtrl = TextEditingController();
+  List<_MusicResult> _results = [];
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _search() async {
+    final keyword = _searchCtrl.text.trim();
+    if (keyword.isEmpty) return;
+
+    setState(() {
+      _loading = true;
+      _error = null;
+      _results = [];
+    });
+
+    try {
+      final uri = Uri.parse(
+        'https://music.163.com/api/search/get/web',
+      ).replace(queryParameters: {
+        's': keyword,
+        'type': '1',
+        'limit': '10',
+      });
+      final resp = await http.get(uri, headers: {
+        'Referer': 'https://music.163.com',
+        'User-Agent': 'Mozilla/5.0',
+      });
+
+      if (resp.statusCode != 200) {
+        setState(() {
+          _loading = false;
+          _error = AppStrings.isZh ? '搜索失败' : 'Search failed';
+        });
+        return;
+      }
+
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      final result = data['result'] as Map<String, dynamic>?;
+      final songs = result?['songs'] as List<dynamic>? ?? [];
+
+      setState(() {
+        _loading = false;
+        _results = songs.map((s) => _MusicResult.fromJson(s)).toList();
+      });
+    } catch (_) {
+      setState(() {
+        _loading = false;
+        _error = AppStrings.isZh ? '网络错误' : 'Network error';
+      });
+    }
+  }
+
+  void _select(_MusicResult song) {
+    final zh = AppStrings.isZh;
+    int width = 330;
+    int height = 86;
+    int playerHeight = 66;
+    bool autoPlay = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 歌曲信息
+                  Row(
+                    children: [
+                      const Icon(Icons.music_note, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${song.name} - ${song.artist}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  // 尺寸选择
+                  Text(zh ? '播放器尺寸' : 'Player size',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                      )),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      _sizeChip(zh ? '小' : 'Small', 330, 86, 66, width, height, playerHeight,
+                          (w, h, ph) => setSheetState(() {
+                                width = w;
+                                height = h;
+                                playerHeight = ph;
+                              })),
+                      _sizeChip(zh ? '迷你' : 'Mini', 298, 52, 32, width, height, playerHeight,
+                          (w, h, ph) => setSheetState(() {
+                                width = w;
+                                height = h;
+                                playerHeight = ph;
+                              })),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // 自动播放
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(zh ? '自动播放' : 'Autoplay',
+                        style: const TextStyle(fontSize: 14)),
+                    value: autoPlay,
+                    onChanged: (v) => setSheetState(() => autoPlay = v),
+                  ),
+                  const SizedBox(height: 16),
+                  // 插入按钮
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () {
+                        final auto = autoPlay ? 1 : 0;
+                        final embed =
+                            '<iframe frameborder="no" border="0" marginwidth="0" '
+                            'marginheight="0" width=$width height=$height '
+                            'src="//music.163.com/outchain/player?type=2'
+                            '&id=${song.id}&auto=$auto&height=$playerHeight">'
+                            '</iframe>';
+                        Navigator.pop(ctx); // 关闭配置面板
+                        Navigator.pop(context, embed); // 返回结果
+                      },
+                      child: Text(zh ? '插入' : 'Insert'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _sizeChip(
+    String label,
+    int w,
+    int h,
+    int ph,
+    int currentW,
+    int currentH,
+    int currentPh,
+    void Function(int w, int h, int ph) onSelected,
+  ) {
+    final selected = currentW == w && currentH == h && currentPh == ph;
+    return ChoiceChip(
+      label: Text('$label ($w×$h)'),
+      selected: selected,
+      onSelected: (_) => onSelected(w, h, ph),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final zh = AppStrings.isZh;
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.3,
+      maxChildSize: 0.9,
+      expand: false,
+      builder: (ctx, scrollCtrl) {
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Icon(Icons.music_note),
+                  const SizedBox(width: 8),
+                  Text(
+                    zh ? '插入音乐' : 'Insert Music',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextField(
+                controller: _searchCtrl,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: zh ? '搜索歌曲名...' : 'Search songs...',
+                  isDense: true,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.search),
+                    onPressed: _search,
+                  ),
+                ),
+                onSubmitted: (_) => _search(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Divider(height: 1),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                      ? Center(
+                          child: Text(_error!,
+                              style: const TextStyle(color: Colors.grey)))
+                      : _results.isEmpty
+                          ? Center(
+                              child: Text(
+                                zh ? '输入关键词搜索网易云音乐' : 'Search NetEase Music',
+                                style: const TextStyle(color: Colors.grey),
+                              ),
+                            )
+                          : ListView.builder(
+                              controller: scrollCtrl,
+                              itemCount: _results.length,
+                              itemBuilder: (ctx, i) {
+                                final song = _results[i];
+                                return ListTile(
+                                  leading: const Icon(Icons.music_note,
+                                      size: 20),
+                                  title: Text(song.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis),
+                                  subtitle: Text(song.artist,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis),
+                                  trailing: Text(
+                                    _formatDuration(song.duration),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                    ),
+                                  ),
+                                  onTap: () => _select(song),
+                                );
+                              },
+                            ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _formatDuration(int ms) {
+    final sec = ms ~/ 1000;
+    final m = sec ~/ 60;
+    final s = sec % 60;
+    return '$m:${s.toString().padLeft(2, '0')}';
+  }
+}
+
+class _MusicResult {
+  final int id;
+  final String name;
+  final String artist;
+  final int duration;
+
+  _MusicResult({
+    required this.id,
+    required this.name,
+    required this.artist,
+    required this.duration,
+  });
+
+  factory _MusicResult.fromJson(Map<String, dynamic> json) {
+    final artists = (json['artists'] as List<dynamic>?)
+            ?.map((a) => (a as Map<String, dynamic>)['name'] as String? ?? '')
+            .where((n) => n.isNotEmpty)
+            .toList() ??
+        [];
+    return _MusicResult(
+      id: json['id'] as int? ?? 0,
+      name: (json['name'] as String?) ?? '',
+      artist: artists.join(' / '),
+      duration: (json['duration'] as int?) ?? 0,
     );
   }
 }
