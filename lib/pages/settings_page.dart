@@ -1,9 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../l10n/app_strings.dart';
 import '../main.dart';
@@ -29,6 +32,8 @@ class _SettingsPageState extends State<SettingsPage> {
   String _version = '';
 
   bool _checkingUpdate = false;
+  bool _downloading = false;
+  double _downloadProgress = 0;
 
   // GitHub 仓库和分支列表
   List<GitHubRepo> _repos = [];
@@ -121,8 +126,21 @@ class _SettingsPageState extends State<SettingsPage> {
       final body = (data['body'] as String?) ?? '';
       final htmlUrl = (data['html_url'] as String?) ?? '';
 
+      // 提取 APK 下载链接
+      String? apkUrl;
+      if (!kIsWeb && Platform.isAndroid) {
+        final assets = (data['assets'] as List<dynamic>?) ?? [];
+        for (final asset in assets) {
+          final name = (asset as Map<String, dynamic>)['name'] as String? ?? '';
+          if (name.endsWith('.apk')) {
+            apkUrl = asset['browser_download_url'] as String?;
+            break;
+          }
+        }
+      }
+
       if (_isNewerVersion(remoteVersion, localVersion)) {
-        _showUpdateDialog(zh, remoteVersion, body, htmlUrl);
+        _showUpdateDialog(zh, remoteVersion, body, htmlUrl, apkUrl);
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -149,36 +167,111 @@ class _SettingsPageState extends State<SettingsPage> {
     return false;
   }
 
-  void _showUpdateDialog(bool zh, String version, String body, String url) {
+  void _showUpdateDialog(bool zh, String version, String body, String url, String? apkUrl) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        icon: Icon(Icons.system_update, color: Theme.of(ctx).colorScheme.primary, size: 40),
-        title: Text(zh ? '发现新版本 v$version' : 'New version v$version'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: SingleChildScrollView(
-            child: Text(
-              body.isNotEmpty ? body : (zh ? '有新版本可用' : 'A new version is available'),
-              style: const TextStyle(fontSize: 13),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          icon: Icon(Icons.system_update, color: Theme.of(ctx).colorScheme.primary, size: 40),
+          title: Text(zh ? '发现新版本 v$version' : 'New version v$version'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    body.isNotEmpty ? body : (zh ? '有新版本可用' : 'A new version is available'),
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  if (_downloading) ...[
+                    const SizedBox(height: 16),
+                    LinearProgressIndicator(value: _downloadProgress),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${(_downloadProgress * 100).toInt()}%',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
+          actions: [
+            if (!_downloading)
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(zh ? '稍后再说' : 'Later'),
+              ),
+            if (!_downloading && apkUrl != null)
+              FilledButton(
+                onPressed: () => _downloadAndInstall(apkUrl, ctx),
+                child: Text(zh ? '下载安装' : 'Download & Install'),
+              ),
+            if (!_downloading && apkUrl == null)
+              FilledButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                },
+                child: Text(zh ? '前往下载' : 'Download'),
+              ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(zh ? '稍后再说' : 'Later'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-            },
-            child: Text(zh ? '前往下载' : 'Download'),
-          ),
-        ],
       ),
     );
+  }
+
+  Future<void> _downloadAndInstall(String url, BuildContext dialogCtx) async {
+    final zh = AppStrings.isZh;
+    setState(() {
+      _downloading = true;
+      _downloadProgress = 0;
+    });
+
+    try {
+      final dir = await getTemporaryDirectory();
+      final filePath = '${dir.path}/inkflow_update.apk';
+      final file = File(filePath);
+
+      final request = http.Request('GET', Uri.parse(url));
+      final response = await http.Client().send(request);
+
+      if (response.statusCode != 200) {
+        _showUpdateError(zh);
+        return;
+      }
+
+      final total = response.contentLength;
+      int received = 0;
+      final sink = file.openWrite();
+
+      await response.stream.forEach((chunk) {
+        sink.add(chunk);
+        received += chunk.length;
+        if (total != null && total > 0) {
+          setState(() => _downloadProgress = received / total);
+        }
+      });
+
+      await sink.close();
+
+      if (mounted && dialogCtx.mounted) {
+        setState(() => _downloading = false);
+        Navigator.of(dialogCtx).pop();
+        await OpenFilex.open(filePath);
+      }
+    } catch (_) {
+      if (mounted && dialogCtx.mounted) {
+        setState(() => _downloading = false);
+        Navigator.of(dialogCtx).pop();
+        _showUpdateError(zh);
+      }
+    }
   }
 
   void _showUpdateError(bool zh) {
@@ -732,8 +825,8 @@ class _SettingsPageState extends State<SettingsPage> {
               if (!kIsWeb) ...[
                 const SizedBox(width: 12),
                 FilledButton.tonal(
-                  onPressed: _checkingUpdate ? null : () => _checkUpdate(zh),
-                  child: _checkingUpdate
+                  onPressed: (_checkingUpdate || _downloading) ? null : () => _checkUpdate(zh),
+                  child: (_checkingUpdate || _downloading)
                       ? const SizedBox(
                           width: 16,
                           height: 16,
