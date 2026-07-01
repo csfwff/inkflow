@@ -13,6 +13,7 @@ import '../main.dart';
 import '../models/settings.dart';
 import 'log_viewer_page.dart';
 import '../services/github_service.dart';
+import '../services/log_service.dart';
 import '../services/image_host/image_path_builder.dart';
 import '../widgets/responsive.dart';
 
@@ -360,6 +361,7 @@ class _SettingsPageState extends State<SettingsPage> {
   /// Only the parent (MyApp) needs to rebuild for theme/locale changes.
   Future<void> _save() async {
     await settingsService.save();
+    LogService.instance.info('设置已保存', tag: 'Settings');
     widget.onSettingsChanged?.call();
   }
 

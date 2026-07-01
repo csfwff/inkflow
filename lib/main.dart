@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'l10n/app_strings.dart';
 import 'models/settings.dart';
 import 'pages/home_page.dart';
+import 'services/log_service.dart';
 import 'services/settings_service.dart';
 import 'services/article_service.dart';
 
@@ -12,14 +14,22 @@ final articleService = ArticleService();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   // 桌面平台需要初始化 sqflite FFI（Web 不需要）
   if (!kIsWeb) {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   }
+
   await articleService.init();
   await settingsService.init();
   AppStrings.setLocale(settingsService.settings.locale);
+
+  // 记录启动日志
+  final log = LogService.instance;
+  final info = await PackageInfo.fromPlatform();
+  log.info('应用启动: ${info.version}+${info.buildNumber}', tag: 'App');
+
   runApp(const MyApp());
 }
 

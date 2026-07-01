@@ -39,6 +39,8 @@ class _LogViewerPageState extends State<LogViewerPage> {
   @override
   void initState() {
     super.initState();
+    // 记录打开日志查看器
+    LogService.instance.info('打开日志查看器', tag: 'LogViewer');
     _loadLogs();
   }
 
@@ -320,26 +322,44 @@ class _LogViewerPageState extends State<LogViewerPage> {
           ),
         ),
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            '${_filteredEntries.length} entries',
-            style: TextStyle(
-              fontSize: 12,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+          FutureBuilder<String>(
+            future: LogService.instance.filePath,
+            builder: (ctx, snap) => Text(
+              '日志路径: ${snap.data ?? "..."}',
+              style: TextStyle(
+                fontSize: 10,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          const Spacer(),
-          TextButton.icon(
-            onPressed: _copyAll,
-            icon: const Icon(Icons.copy, size: 16),
-            label: Text(s.logCopyAll),
-          ),
-          const SizedBox(width: 8),
-          TextButton.icon(
-            onPressed: _clearLogs,
-            icon: const Icon(Icons.delete_outline, size: 16),
-            label: Text(s.logClear),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Text(
+                '${_filteredEntries.length} entries',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: _copyAll,
+                icon: const Icon(Icons.copy, size: 16),
+                label: Text(s.logCopyAll),
+              ),
+              const SizedBox(width: 8),
+              TextButton.icon(
+                onPressed: _clearLogs,
+                icon: const Icon(Icons.delete_outline, size: 16),
+                label: Text(s.logClear),
+              ),
+            ],
           ),
         ],
       ),

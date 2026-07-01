@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -40,17 +41,17 @@ class LogService {
       if (await file.exists()) {
         final size = await file.length();
         if (size > _maxSize) {
-          final content = await file.readAsString();
+          final content = await file.readAsString(encoding: utf8);
           final half = content.length ~/ 2;
           // 从中间位置找到下一个换行符，避免截断行
           final nextLine = content.indexOf('\n', half);
           final keep = nextLine > 0 ? content.substring(nextLine + 1) : content.substring(half);
-          await file.writeAsString('[--- log truncated ---]\n$keep');
+          await file.writeAsString('[--- log truncated ---]\n$keep', encoding: utf8);
         }
       }
 
       // 追加写入
-      await file.writeAsString(line, mode: FileMode.append);
+      await file.writeAsString(line, mode: FileMode.append, encoding: utf8);
     } catch (_) {
       // 日志写入失败不应影响正常功能
     }
@@ -89,7 +90,7 @@ class LogService {
     try {
       final file = await logFile;
       if (await file.exists()) {
-        return await file.readAsString();
+        return await file.readAsString(encoding: utf8);
       }
     } catch (_) {}
     return '';
