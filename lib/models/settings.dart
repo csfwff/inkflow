@@ -68,7 +68,7 @@ class Settings {
     this.imageNamingMode = ImageNamingMode.timestamp,
     this.imageCompressEnabled = false,
     this.imageCompressTargetKB = 1024,
-    this.friendLinkPath = 'source/_data/links.yml',
+    this.friendLinkPath = 'source/_data/link.yml',
     this.themeMode = AppThemeMode.system,
     this.locale = AppLocale.system,
     this.lastSyncTime,
@@ -141,7 +141,7 @@ class Settings {
       imageCompressTargetKB = json['imageCompressTargetKB'] ?? 1024;
     }
     if (json.containsKey('friendLinkPath')) {
-      friendLinkPath = json['friendLinkPath'] ?? 'source/_data/links.yml';
+      friendLinkPath = json['friendLinkPath'] ?? 'source/_data/link.yml';
     }
   }
 }

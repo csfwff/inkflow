@@ -73,7 +73,7 @@ class SettingsService {
           ImageNamingMode.values[_prefs.getInt(_keyImageNamingMode) ?? 0],
       imageCompressEnabled: _prefs.getBool(_keyImageCompressEnabled) ?? false,
       imageCompressTargetKB: _prefs.getInt(_keyImageCompressTargetKB) ?? 1024,
-      friendLinkPath: _prefs.getString(_keyFriendLinkPath) ?? 'source/_data/links.yml',
+      friendLinkPath: _prefs.getString(_keyFriendLinkPath) ?? 'source/_data/link.yml',
       themeMode: AppThemeMode.values[_prefs.getInt(_keyThemeMode) ?? 0],
       locale: AppLocale.values[_prefs.getInt(_keyLocale) ?? 0],
       lastSyncTime: _loadDateTime(_prefs.getString(_keyLastSyncTime)),

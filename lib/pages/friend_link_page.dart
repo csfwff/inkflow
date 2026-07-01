@@ -23,6 +23,7 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
   List<FriendLink> _links = [];
   bool _loading = true;
   bool _syncing = false;
+  bool _checking = false;
   _FriendLinkFilter _filter = _FriendLinkFilter.all;
 
   @override
@@ -32,7 +33,7 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
   }
 
   Future<void> _initService() async {
-    await _service.init();
+    await _service.init(articleService.database);
     await _loadLinks();
   }
 
@@ -137,6 +138,133 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
         ),
       );
     }
+  }
+
+  void _showAddMenu() {
+    final s = AppStrings.current;
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: Text(s.addFriendLink),
+              onTap: () {
+                Navigator.pop(ctx);
+                _addLink();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.content_paste),
+              title: Text(s.pasteYaml),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pasteFromYaml();
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _checkLinks() async {
+    setState(() => _checking = true);
+
+    final results = await _service.checkAllLinks();
+
+    if (!mounted) return;
+    setState(() => _checking = false);
+
+    // 显示检测结果
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('友链检测结果'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: results.length,
+            itemBuilder: (_, index) {
+              final r = results[index];
+              return ListTile(
+                dense: true,
+                leading: Icon(
+                  r.isAccessible ? Icons.check_circle : Icons.error,
+                  color: r.isAccessible ? Colors.green : Colors.red,
+                  size: 20,
+                ),
+                title: Text(r.name, style: const TextStyle(fontSize: 14)),
+                subtitle: Text(
+                  r.isAccessible
+                      ? '${r.statusCode}'
+                      : r.error ?? '不可访问',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: r.isAccessible ? Colors.green : Colors.red,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(AppStrings.current.done),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _checkSingleLink(FriendLink link) async {
+    final result = await _service.checkLink(link);
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(link.name),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(link.link, style: const TextStyle(fontSize: 13)),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(
+                  result.isAccessible ? Icons.check_circle : Icons.error,
+                  color: result.isAccessible ? Colors.green : Colors.red,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  result.isAccessible
+                      ? '可访问 (${result.statusCode})'
+                      : result.error ?? '不可访问',
+                  style: TextStyle(
+                    color: result.isAccessible ? Colors.green : Colors.red,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(AppStrings.current.done),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _addLink() async {
@@ -279,27 +407,38 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
             )
-          else
-            PopupMenuButton<String>(
-              onSelected: (v) {
-                switch (v) {
-                  case 'sync':
-                    _syncFromGitHub();
-                  case 'push':
-                    _pushToGitHub();
-                  case 'dev':
-                    _addDevLink();
-                  case 'yaml':
-                    _pasteFromYaml();
-                }
-              },
-              itemBuilder: (_) => [
-                PopupMenuItem(value: 'sync', child: Text(s.syncFriendLinks)),
-                PopupMenuItem(value: 'push', child: Text('推送到 GitHub')),
-                PopupMenuItem(value: 'dev', child: Text(s.addDevFriendLink)),
-                PopupMenuItem(value: 'yaml', child: Text(s.pasteYaml)),
-              ],
+          else ...[
+            if (_checking)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            else
+              IconButton(
+                icon: const Icon(Icons.link_outlined),
+                tooltip: '检测友链',
+                onPressed: _checkLinks,
+              ),
+            IconButton(
+              icon: const Icon(Icons.cloud_download_outlined),
+              tooltip: s.syncFriendLinks,
+              onPressed: _syncFromGitHub,
             ),
+            IconButton(
+              icon: const Icon(Icons.cloud_upload_outlined),
+              tooltip: '推送到 GitHub',
+              onPressed: _pushToGitHub,
+            ),
+            IconButton(
+              icon: const Icon(Icons.person_add_outlined),
+              tooltip: s.addDevFriendLink,
+              onPressed: _addDevLink,
+            ),
+          ],
         ],
       ),
       body: Column(
@@ -321,7 +460,7 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _addLink,
+        onPressed: _showAddMenu,
         child: const Icon(Icons.add),
       ),
     );
@@ -464,6 +603,18 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
                     ),
                   ],
                 ),
+              ),
+              // Edit
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, size: 20),
+                tooltip: s.editFriendLink,
+                onPressed: () => _editLink(link),
+              ),
+              // Check link
+              IconButton(
+                icon: const Icon(Icons.link, size: 20),
+                tooltip: '检测链接',
+                onPressed: () => _checkSingleLink(link),
               ),
               // Delete
               IconButton(

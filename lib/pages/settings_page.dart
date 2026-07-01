@@ -1118,7 +1118,7 @@ class _SettingsPageState extends State<SettingsPage> {
         _sectionHeader(s.friendLinkPath),
         _inputRow(
           controller: _friendLinkPathCtrl,
-          hint: 'source/_data/links.yml',
+          hint: 'source/_data/link.yml',
           onChanged: (v) {
             _settings.friendLinkPath = v;
             _save();

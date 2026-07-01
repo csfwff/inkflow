@@ -5,6 +5,9 @@ import 'database/app_database.dart';
 class ArticleService {
   late final AppDatabase _db;
 
+  /// 获取数据库实例（供其他服务共享使用）
+  AppDatabase get database => _db;
+
   Future<void> init() async {
     _db = await AppDatabase.create();
   }

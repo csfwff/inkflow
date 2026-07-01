@@ -1,16 +1,35 @@
 import 'package:drift/drift.dart';
+import 'package:http/http.dart' as http;
 import '../models/friend_link.dart';
 import 'database/app_database.dart';
 import 'friend_link_parser.dart';
 import 'github_service.dart';
 import 'log_service.dart';
 
+/// 链接检测结果
+class LinkCheckResult {
+  final String name;
+  final String url;
+  final bool isAccessible;
+  final int? statusCode;
+  final String? error;
+
+  LinkCheckResult({
+    required this.name,
+    required this.url,
+    required this.isAccessible,
+    this.statusCode,
+    this.error,
+  });
+}
+
 class FriendLinkService {
   late final AppDatabase _db;
   static final _log = LogService.instance;
 
-  Future<void> init() async {
-    _db = await AppDatabase.create();
+  /// 初始化服务，共享已有的数据库实例
+  Future<void> init(AppDatabase db) async {
+    _db = db;
   }
 
   // ── CRUD ──
@@ -66,6 +85,48 @@ class FriendLinkService {
       }
     }
     return count;
+  }
+
+  // ── 链接检测 ──
+
+  /// 检测单个链接是否可访问
+  Future<LinkCheckResult> checkLink(FriendLink link) async {
+    try {
+      final response = await http.head(Uri.parse(link.link))
+          .timeout(const Duration(seconds: 10));
+      return LinkCheckResult(
+        name: link.name,
+        url: link.link,
+        isAccessible: response.statusCode >= 200 && response.statusCode < 400,
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      return LinkCheckResult(
+        name: link.name,
+        url: link.link,
+        isAccessible: false,
+        error: e.toString(),
+      );
+    }
+  }
+
+  /// 批量检测所有启用的友链
+  Future<List<LinkCheckResult>> checkAllLinks() async {
+    final links = await getAll();
+    final enabledLinks = links.where((l) => !l.isCommented).toList();
+
+    _log.logAction('检测友链', detail: '${enabledLinks.length} 条');
+
+    final results = <LinkCheckResult>[];
+    for (final link in enabledLinks) {
+      final result = await checkLink(link);
+      results.add(result);
+    }
+
+    final accessible = results.where((r) => r.isAccessible).length;
+    _log.info('友链检测完成: $accessible/${results.length} 可访问', tag: 'FriendLink');
+
+    return results;
   }
 
   // ── GitHub 同步 ──

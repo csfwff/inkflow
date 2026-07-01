@@ -57,8 +57,14 @@ class FriendLinkParser {
 
       // 检测条目内的字段
       if (inEntry) {
-        // 处理注释前缀
-        final fieldLine = trimmed.startsWith('# ') ? trimmed.substring(2) : trimmed;
+        // 处理注释前缀（支持 # 和 # 两种格式）
+        String fieldLine = trimmed;
+        if (fieldLine.startsWith('# ')) {
+          fieldLine = fieldLine.substring(2);
+        } else if (fieldLine.startsWith('#') && fieldLine.length > 1) {
+          fieldLine = fieldLine.substring(1);
+        }
+        fieldLine = fieldLine.trim();
 
         final linkMatch = RegExp(r'^link:\s*(.+)$').firstMatch(fieldLine);
         if (linkMatch != null) {
