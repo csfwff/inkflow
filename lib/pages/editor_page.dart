@@ -217,6 +217,7 @@ class _EditorPageState extends State<EditorPage> {
       excerpt: _editingArticle?.excerpt,
       description: _editingArticle?.description,
       author: _editingArticle?.author,
+      customFields: _editingArticle?.customFields ?? {},
     );
   }
 
@@ -239,6 +240,17 @@ class _EditorPageState extends State<EditorPage> {
     }
 
     final old = _editingArticle!;
+    // 快照元数据，因为 MetadataPage 会直接修改 old 对象
+    final oldTags = List<String>.from(old.tags);
+    final oldCategories = List<String>.from(old.categories);
+    final oldPermalink = old.permalink;
+    final oldTopImg = old.topImg;
+    final oldCover = old.cover;
+    final oldExcerpt = old.excerpt;
+    final oldDescription = old.description;
+    final oldAuthor = old.author;
+    final oldCustomFields = Map<String, String>.from(old.customFields);
+
     final result = await Navigator.push<Article>(
       context,
       MaterialPageRoute(
@@ -251,15 +263,15 @@ class _EditorPageState extends State<EditorPage> {
     );
 
     if (result != null && mounted) {
-      final changed = !_listEquals(result.tags, old.tags) ||
-          !_listEquals(result.categories, old.categories) ||
-          _neq(result.permalink, old.permalink) ||
-          _neq(result.topImg, old.topImg) ||
-          _neq(result.cover, old.cover) ||
-          _neq(result.excerpt, old.excerpt) ||
-          _neq(result.description, old.description) ||
-          _neq(result.author, old.author) ||
-          !_mapEquals(result.customFields, old.customFields);
+      final changed = !_listEquals(result.tags, oldTags) ||
+          !_listEquals(result.categories, oldCategories) ||
+          _neq(result.permalink, oldPermalink) ||
+          _neq(result.topImg, oldTopImg) ||
+          _neq(result.cover, oldCover) ||
+          _neq(result.excerpt, oldExcerpt) ||
+          _neq(result.description, oldDescription) ||
+          _neq(result.author, oldAuthor) ||
+          !_mapEquals(result.customFields, oldCustomFields);
       setState(() {
         _editingArticle = result;
         if (changed) _dirty = true;

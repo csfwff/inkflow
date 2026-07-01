@@ -80,9 +80,8 @@ class _MetadataPageState extends State<MetadataPage> {
   void initState() {
     super.initState();
     final article = widget.article;
-    _tagsCtrl = TextEditingController(text: article.tags.join(', '));
-    _categoriesCtrl =
-        TextEditingController(text: article.categories.join('\n'));
+    _tagsCtrl = TextEditingController();
+    _categoriesCtrl = TextEditingController();
     _permalinkCtrl = TextEditingController(text: article.permalink ?? '');
     _topImgCtrl = TextEditingController(text: article.topImg ?? '');
     _coverCtrl = TextEditingController(text: article.cover ?? '');
