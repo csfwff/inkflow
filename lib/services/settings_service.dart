@@ -23,6 +23,8 @@ class SettingsService {
   static const _keyUpyunPath = 'upyun_path';
   static const _keyImageDateFolderMode = 'image_date_folder_mode';
   static const _keyImageNamingMode = 'image_naming_mode';
+  static const _keyImageCompressEnabled = 'image_compress_enabled';
+  static const _keyImageCompressTargetKB = 'image_compress_target_kb';
   static const _keyThemeMode = 'theme_mode';
   static const _keyLocale = 'locale';
   static const _keyLastSyncTime = 'last_sync_time';
@@ -68,6 +70,8 @@ class SettingsService {
           ImageDateFolderMode.values[_prefs.getInt(_keyImageDateFolderMode) ?? 0],
       imageNamingMode:
           ImageNamingMode.values[_prefs.getInt(_keyImageNamingMode) ?? 0],
+      imageCompressEnabled: _prefs.getBool(_keyImageCompressEnabled) ?? false,
+      imageCompressTargetKB: _prefs.getInt(_keyImageCompressTargetKB) ?? 1024,
       themeMode: AppThemeMode.values[_prefs.getInt(_keyThemeMode) ?? 0],
       locale: AppLocale.values[_prefs.getInt(_keyLocale) ?? 0],
       lastSyncTime: _loadDateTime(_prefs.getString(_keyLastSyncTime)),
@@ -98,6 +102,8 @@ class SettingsService {
       _prefs.setString(_keyUpyunPath, settings.upyunPath),
       _prefs.setInt(_keyImageDateFolderMode, settings.imageDateFolderMode.index),
       _prefs.setInt(_keyImageNamingMode, settings.imageNamingMode.index),
+      _prefs.setBool(_keyImageCompressEnabled, settings.imageCompressEnabled),
+      _prefs.setInt(_keyImageCompressTargetKB, settings.imageCompressTargetKB),
       _prefs.setInt(_keyThemeMode, settings.themeMode.index),
       _prefs.setInt(_keyLocale, settings.locale.index),
       _prefs.setString(

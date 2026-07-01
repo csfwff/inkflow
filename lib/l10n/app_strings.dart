@@ -151,6 +151,26 @@ class AppStrings {
   final String importConfigHint;
   final String importConfigConfirm;
 
+  // Log viewer
+  final String logViewer;
+  final String logAll;
+  final String logInfo;
+  final String logWarn;
+  final String logError;
+  final String logUserAction;
+  final String logCopyAll;
+  final String logClear;
+  final String logClearConfirm;
+  final String logCopied;
+  final String logEmpty;
+
+  // Image compression
+  final String imageCompress;
+  final String imageCompressDesc;
+  final String imageCompressTarget;
+  final String imageCompressUnlimited;
+  final String imageCompressResult;
+
   const AppStrings._({
     required this.appTitle,
     required this.homeTitle,
@@ -276,6 +296,24 @@ class AppStrings {
     required this.unsavedChanges,
     required this.unsavedChangesDesc,
     required this.discard,
+    // Log viewer
+    required this.logViewer,
+    required this.logAll,
+    required this.logInfo,
+    required this.logWarn,
+    required this.logError,
+    required this.logUserAction,
+    required this.logCopyAll,
+    required this.logClear,
+    required this.logClearConfirm,
+    required this.logCopied,
+    required this.logEmpty,
+    // Image compression
+    required this.imageCompress,
+    required this.imageCompressDesc,
+    required this.imageCompressTarget,
+    required this.imageCompressUnlimited,
+    required this.imageCompressResult,
   });
 
   static const en = AppStrings._(
@@ -403,6 +441,24 @@ class AppStrings {
     unsavedChanges: 'Unsaved Changes',
     unsavedChangesDesc: 'You have unsaved changes. Are you sure you want to leave?',
     discard: 'Discard',
+    // Log viewer
+    logViewer: 'View Logs',
+    logAll: 'All',
+    logInfo: 'Info',
+    logWarn: 'Warn',
+    logError: 'Error',
+    logUserAction: 'User Actions',
+    logCopyAll: 'Copy All',
+    logClear: 'Clear Logs',
+    logClearConfirm: 'Clear all logs?',
+    logCopied: 'Logs copied',
+    logEmpty: 'No logs',
+    // Image compression
+    imageCompress: 'Image Compression',
+    imageCompressDesc: 'Compress images before uploading to save storage',
+    imageCompressTarget: 'Target Size',
+    imageCompressUnlimited: 'Unlimited',
+    imageCompressResult: 'Compressed',
   );
 
   static const zh = AppStrings._(
@@ -530,6 +586,24 @@ class AppStrings {
     unsavedChanges: '未保存的更改',
     unsavedChangesDesc: '你有未保存的更改，确定要离开吗？',
     discard: '放弃',
+    // Log viewer
+    logViewer: '查看日志',
+    logAll: '全部',
+    logInfo: '信息',
+    logWarn: '警告',
+    logError: '错误',
+    logUserAction: '用户操作',
+    logCopyAll: '复制全部',
+    logClear: '清空日志',
+    logClearConfirm: '确认清空所有日志？',
+    logCopied: '日志已复制',
+    logEmpty: '暂无日志',
+    // Image compression
+    imageCompress: '图片压缩',
+    imageCompressDesc: '上传前压缩图片以节省存储空间',
+    imageCompressTarget: '目标大小',
+    imageCompressUnlimited: '不限',
+    imageCompressResult: '已压缩',
   );
 
   /// 应用当前语言设置，默认跟随系统。

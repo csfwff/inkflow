@@ -8,6 +8,7 @@ import '../main.dart';
 import '../models/article.dart';
 import '../services/github_service.dart';
 import '../services/image_host/image_host_service.dart';
+import '../services/log_service.dart';
 import '../services/sync_service.dart';
 import '../widgets/responsive.dart';
 import 'metadata_page.dart';
@@ -282,6 +283,8 @@ class _EditorPageState extends State<EditorPage> {
   Future<bool> _saveDraft({bool showMessage = true}) async {
     final s = AppStrings.current;
     final title = _titleCtrl.text.trim();
+
+    LogService.instance.logAction('保存草稿', detail: title);
     if (title.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(s.titleHint)),
@@ -318,6 +321,8 @@ class _EditorPageState extends State<EditorPage> {
   Future<void> _publish({bool drafts = false}) async {
     final s = AppStrings.current;
     final settings = settingsService.settings;
+
+    LogService.instance.logAction('发布文章', detail: drafts ? '存为草稿' : '正式发布');
 
     if (settings.githubToken.isEmpty ||
         settings.githubOwner.isEmpty ||
@@ -557,15 +562,30 @@ class _EditorPageState extends State<EditorPage> {
     if (!mounted) return;
     setState(() => _uploading = true);
 
-    // Upload
+    // Upload (with compression if enabled)
     final bytes = await file.readAsBytes();
-    final result = await imageHost.upload(bytes, file.name);
+    final result = await imageHost.uploadWithCompress(bytes, file.name);
 
     if (!mounted) return;
     setState(() => _uploading = false);
 
     if (result.success && result.url != null) {
       _insertBlock('![${file.name}](${result.url})');
+
+      // Show compression effect if compressed
+      if (result.wasCompressed && mounted) {
+        final compressResult = result.compressResult!;
+        final s = AppStrings.current;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${s.imageCompressResult}: ${compressResult.originalSizeFormatted} → ${compressResult.compressedSizeFormatted} '
+              '(-${compressResult.ratio.toStringAsFixed(0)}%)',
+            ),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

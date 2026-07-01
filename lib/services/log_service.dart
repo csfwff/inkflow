@@ -2,6 +2,9 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
+/// 日志等级
+enum LogLevel { debug, info, warn, error }
+
 /// 简单的文件日志服务，最大 5MB，超出后截断重写。
 class LogService {
   static const int _maxSize = 5 * 1024 * 1024; // 5MB
@@ -22,12 +25,13 @@ class LogService {
     return _logFile!;
   }
 
-  /// 写入一条日志
-  Future<void> write(String message, {String tag = 'App'}) async {
+  /// 写入一条日志（带等级）
+  Future<void> log(LogLevel level, String message, {String tag = 'App'}) async {
     try {
       final file = await logFile;
       final now = DateTime.now().toString().substring(0, 23);
-      final line = '[$now][$tag] $message\n';
+      final levelStr = level.name.toUpperCase().padRight(5);
+      final line = '[$now][$levelStr][$tag] $message\n';
 
       // 同时输出到 debug console
       debugPrint(line.trimRight());
@@ -50,6 +54,34 @@ class LogService {
     } catch (_) {
       // 日志写入失败不应影响正常功能
     }
+  }
+
+  /// 写入一条日志（兼容旧接口）
+  Future<void> write(String message, {String tag = 'App'}) async {
+    await log(LogLevel.info, message, tag: tag);
+  }
+
+  /// 便捷方法
+  Future<void> debug(String message, {String tag = 'App'}) async {
+    await log(LogLevel.debug, message, tag: tag);
+  }
+
+  Future<void> info(String message, {String tag = 'App'}) async {
+    await log(LogLevel.info, message, tag: tag);
+  }
+
+  Future<void> warn(String message, {String tag = 'App'}) async {
+    await log(LogLevel.warn, message, tag: tag);
+  }
+
+  Future<void> error(String message, {String tag = 'App'}) async {
+    await log(LogLevel.error, message, tag: tag);
+  }
+
+  /// 记录用户操作路径
+  Future<void> logAction(String action, {String? detail}) async {
+    final msg = detail != null ? '$action - $detail' : action;
+    await log(LogLevel.info, msg, tag: 'UserAction');
   }
 
   /// 读取全部日志内容

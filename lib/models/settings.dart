@@ -34,6 +34,10 @@ class Settings {
   ImageDateFolderMode imageDateFolderMode;
   ImageNamingMode imageNamingMode;
 
+  // Image compression
+  bool imageCompressEnabled;
+  int imageCompressTargetKB; // 0 = unlimited, 256, 512, 1024, 2048
+
   // App
   AppThemeMode themeMode;
   AppLocale locale;
@@ -59,6 +63,8 @@ class Settings {
     this.upyunPath = '',
     this.imageDateFolderMode = ImageDateFolderMode.none,
     this.imageNamingMode = ImageNamingMode.timestamp,
+    this.imageCompressEnabled = false,
+    this.imageCompressTargetKB = 1024,
     this.themeMode = AppThemeMode.system,
     this.locale = AppLocale.system,
     this.lastSyncTime,
@@ -84,6 +90,8 @@ class Settings {
       'upyunPath': upyunPath,
       'imageDateFolderMode': imageDateFolderMode.index,
       'imageNamingMode': imageNamingMode.index,
+      'imageCompressEnabled': imageCompressEnabled,
+      'imageCompressTargetKB': imageCompressTargetKB,
     };
   }
 
@@ -120,6 +128,12 @@ class Settings {
       if (idx >= 0 && idx < ImageNamingMode.values.length) {
         imageNamingMode = ImageNamingMode.values[idx];
       }
+    }
+    if (json.containsKey('imageCompressEnabled')) {
+      imageCompressEnabled = json['imageCompressEnabled'] ?? false;
+    }
+    if (json.containsKey('imageCompressTargetKB')) {
+      imageCompressTargetKB = json['imageCompressTargetKB'] ?? 1024;
     }
   }
 }

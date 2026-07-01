@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../l10n/app_strings.dart';
 import '../main.dart';
 import '../models/settings.dart';
+import 'log_viewer_page.dart';
 import '../services/github_service.dart';
 import '../services/image_host/image_path_builder.dart';
 import '../widgets/responsive.dart';
@@ -543,6 +544,8 @@ class _SettingsPageState extends State<SettingsPage> {
         _divider(),
         _buildImportExport(s),
         _divider(),
+        _buildLogViewerEntry(s),
+        _divider(),
         _buildDangerZone(s),
       ],
     );
@@ -575,6 +578,31 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLogViewerEntry(AppStrings s) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionHeader(s.logViewer),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.article_outlined),
+              label: Text(s.logViewer),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LogViewerPage()),
+                );
+              },
+            ),
           ),
         ),
       ],
@@ -1394,6 +1422,34 @@ class _SettingsPageState extends State<SettingsPage> {
             _save();
           },
         ),
+        _divider(),
+        _sectionHeader(s.imageCompress),
+        SwitchListTile(
+          title: Text(s.imageCompress),
+          subtitle: Text(s.imageCompressDesc),
+          value: _settings.imageCompressEnabled,
+          onChanged: (v) {
+            setState(() => _settings.imageCompressEnabled = v);
+            _save();
+          },
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        ),
+        if (_settings.imageCompressEnabled)
+          _dropdownRow<int>(
+            value: _settings.imageCompressTargetKB,
+            items: [
+              DropdownMenuItem(value: 256, child: Text('256 KB')),
+              DropdownMenuItem(value: 512, child: Text('512 KB')),
+              DropdownMenuItem(value: 1024, child: Text('1024 KB')),
+              DropdownMenuItem(value: 2048, child: Text('2048 KB')),
+              DropdownMenuItem(value: 0, child: Text(s.imageCompressUnlimited)),
+            ],
+            onChanged: (v) {
+              if (v == null) return;
+              setState(() => _settings.imageCompressTargetKB = v);
+              _save();
+            },
+          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
           child: Text(

@@ -5,6 +5,7 @@ import '../l10n/app_strings.dart';
 import '../models/article.dart';
 import '../services/article_service.dart';
 import '../services/image_host/image_host_service.dart';
+import '../services/log_service.dart';
 import '../services/settings_service.dart';
 
 class MetadataPage extends StatefulWidget {
@@ -215,6 +216,7 @@ class _MetadataPageState extends State<MetadataPage> {
   }
 
   void _save() {
+    LogService.instance.logAction('保存元数据', detail: widget.article.title);
     final article = widget.article;
     article.tags = List.from(_selectedTags);
     article.categories = List.from(_selectedCategories);
@@ -507,9 +509,23 @@ class _MetadataPageState extends State<MetadataPage> {
     setState(() => _uploading = true);
     try {
       final bytes = await file.readAsBytes();
-      final result = await imageHost.upload(bytes, file.name);
+      final result = await imageHost.uploadWithCompress(bytes, file.name);
       if (result.success && result.url != null) {
         controller.text = result.url!;
+
+        // Show compression effect if compressed
+        if (result.wasCompressed && mounted) {
+          final compressResult = result.compressResult!;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${s.imageCompressResult}: ${compressResult.originalSizeFormatted} → ${compressResult.compressedSizeFormatted} '
+                '(-${compressResult.ratio.toStringAsFixed(0)}%)',
+              ),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

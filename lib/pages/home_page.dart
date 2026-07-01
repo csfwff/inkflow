@@ -3,6 +3,7 @@ import '../l10n/app_strings.dart';
 import '../main.dart';
 import '../models/article.dart';
 import '../services/github_service.dart';
+import '../services/log_service.dart';
 import '../services/sync_service.dart';
 import '../widgets/responsive.dart';
 import 'editor_page.dart';
@@ -57,6 +58,8 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _syncFromGitHub({bool incremental = false}) async {
     if (_syncing) return;
+
+    LogService.instance.logAction('同步文章', detail: incremental ? '增量同步' : '全量同步');
 
     final s = AppStrings.current;
     final settings = settingsService.settings;
@@ -134,6 +137,8 @@ class _HomePageState extends State<HomePage> {
     );
 
     if (confirmed != true || article.id == null) return;
+
+    LogService.instance.logAction('删除文章', detail: article.title);
 
     // 如果有远程文件（synced 或 repoDraft），先删除远程
     final remotePath = article.remotePath;
