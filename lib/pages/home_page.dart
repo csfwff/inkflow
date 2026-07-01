@@ -7,6 +7,7 @@ import '../services/log_service.dart';
 import '../services/sync_service.dart';
 import '../widgets/responsive.dart';
 import 'editor_page.dart';
+import 'friend_link_page.dart';
 import 'settings_page.dart';
 
 enum _ArticleFilter { all, draft, synced, repoDraft }
@@ -262,6 +263,16 @@ class _HomePageState extends State<HomePage> {
                 ),
               ],
             ),
+          IconButton(
+            icon: const Icon(Icons.people_outline),
+            tooltip: s.friendLinks,
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FriendLinkPage()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.settings),
             tooltip: s.settingsTitle,

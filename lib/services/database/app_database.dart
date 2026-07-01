@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 
 import '../../models/article.dart';
+import '../../models/friend_link.dart';
 import '_db_native.dart' if (dart.library.js_interop) '_db_web.dart';
 
 part 'app_database.g.dart';
@@ -50,17 +51,37 @@ class CategoryRows extends Table {
   List<Set<Column>> get uniqueKeys => [{name}];
 }
 
-@DriftDatabase(tables: [ArticleRows, TagRows, CategoryRows])
+/// 友链表
+class FriendLinkRows extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get name => text().withLength(min: 1, max: 100)();
+  TextColumn get link => text().withDefault(const Constant(''))();
+  TextColumn get avatar => text().withDefault(const Constant(''))();
+  TextColumn get descr => text().withDefault(const Constant(''))();
+  BoolColumn get isCommented => boolean().withDefault(const Constant(false))();
+  BoolColumn get isDev => boolean().withDefault(const Constant(false))();
+  TextColumn get createdAt => text()();
+
+  @override
+  List<Set<Column>> get uniqueKeys => [{name}];
+}
+
+@DriftDatabase(tables: [ArticleRows, TagRows, CategoryRows, FriendLinkRows])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (Migrator m) async {
           await m.createAll();
+        },
+        onUpgrade: (Migrator m, int from, int to) async {
+          if (from < 2) {
+            await m.createTable(friendLinkRows);
+          }
         },
       );
 
@@ -131,3 +152,27 @@ Map<String, String> _parseCustomFields(String json) {
   } catch (_) {}
   return {};
 }
+
+// --- FriendLink model <-> FriendLinkRow conversion ---
+
+FriendLinkRowsCompanion friendLinkToCompanion(FriendLink fl) => FriendLinkRowsCompanion(
+      id: fl.id != null ? Value(fl.id!) : const Value.absent(),
+      name: Value(fl.name),
+      link: Value(fl.link),
+      avatar: Value(fl.avatar),
+      descr: Value(fl.descr),
+      isCommented: Value(fl.isCommented),
+      isDev: Value(fl.isDev),
+      createdAt: Value(fl.createdAt.toIso8601String()),
+    );
+
+FriendLink friendLinkFromRow(FriendLinkRow row) => FriendLink(
+      id: row.id,
+      name: row.name,
+      link: row.link,
+      avatar: row.avatar,
+      descr: row.descr,
+      isCommented: row.isCommented,
+      isDev: row.isDev,
+      createdAt: DateTime.parse(row.createdAt),
+    );

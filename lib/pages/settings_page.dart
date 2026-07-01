@@ -59,6 +59,7 @@ class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController _upyunPasswordCtrl;
   late final TextEditingController _upyunDomainCtrl;
   late final TextEditingController _upyunPathCtrl;
+  late final TextEditingController _friendLinkPathCtrl;
 
   @override
   void initState() {
@@ -79,6 +80,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _upyunPasswordCtrl = TextEditingController(text: _settings.upyunPassword);
     _upyunDomainCtrl = TextEditingController(text: _settings.upyunDomain);
     _upyunPathCtrl = TextEditingController(text: _settings.upyunPath);
+    _friendLinkPathCtrl = TextEditingController(text: _settings.friendLinkPath);
 
     _loadVersion();
   }
@@ -99,6 +101,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _upyunPasswordCtrl.dispose();
     _upyunDomainCtrl.dispose();
     _upyunPathCtrl.dispose();
+    _friendLinkPathCtrl.dispose();
     super.dispose();
   }
 
@@ -1110,6 +1113,16 @@ class _SettingsPageState extends State<SettingsPage> {
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
           ),
+        ),
+        _divider(),
+        _sectionHeader(s.friendLinkPath),
+        _inputRow(
+          controller: _friendLinkPathCtrl,
+          hint: 'source/_data/links.yml',
+          onChanged: (v) {
+            _settings.friendLinkPath = v;
+            _save();
+          },
         ),
       ],
     );

@@ -171,6 +171,22 @@ class AppStrings {
   final String imageCompressUnlimited;
   final String imageCompressResult;
 
+  // Friend links
+  final String friendLinks;
+  final String addFriendLink;
+  final String editFriendLink;
+  final String deleteFriendLink;
+  final String friendLinkName;
+  final String friendLinkLink;
+  final String friendLinkAvatar;
+  final String friendLinkDescr;
+  final String friendLinkEnabled;
+  final String friendLinkDisabled;
+  final String syncFriendLinks;
+  final String addDevFriendLink;
+  final String pasteYaml;
+  final String friendLinkPath;
+
   const AppStrings._({
     required this.appTitle,
     required this.homeTitle,
@@ -314,6 +330,21 @@ class AppStrings {
     required this.imageCompressTarget,
     required this.imageCompressUnlimited,
     required this.imageCompressResult,
+    // Friend links
+    required this.friendLinks,
+    required this.addFriendLink,
+    required this.editFriendLink,
+    required this.deleteFriendLink,
+    required this.friendLinkName,
+    required this.friendLinkLink,
+    required this.friendLinkAvatar,
+    required this.friendLinkDescr,
+    required this.friendLinkEnabled,
+    required this.friendLinkDisabled,
+    required this.syncFriendLinks,
+    required this.addDevFriendLink,
+    required this.pasteYaml,
+    required this.friendLinkPath,
   });
 
   static const en = AppStrings._(
@@ -459,6 +490,21 @@ class AppStrings {
     imageCompressTarget: 'Target Size',
     imageCompressUnlimited: 'Unlimited',
     imageCompressResult: 'Compressed',
+    // Friend links
+    friendLinks: 'Friend Links',
+    addFriendLink: 'Add Friend Link',
+    editFriendLink: 'Edit Friend Link',
+    deleteFriendLink: 'Delete Friend Link',
+    friendLinkName: 'Name',
+    friendLinkLink: 'Link',
+    friendLinkAvatar: 'Avatar',
+    friendLinkDescr: 'Description',
+    friendLinkEnabled: 'Enabled',
+    friendLinkDisabled: 'Disabled',
+    syncFriendLinks: 'Sync Friend Links',
+    addDevFriendLink: 'Add Author Link',
+    pasteYaml: 'Paste from YAML',
+    friendLinkPath: 'Friend Link File Path',
   );
 
   static const zh = AppStrings._(
@@ -604,6 +650,21 @@ class AppStrings {
     imageCompressTarget: '目标大小',
     imageCompressUnlimited: '不限',
     imageCompressResult: '已压缩',
+    // Friend links
+    friendLinks: '友链管理',
+    addFriendLink: '添加友链',
+    editFriendLink: '编辑友链',
+    deleteFriendLink: '删除友链',
+    friendLinkName: '名称',
+    friendLinkLink: '链接',
+    friendLinkAvatar: '头像',
+    friendLinkDescr: '简介',
+    friendLinkEnabled: '启用',
+    friendLinkDisabled: '已禁用',
+    syncFriendLinks: '同步友链',
+    addDevFriendLink: '添加作者友链',
+    pasteYaml: '从 YAML 粘贴',
+    friendLinkPath: '友链文件路径',
   );
 
   /// 应用当前语言设置，默认跟随系统。

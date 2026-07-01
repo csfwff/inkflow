@@ -38,6 +38,9 @@ class Settings {
   bool imageCompressEnabled;
   int imageCompressTargetKB; // 0 = unlimited, 256, 512, 1024, 2048
 
+  // Friend links
+  String friendLinkPath;
+
   // App
   AppThemeMode themeMode;
   AppLocale locale;
@@ -65,6 +68,7 @@ class Settings {
     this.imageNamingMode = ImageNamingMode.timestamp,
     this.imageCompressEnabled = false,
     this.imageCompressTargetKB = 1024,
+    this.friendLinkPath = 'source/_data/links.yml',
     this.themeMode = AppThemeMode.system,
     this.locale = AppLocale.system,
     this.lastSyncTime,
@@ -92,6 +96,7 @@ class Settings {
       'imageNamingMode': imageNamingMode.index,
       'imageCompressEnabled': imageCompressEnabled,
       'imageCompressTargetKB': imageCompressTargetKB,
+      'friendLinkPath': friendLinkPath,
     };
   }
 
@@ -134,6 +139,9 @@ class Settings {
     }
     if (json.containsKey('imageCompressTargetKB')) {
       imageCompressTargetKB = json['imageCompressTargetKB'] ?? 1024;
+    }
+    if (json.containsKey('friendLinkPath')) {
+      friendLinkPath = json['friendLinkPath'] ?? 'source/_data/links.yml';
     }
   }
 }
