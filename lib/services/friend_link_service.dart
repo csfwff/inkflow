@@ -8,6 +8,7 @@ import 'log_service.dart';
 
 /// 链接检测结果
 class LinkCheckResult {
+  final int? linkId;
   final String name;
   final String url;
   final bool isAccessible;
@@ -15,6 +16,7 @@ class LinkCheckResult {
   final String? error;
 
   LinkCheckResult({
+    this.linkId,
     required this.name,
     required this.url,
     required this.isAccessible,
@@ -95,6 +97,7 @@ class FriendLinkService {
       final response = await http.head(Uri.parse(link.link))
           .timeout(const Duration(seconds: 10));
       return LinkCheckResult(
+        linkId: link.id,
         name: link.name,
         url: link.link,
         isAccessible: response.statusCode >= 200 && response.statusCode < 400,
@@ -102,6 +105,7 @@ class FriendLinkService {
       );
     } catch (e) {
       return LinkCheckResult(
+        linkId: link.id,
         name: link.name,
         url: link.link,
         isAccessible: false,
