@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../../models/settings.dart';
+import '../log_service.dart';
 import 'image_path_builder.dart';
 import 'image_uploader.dart';
 
@@ -14,6 +15,7 @@ class GitHubImageUploader implements ImageUploader {
   final String? domain;
   final ImageDateFolderMode dateFolderMode;
   final ImageNamingMode namingMode;
+  static final _log = LogService.instance;
 
   GitHubImageUploader({
     required this.token,
@@ -27,10 +29,10 @@ class GitHubImageUploader implements ImageUploader {
   });
 
   Map<String, String> get _headers => {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json',
-      };
+    'Authorization': 'Bearer $token',
+    'Accept': 'application/vnd.github.v3+json',
+    'Content-Type': 'application/json',
+  };
 
   String get _baseUrl => 'https://api.github.com/repos/$owner/$repo/contents';
 
@@ -60,8 +62,12 @@ class GitHubImageUploader implements ImageUploader {
         // 优先用自定义域名，否则用 GitHub raw URL
         String imageUrl;
         if (domain != null && domain!.isNotEmpty) {
-          final cleanDomain = domain!.endsWith('/') ? domain!.substring(0, domain!.length - 1) : domain!;
-          final cleanRemote = remotePath.startsWith('/') ? remotePath : '/$remotePath';
+          final cleanDomain = domain!.endsWith('/')
+              ? domain!.substring(0, domain!.length - 1)
+              : domain!;
+          final cleanRemote = remotePath.startsWith('/')
+              ? remotePath
+              : '/$remotePath';
           imageUrl = '$cleanDomain$cleanRemote';
         } else {
           imageUrl = data['content']?['download_url'] ?? '';
@@ -74,7 +80,13 @@ class GitHubImageUploader implements ImageUploader {
           error: data['message'] ?? 'Upload failed: ${response.statusCode}',
         );
       }
-    } catch (e) {
+    } catch (e, stack) {
+      await _log.logException(
+        e,
+        stack,
+        tag: 'ImageHost',
+        context: 'GitHub 图床上传失败: $remotePath',
+      );
       return UploadResult(success: false, error: 'Network error: $e');
     }
   }

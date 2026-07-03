@@ -74,8 +74,10 @@ class _EditorPageState extends State<EditorPage> {
     if (article != null && mounted) {
       final body = article.bodyContent;
       // 保留原始 frontmatter（含不支持的字段）
-      final fmMatch = RegExp(r'^---\s*\n(.*?)\n---\s*\n', dotAll: true)
-          .firstMatch(article.content);
+      final fmMatch = RegExp(
+        r'^---\s*\n(.*?)\n---\s*\n',
+        dotAll: true,
+      ).firstMatch(article.content);
       _updatingFields = true;
       setState(() {
         _editingArticle = article;
@@ -183,7 +185,8 @@ class _EditorPageState extends State<EditorPage> {
         : '';
 
     // 已同步的文章保留原 filePath，避免路径模板变更后重新发布导致重复
-    final filePath = (_editingArticle?.githubSha != null &&
+    final filePath =
+        (_editingArticle?.githubSha != null &&
             _editingArticle!.filePath.isNotEmpty)
         ? _editingArticle!.filePath
         : _resolvePathPattern(
@@ -226,8 +229,7 @@ class _EditorPageState extends State<EditorPage> {
     return switch (article.status) {
       ArticleStatus.synced ||
       ArticleStatus.repoDraft ||
-      ArticleStatus.pendingPublish =>
-        ArticleStatus.pendingPublish,
+      ArticleStatus.pendingPublish => ArticleStatus.pendingPublish,
       ArticleStatus.draft => ArticleStatus.draft,
       ArticleStatus.remoteDeleted => ArticleStatus.remoteDeleted,
     };
@@ -264,7 +266,8 @@ class _EditorPageState extends State<EditorPage> {
     );
 
     if (result != null && mounted) {
-      final changed = !_listEquals(result.tags, oldTags) ||
+      final changed =
+          !_listEquals(result.tags, oldTags) ||
           !_listEquals(result.categories, oldCategories) ||
           _neq(result.permalink, oldPermalink) ||
           _neq(result.topImg, oldTopImg) ||
@@ -286,9 +289,9 @@ class _EditorPageState extends State<EditorPage> {
 
     LogService.instance.logAction('保存草稿', detail: title);
     if (title.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(s.titleHint)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(s.titleHint)));
       return false;
     }
 
@@ -311,9 +314,9 @@ class _EditorPageState extends State<EditorPage> {
     setState(() => _dirty = false);
 
     if (showMessage) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(s.articleSaved)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(s.articleSaved)));
     }
     return true;
   }
@@ -327,17 +330,17 @@ class _EditorPageState extends State<EditorPage> {
     if (settings.githubToken.isEmpty ||
         settings.githubOwner.isEmpty ||
         settings.githubRepo.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(s.githubNotConfigured)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(s.githubNotConfigured)));
       return;
     }
 
     final title = _titleCtrl.text.trim();
     if (title.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(s.titleHint)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(s.titleHint)));
       return;
     }
 
@@ -354,10 +357,12 @@ class _EditorPageState extends State<EditorPage> {
       branch: settings.githubBranch,
     );
 
-    final targetStatus =
-        drafts ? ArticleStatus.repoDraft : ArticleStatus.synced;
-    final targetRemoteKind =
-        drafts ? ArticleRemoteKind.repoDraft : ArticleRemoteKind.post;
+    final targetStatus = drafts
+        ? ArticleStatus.repoDraft
+        : ArticleStatus.synced;
+    final targetRemoteKind = drafts
+        ? ArticleRemoteKind.repoDraft
+        : ArticleRemoteKind.post;
     final targetRemotePath = Article.buildRemotePath(
       kind: targetRemoteKind,
       filePath: fileName,
@@ -448,10 +453,12 @@ class _EditorPageState extends State<EditorPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(_label('从远端覆盖', 'Restore from remote')),
-        content: Text(_label(
-          '这会放弃本地未发布修改，并用远端最新内容覆盖当前文章。',
-          'This discards local unpublished changes and replaces this article with the latest remote content.',
-        )),
+        content: Text(
+          _label(
+            '这会放弃本地未发布修改，并用远端最新内容覆盖当前文章。',
+            'This discards local unpublished changes and replaces this article with the latest remote content.',
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -494,10 +501,12 @@ class _EditorPageState extends State<EditorPage> {
     if (remoteArticle == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_label(
-            '远端文件不存在或读取失败',
-            'Remote file does not exist or could not be read',
-          )),
+          content: Text(
+            _label(
+              '远端文件不存在或读取失败',
+              'Remote file does not exist or could not be read',
+            ),
+          ),
           backgroundColor: Colors.red,
         ),
       );
@@ -522,8 +531,10 @@ class _EditorPageState extends State<EditorPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(_label(
-                '请先在设置中配置图床', 'Please configure image host in settings'))),
+          content: Text(
+            _label('请先在设置中配置图床', 'Please configure image host in settings'),
+          ),
+        ),
       );
       return;
     }
@@ -603,7 +614,9 @@ class _EditorPageState extends State<EditorPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(s.unsavedChanges),
-        content: Text('${s.unsavedChangesDesc}\n\n${AppStrings.isZh ? '离开将丢失这些未保存的改动' : 'Leaving will discard unsaved changes'}'),
+        content: Text(
+          '${s.unsavedChangesDesc}\n\n${AppStrings.isZh ? '离开将丢失这些未保存的改动' : 'Leaving will discard unsaved changes'}',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -778,9 +791,9 @@ class _EditorPageState extends State<EditorPage> {
                   contentPadding: EdgeInsets.zero,
                 ),
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0,
-                    ),
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0,
+                ),
               ),
               const SizedBox(height: 12),
               Wrap(
@@ -821,8 +834,9 @@ class _EditorPageState extends State<EditorPage> {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerLow,
         border: Border(
-          bottom:
-              BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+          bottom: BorderSide(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
       child: Align(
@@ -834,10 +848,7 @@ class _EditorPageState extends State<EditorPage> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               children: [
-                _HeadingButton(
-                  label: _label,
-                  contentCtrl: _contentCtrl,
-                ),
+                _HeadingButton(label: _label, contentCtrl: _contentCtrl),
                 _ToolButton(
                   icon: Icons.format_bold,
                   tooltip: _label('加粗', 'Bold'),
@@ -1006,10 +1017,7 @@ class _EditorPageState extends State<EditorPage> {
       constraints: BoxConstraints(minHeight: minHeight),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        child: MarkdownBody(
-          data: _previewText,
-          selectable: true,
-        ),
+        child: MarkdownBody(data: _previewText, selectable: true),
       ),
     );
   }
@@ -1019,8 +1027,9 @@ class _EditorPageState extends State<EditorPage> {
     final selection = value.selection;
     final start = selection.isValid ? selection.start : value.text.length;
     final end = selection.isValid ? selection.end : value.text.length;
-    final selected =
-        start == end ? placeholder : value.text.substring(start, end);
+    final selected = start == end
+        ? placeholder
+        : value.text.substring(start, end);
     final replacement = '$prefix$selected$suffix';
     final nextText = value.text.replaceRange(start, end, replacement);
     final selectionStart = start + prefix.length;
@@ -1256,11 +1265,7 @@ class _ActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!wide) {
-      return IconButton(
-        onPressed: onPressed,
-        icon: Icon(icon),
-        tooltip: label,
-      );
+      return IconButton(onPressed: onPressed, icon: Icon(icon), tooltip: label);
     }
 
     return TextButton.icon(
@@ -1432,11 +1437,12 @@ class _HeadingButton extends StatelessWidget {
     }
 
     final nextText = text.replaceRange(
-        lineStart,
-        text.indexOf('\n', lineStart) < 0
-            ? text.length
-            : text.indexOf('\n', lineStart),
-        newLine);
+      lineStart,
+      text.indexOf('\n', lineStart) < 0
+          ? text.length
+          : text.indexOf('\n', lineStart),
+      newLine,
+    );
     contentCtrl.value = contentCtrl.value.copyWith(
       text: nextText,
       selection: TextSelection.collapsed(offset: newCursorOffset),
@@ -1465,19 +1471,23 @@ class _HeadingButton extends StatelessWidget {
           children: [
             Transform.translate(
               offset: const Offset(0, -2),
-              child: Text('H',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Theme.of(context).iconTheme.color,
-                  )),
+              child: Text(
+                'H',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: Theme.of(context).iconTheme.color,
+                ),
+              ),
             ),
             if (displayLevel.isNotEmpty)
-              Text(displayLevel,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Theme.of(context).iconTheme.color,
-                  )),
+              Text(
+                displayLevel,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Theme.of(context).iconTheme.color,
+                ),
+              ),
           ],
         ),
       ),
@@ -1518,15 +1528,14 @@ class _MusicSearchSheetState extends State<_MusicSearchSheet> {
     try {
       final uri = Uri.parse(
         'https://music.163.com/api/search/get/web',
-      ).replace(queryParameters: {
-        's': keyword,
-        'type': '1',
-        'limit': '10',
-      });
-      final resp = await http.get(uri, headers: {
-        'Referer': 'https://music.163.com',
-        'User-Agent': 'Mozilla/5.0',
-      });
+      ).replace(queryParameters: {'s': keyword, 'type': '1', 'limit': '10'});
+      final resp = await http.get(
+        uri,
+        headers: {
+          'Referer': 'https://music.163.com',
+          'User-Agent': 'Mozilla/5.0',
+        },
+      );
 
       if (resp.statusCode != 200) {
         setState(() {
@@ -1544,7 +1553,13 @@ class _MusicSearchSheetState extends State<_MusicSearchSheet> {
         _loading = false;
         _results = songs.map((s) => _MusicResult.fromJson(s)).toList();
       });
-    } catch (_) {
+    } catch (e, stack) {
+      await LogService.instance.logException(
+        e,
+        stack,
+        tag: 'Editor',
+        context: '搜索音乐失败',
+      );
       setState(() {
         _loading = false;
         _error = AppStrings.isZh ? '网络错误' : 'Network error';
@@ -1591,36 +1606,56 @@ class _MusicSearchSheetState extends State<_MusicSearchSheet> {
                   ),
                   const SizedBox(height: 20),
                   // 尺寸选择
-                  Text(zh ? '播放器尺寸' : 'Player size',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(ctx).colorScheme.onSurfaceVariant,
-                      )),
+                  Text(
+                    zh ? '播放器尺寸' : 'Player size',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
                     children: [
-                      _sizeChip(zh ? '小' : 'Small', 330, 86, 66, width, height, playerHeight,
-                          (w, h, ph) => setSheetState(() {
-                                width = w;
-                                height = h;
-                                playerHeight = ph;
-                              })),
-                      _sizeChip(zh ? '迷你' : 'Mini', 298, 52, 32, width, height, playerHeight,
-                          (w, h, ph) => setSheetState(() {
-                                width = w;
-                                height = h;
-                                playerHeight = ph;
-                              })),
+                      _sizeChip(
+                        zh ? '小' : 'Small',
+                        330,
+                        86,
+                        66,
+                        width,
+                        height,
+                        playerHeight,
+                        (w, h, ph) => setSheetState(() {
+                          width = w;
+                          height = h;
+                          playerHeight = ph;
+                        }),
+                      ),
+                      _sizeChip(
+                        zh ? '迷你' : 'Mini',
+                        298,
+                        52,
+                        32,
+                        width,
+                        height,
+                        playerHeight,
+                        (w, h, ph) => setSheetState(() {
+                          width = w;
+                          height = h;
+                          playerHeight = ph;
+                        }),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
                   // 自动播放
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: Text(zh ? '自动播放' : 'Autoplay',
-                        style: const TextStyle(fontSize: 14)),
+                    title: Text(
+                      zh ? '自动播放' : 'Autoplay',
+                      style: const TextStyle(fontSize: 14),
+                    ),
                     value: autoPlay,
                     onChanged: (v) => setSheetState(() => autoPlay = v),
                   ),
@@ -1710,8 +1745,10 @@ class _MusicSearchSheetState extends State<_MusicSearchSheet> {
                 decoration: InputDecoration(
                   hintText: zh ? '搜索歌曲名...' : 'Search songs...',
                   isDense: true,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   border: const OutlineInputBorder(),
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.search),
@@ -1727,43 +1764,49 @@ class _MusicSearchSheetState extends State<_MusicSearchSheet> {
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
-                      ? Center(
-                          child: Text(_error!,
-                              style: const TextStyle(color: Colors.grey)))
-                      : _results.isEmpty
-                          ? Center(
-                              child: Text(
-                                zh ? '输入关键词搜索网易云音乐' : 'Search NetEase Music',
-                                style: const TextStyle(color: Colors.grey),
-                              ),
-                            )
-                          : ListView.builder(
-                              controller: scrollCtrl,
-                              itemCount: _results.length,
-                              itemBuilder: (ctx, i) {
-                                final song = _results[i];
-                                return ListTile(
-                                  leading: const Icon(Icons.music_note,
-                                      size: 20),
-                                  title: Text(song.name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis),
-                                  subtitle: Text(song.artist,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis),
-                                  trailing: Text(
-                                    _formatDuration(song.duration),
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                    ),
-                                  ),
-                                  onTap: () => _select(song),
-                                );
-                              },
+                  ? Center(
+                      child: Text(
+                        _error!,
+                        style: const TextStyle(color: Colors.grey),
+                      ),
+                    )
+                  : _results.isEmpty
+                  ? Center(
+                      child: Text(
+                        zh ? '输入关键词搜索网易云音乐' : 'Search NetEase Music',
+                        style: const TextStyle(color: Colors.grey),
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: scrollCtrl,
+                      itemCount: _results.length,
+                      itemBuilder: (ctx, i) {
+                        final song = _results[i];
+                        return ListTile(
+                          leading: const Icon(Icons.music_note, size: 20),
+                          title: Text(
+                            song.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(
+                            song.artist,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          trailing: Text(
+                            _formatDuration(song.duration),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                             ),
+                          ),
+                          onTap: () => _select(song),
+                        );
+                      },
+                    ),
             ),
           ],
         );
@@ -1793,7 +1836,8 @@ class _MusicResult {
   });
 
   factory _MusicResult.fromJson(Map<String, dynamic> json) {
-    final artists = (json['artists'] as List<dynamic>?)
+    final artists =
+        (json['artists'] as List<dynamic>?)
             ?.map((a) => (a as Map<String, dynamic>)['name'] as String? ?? '')
             .where((n) => n.isNotEmpty)
             .toList() ??

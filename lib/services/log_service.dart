@@ -32,7 +32,10 @@ class LogService {
       final file = await logFile;
       final now = DateTime.now().toString().substring(0, 23);
       final levelStr = level.name.toUpperCase().padRight(5);
-      final line = '[$now][$levelStr][$tag] $message\n';
+      final prefix = '[$now][$levelStr][$tag] ';
+      final messageLines = const LineSplitter().convert(message);
+      final line =
+          '${(messageLines.isEmpty ? [''] : messageLines).map((part) => '$prefix$part').join('\n')}\n';
 
       // 同时输出到 debug console
       debugPrint(line.trimRight());
@@ -45,8 +48,13 @@ class LogService {
           final half = content.length ~/ 2;
           // 从中间位置找到下一个换行符，避免截断行
           final nextLine = content.indexOf('\n', half);
-          final keep = nextLine > 0 ? content.substring(nextLine + 1) : content.substring(half);
-          await file.writeAsString('[--- log truncated ---]\n$keep', encoding: utf8);
+          final keep = nextLine > 0
+              ? content.substring(nextLine + 1)
+              : content.substring(half);
+          await file.writeAsString(
+            '[--- log truncated ---]\n$keep',
+            encoding: utf8,
+          );
         }
       }
 
@@ -77,6 +85,46 @@ class LogService {
 
   Future<void> error(String message, {String tag = 'App'}) async {
     await log(LogLevel.error, message, tag: tag);
+  }
+
+  /// 记录异常和堆栈。
+  Future<void> logException(
+    Object error,
+    StackTrace stack, {
+    String tag = 'App',
+    String? context,
+  }) async {
+    final buffer = StringBuffer();
+    if (context != null && context.isNotEmpty) {
+      buffer.writeln(context);
+    }
+    buffer.writeln('Exception: $error');
+    buffer.writeln('Stack trace:');
+    buffer.write(stack);
+    await log(LogLevel.error, buffer.toString(), tag: tag);
+  }
+
+  /// 记录 Flutter 框架捕获到的错误。
+  Future<void> logFlutterError(
+    FlutterErrorDetails details, {
+    String tag = 'Flutter',
+  }) async {
+    final buffer = StringBuffer();
+    buffer.writeln('FlutterError: ${details.exceptionAsString()}');
+    final library = details.library;
+    if (library != null && library.isNotEmpty) {
+      buffer.writeln('Library: $library');
+    }
+    final context = details.context?.toDescription();
+    if (context != null && context.isNotEmpty) {
+      buffer.writeln('Context: $context');
+    }
+    final stack = details.stack;
+    if (stack != null) {
+      buffer.writeln('Stack trace:');
+      buffer.write(stack);
+    }
+    await log(LogLevel.error, buffer.toString(), tag: tag);
   }
 
   /// 记录用户操作路径

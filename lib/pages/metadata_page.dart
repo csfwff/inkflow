@@ -105,10 +105,7 @@ class _MetadataPageState extends State<MetadataPage> {
 
     // 初始化自定义字段
     _customFields = article.customFields.entries
-        .map((e) => _CustomFieldEntry(
-              key: e.key,
-              value: e.value,
-            ))
+        .map((e) => _CustomFieldEntry(key: e.key, value: e.value))
         .toList();
     _initialCustomFields = Map.from(article.customFields);
 
@@ -148,7 +145,8 @@ class _MetadataPageState extends State<MetadataPage> {
     return trimmed.isEmpty ? null : trimmed;
   }
 
-  String _resolvePathPattern(String pattern, {
+  String _resolvePathPattern(
+    String pattern, {
     required String slug,
     String category = '',
   }) {
@@ -165,9 +163,15 @@ class _MetadataPageState extends State<MetadataPage> {
   void _generatePermalink() {
     final article = widget.article;
     final slug = article.slug.isNotEmpty ? article.slug : 'post';
-    final category = article.categories.isNotEmpty ? article.categories.first : '';
+    final category = article.categories.isNotEmpty
+        ? article.categories.first
+        : '';
     final pattern = widget.settingsService.settings.permalinkPattern;
-    final permalink = _resolvePathPattern(pattern, slug: slug, category: category);
+    final permalink = _resolvePathPattern(
+      pattern,
+      slug: slug,
+      category: category,
+    );
     _permalinkCtrl.text = permalink;
   }
 
@@ -259,147 +263,138 @@ class _MetadataPageState extends State<MetadataPage> {
         }
       },
       child: Scaffold(
-      appBar: AppBar(
-        title: Text(s.metadata),
-        actions: [
-          TextButton.icon(
-            onPressed: _save,
-            icon: const Icon(Icons.check),
-            label: Text(s.done),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Tags
-            _buildSectionTitle(s.tags, Icons.tag),
-            const SizedBox(height: 8),
-            _buildChipSelector(
-              controller: _tagsCtrl,
-              selected: _selectedTags,
-              allOptions: _allTags,
-              onAdd: (value) {
-                setState(() {
-                  if (!_selectedTags.contains(value)) {
-                    _selectedTags.add(value);
-                  }
-                });
-              },
-              onRemove: (value) {
-                setState(() {
-                  _selectedTags.remove(value);
-                });
-              },
-              onShowAll: () => _showTagSelector(),
+        appBar: AppBar(
+          title: Text(s.metadata),
+          actions: [
+            TextButton.icon(
+              onPressed: _save,
+              icon: const Icon(Icons.check),
+              label: Text(s.done),
             ),
-            const SizedBox(height: 16),
-
-            // Categories
-            _buildSectionTitle(s.categories, Icons.folder_outlined),
-            const SizedBox(height: 8),
-            _buildChipSelector(
-              controller: _categoriesCtrl,
-              selected: _selectedCategories,
-              allOptions: _allCategories,
-              onAdd: (value) {
-                setState(() {
-                  if (!_selectedCategories.contains(value)) {
-                    _selectedCategories.add(value);
-                  }
-                });
-              },
-              onRemove: (value) {
-                setState(() {
-                  _selectedCategories.remove(value);
-                });
-              },
-              onShowAll: () => _showCategorySelector(),
-            ),
-            const SizedBox(height: 16),
-
-            // Permalink
-            _buildSectionTitle(s.permalink, Icons.link),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildTextField(
-                    controller: _permalinkCtrl,
-                    hint: s.permalinkHint,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  onPressed: _generatePermalink,
-                  icon: const Icon(Icons.auto_fix_high, size: 20),
-                  tooltip: s.generatePermalink,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Images
-            _buildSectionTitle(s.topImg, Icons.image),
-            const SizedBox(height: 8),
-            _buildImageField(
-              controller: _topImgCtrl,
-              hint: s.topImgHint,
-            ),
-            const SizedBox(height: 16),
-
-            _buildSectionTitle(s.cover, Icons.image_outlined),
-            const SizedBox(height: 8),
-            _buildImageField(
-              controller: _coverCtrl,
-              hint: s.coverHint,
-            ),
-            const SizedBox(height: 16),
-
-            // Excerpt & Description
-            _buildSectionTitle(s.excerpt, Icons.short_text),
-            const SizedBox(height: 8),
-            _buildTextField(
-              controller: _excerptCtrl,
-              hint: s.excerptHint,
-              maxLines: 3,
-            ),
-            const SizedBox(height: 16),
-
-            _buildSectionTitle(s.description, Icons.description),
-            const SizedBox(height: 8),
-            _buildTextField(
-              controller: _descriptionCtrl,
-              hint: s.descriptionHint,
-              maxLines: 3,
-            ),
-            const SizedBox(height: 16),
-
-            // Author
-            _buildSectionTitle(s.author, Icons.person_outline),
-            const SizedBox(height: 8),
-            _buildTextField(
-              controller: _authorCtrl,
-              hint: s.authorHint,
-            ),
-            const SizedBox(height: 24),
-
-            // 自定义字段
-            _buildSectionTitle(s.customFields, Icons.tune),
-            const SizedBox(height: 8),
-            ..._buildCustomFieldRows(),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: _addCustomField,
-              icon: const Icon(Icons.add, size: 18),
-              label: Text(s.addCustomField),
-            ),
-            const SizedBox(height: 32),
           ],
         ),
-      ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Tags
+              _buildSectionTitle(s.tags, Icons.tag),
+              const SizedBox(height: 8),
+              _buildChipSelector(
+                controller: _tagsCtrl,
+                selected: _selectedTags,
+                allOptions: _allTags,
+                onAdd: (value) {
+                  setState(() {
+                    if (!_selectedTags.contains(value)) {
+                      _selectedTags.add(value);
+                    }
+                  });
+                },
+                onRemove: (value) {
+                  setState(() {
+                    _selectedTags.remove(value);
+                  });
+                },
+                onShowAll: () => _showTagSelector(),
+              ),
+              const SizedBox(height: 16),
+
+              // Categories
+              _buildSectionTitle(s.categories, Icons.folder_outlined),
+              const SizedBox(height: 8),
+              _buildChipSelector(
+                controller: _categoriesCtrl,
+                selected: _selectedCategories,
+                allOptions: _allCategories,
+                onAdd: (value) {
+                  setState(() {
+                    if (!_selectedCategories.contains(value)) {
+                      _selectedCategories.add(value);
+                    }
+                  });
+                },
+                onRemove: (value) {
+                  setState(() {
+                    _selectedCategories.remove(value);
+                  });
+                },
+                onShowAll: () => _showCategorySelector(),
+              ),
+              const SizedBox(height: 16),
+
+              // Permalink
+              _buildSectionTitle(s.permalink, Icons.link),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildTextField(
+                      controller: _permalinkCtrl,
+                      hint: s.permalinkHint,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filled(
+                    onPressed: _generatePermalink,
+                    icon: const Icon(Icons.auto_fix_high, size: 20),
+                    tooltip: s.generatePermalink,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Images
+              _buildSectionTitle(s.topImg, Icons.image),
+              const SizedBox(height: 8),
+              _buildImageField(controller: _topImgCtrl, hint: s.topImgHint),
+              const SizedBox(height: 16),
+
+              _buildSectionTitle(s.cover, Icons.image_outlined),
+              const SizedBox(height: 8),
+              _buildImageField(controller: _coverCtrl, hint: s.coverHint),
+              const SizedBox(height: 16),
+
+              // Excerpt & Description
+              _buildSectionTitle(s.excerpt, Icons.short_text),
+              const SizedBox(height: 8),
+              _buildTextField(
+                controller: _excerptCtrl,
+                hint: s.excerptHint,
+                maxLines: 3,
+              ),
+              const SizedBox(height: 16),
+
+              _buildSectionTitle(s.description, Icons.description),
+              const SizedBox(height: 8),
+              _buildTextField(
+                controller: _descriptionCtrl,
+                hint: s.descriptionHint,
+                maxLines: 3,
+              ),
+              const SizedBox(height: 16),
+
+              // Author
+              _buildSectionTitle(s.author, Icons.person_outline),
+              const SizedBox(height: 8),
+              _buildTextField(controller: _authorCtrl, hint: s.authorHint),
+              const SizedBox(height: 24),
+
+              // 自定义字段
+              _buildSectionTitle(s.customFields, Icons.tune),
+              const SizedBox(height: 8),
+              ..._buildCustomFieldRows(),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _addCustomField,
+                icon: const Icon(Icons.add, size: 18),
+                label: Text(s.addCustomField),
+              ),
+              const SizedBox(height: 32),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -432,8 +427,10 @@ class _MetadataPageState extends State<MetadataPage> {
       decoration: InputDecoration(
         hintText: hint,
         isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
+        ),
         border: const OutlineInputBorder(),
         filled: true,
         fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
@@ -453,9 +450,7 @@ class _MetadataPageState extends State<MetadataPage> {
         ),
         const SizedBox(width: 8),
         IconButton(
-          onPressed: _uploading
-              ? null
-              : () => _showImagePicker(controller),
+          onPressed: _uploading ? null : () => _showImagePicker(controller),
           icon: Icon(
             _uploading ? Icons.hourglass_top : Icons.image_outlined,
             size: 20,
@@ -471,16 +466,15 @@ class _MetadataPageState extends State<MetadataPage> {
       context: context,
       isScrollControlled: true,
       builder: (ctx) {
-        return _ImagePickerSheet(
-          articleBody: widget.article.bodyContent,
-        );
+        return _ImagePickerSheet(articleBody: widget.article.bodyContent);
       },
     );
     if (result == null || result.isEmpty) return;
 
     if (result == 'gallery' || result == 'camera') {
-      final source =
-          result == 'gallery' ? ImageSource.gallery : ImageSource.camera;
+      final source = result == 'gallery'
+          ? ImageSource.gallery
+          : ImageSource.camera;
       await _pickAndUploadImage(controller, source);
     } else {
       // 从文章选择的图片 URL
@@ -489,15 +483,18 @@ class _MetadataPageState extends State<MetadataPage> {
   }
 
   Future<void> _pickAndUploadImage(
-      TextEditingController controller, ImageSource source) async {
+    TextEditingController controller,
+    ImageSource source,
+  ) async {
     final s = AppStrings.current;
-    final imageHost =
-        ImageHostService(settings: widget.settingsService.settings);
+    final imageHost = ImageHostService(
+      settings: widget.settingsService.settings,
+    );
     if (!imageHost.isConfigured) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(s.imageHostNotConfigured)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(s.imageHostNotConfigured)));
       }
       return;
     }
@@ -534,10 +531,19 @@ class _MetadataPageState extends State<MetadataPage> {
           ),
         );
       }
-    } catch (e) {
+    } catch (e, stack) {
+      await LogService.instance.logException(
+        e,
+        stack,
+        tag: 'Metadata',
+        context: '上传元数据图片失败',
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(s.imageUploadFailed), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(s.imageUploadFailed),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -573,12 +579,15 @@ class _MetadataPageState extends State<MetadataPage> {
                 decoration: InputDecoration(
                   hintText: s.customFieldKeyHint,
                   isDense: true,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
                   border: const OutlineInputBorder(),
                   filled: true,
-                  fillColor:
-                      Theme.of(context).colorScheme.surfaceContainerLowest,
+                  fillColor: Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainerLowest,
                 ),
                 style: const TextStyle(fontSize: 14),
               ),
@@ -591,12 +600,15 @@ class _MetadataPageState extends State<MetadataPage> {
                 decoration: InputDecoration(
                   hintText: s.customFieldValueHint,
                   isDense: true,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
                   border: const OutlineInputBorder(),
                   filled: true,
-                  fillColor:
-                      Theme.of(context).colorScheme.surfaceContainerLowest,
+                  fillColor: Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainerLowest,
                 ),
                 style: const TextStyle(fontSize: 14),
               ),
@@ -629,12 +641,14 @@ class _MetadataPageState extends State<MetadataPage> {
           spacing: 8,
           runSpacing: 4,
           children: [
-            ...selected.map((tag) => Chip(
-                  label: Text(tag),
-                  deleteIcon: const Icon(Icons.close, size: 16),
-                  onDeleted: () => onRemove(tag),
-                  visualDensity: VisualDensity.compact,
-                )),
+            ...selected.map(
+              (tag) => Chip(
+                label: Text(tag),
+                deleteIcon: const Icon(Icons.close, size: 16),
+                onDeleted: () => onRemove(tag),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
             ActionChip(
               avatar: const Icon(Icons.add, size: 16),
               label: Text(s.selectFromExisting),
@@ -649,12 +663,13 @@ class _MetadataPageState extends State<MetadataPage> {
           decoration: InputDecoration(
             hintText: s.addNewHint,
             isDense: true,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
+            ),
             border: const OutlineInputBorder(),
             filled: true,
-            fillColor:
-                Theme.of(context).colorScheme.surfaceContainerLowest,
+            fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
             suffixIcon: const Icon(Icons.add, size: 18),
           ),
           style: const TextStyle(fontSize: 14),
@@ -814,9 +829,7 @@ class _SelectorSheetState extends State<_SelectorSheet> {
 class _ImagePickerSheet extends StatefulWidget {
   final String articleBody;
 
-  const _ImagePickerSheet({
-    required this.articleBody,
-  });
+  const _ImagePickerSheet({required this.articleBody});
 
   @override
   State<_ImagePickerSheet> createState() => _ImagePickerSheetState();
@@ -836,8 +849,10 @@ class _ImagePickerSheetState extends State<_ImagePickerSheet>
 
   void _extractArticleImages() {
     final regex = RegExp(r'!\[.*?\]\((https?://[^\)]+)\)');
-    _articleImages =
-        regex.allMatches(widget.articleBody).map((m) => m.group(1)!).toList();
+    _articleImages = regex
+        .allMatches(widget.articleBody)
+        .map((m) => m.group(1)!)
+        .toList();
   }
 
   @override
@@ -901,6 +916,10 @@ class _ImagePickerSheetState extends State<_ImagePickerSheet>
 
   Widget _buildUploadTab(ScrollController scrollController) {
     final s = AppStrings.current;
+    final canUseCamera =
+        !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS);
     return ListView(
       controller: scrollController,
       padding: const EdgeInsets.all(16),
@@ -911,12 +930,13 @@ class _ImagePickerSheetState extends State<_ImagePickerSheet>
           subtitle: const Text('Gallery'),
           onTap: () => Navigator.pop(context, 'gallery'),
         ),
-        ListTile(
-          leading: const Icon(Icons.camera_alt),
-          title: Text(s.uploadImage),
-          subtitle: const Text('Camera'),
-          onTap: () => Navigator.pop(context, 'camera'),
-        ),
+        if (canUseCamera)
+          ListTile(
+            leading: const Icon(Icons.camera_alt),
+            title: Text(s.uploadImage),
+            subtitle: const Text('Camera'),
+            onTap: () => Navigator.pop(context, 'camera'),
+          ),
       ],
     );
   }
@@ -930,8 +950,10 @@ class _ImagePickerSheetState extends State<_ImagePickerSheet>
           children: [
             const Icon(Icons.image_not_supported, size: 48, color: Colors.grey),
             const SizedBox(height: 16),
-            Text(s.noImagesInArticle,
-                style: const TextStyle(color: Colors.grey)),
+            Text(
+              s.noImagesInArticle,
+              style: const TextStyle(color: Colors.grey),
+            ),
           ],
         ),
       );

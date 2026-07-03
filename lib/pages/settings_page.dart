@@ -221,7 +221,13 @@ class _SettingsPageState extends State<SettingsPage> {
           );
         }
       }
-    } catch (_) {
+    } catch (e, stack) {
+      await LogService.instance.logException(
+        e,
+        stack,
+        tag: 'Update',
+        context: '检查更新失败',
+      );
       _showUpdateError(zh);
     } finally {
       if (mounted) setState(() => _checkingUpdate = false);
@@ -428,7 +434,13 @@ class _SettingsPageState extends State<SettingsPage> {
       }
       _closeDownloadProgressDialog();
       _showInstallPrompt(updateAsset, packageFile.path, zh);
-    } catch (_) {
+    } catch (e, stack) {
+      await LogService.instance.logException(
+        e,
+        stack,
+        tag: 'Update',
+        context: '下载更新失败: ${updateAsset.name}',
+      );
       try {
         await sink?.close();
       } catch (_) {}
@@ -650,7 +662,14 @@ class _SettingsPageState extends State<SettingsPage> {
           'filePath': filePath,
         });
         return;
-      } catch (_) {}
+      } catch (e, stack) {
+        await LogService.instance.logException(
+          e,
+          stack,
+          tag: 'Update',
+          context: '调用 Android 安装接口失败，改用系统打开安装包',
+        );
+      }
     }
     await OpenFilex.open(filePath);
   }
@@ -682,7 +701,13 @@ class _SettingsPageState extends State<SettingsPage> {
       await _startWindowsUpdateScript(script.path, runAsAdmin: runAsAdmin);
       await Future<void>.delayed(const Duration(milliseconds: 300));
       exit(0);
-    } catch (_) {
+    } catch (e, stack) {
+      await LogService.instance.logException(
+        e,
+        stack,
+        tag: 'Update',
+        context: '启动 Windows 更新脚本失败',
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -744,7 +769,13 @@ class _SettingsPageState extends State<SettingsPage> {
       );
       await Future<void>.delayed(const Duration(milliseconds: 300));
       exit(0);
-    } catch (_) {
+    } catch (e, stack) {
+      await LogService.instance.logException(
+        e,
+        stack,
+        tag: 'Update',
+        context: '启动 Linux 更新脚本失败',
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1093,7 +1124,12 @@ rm -rf "\$BACKUP_DIR"
           _sameUpdatePackageFamily(entity.path, keepFile.path)) {
         try {
           await entity.delete();
-        } catch (_) {}
+        } catch (e) {
+          await LogService.instance.warn(
+            '清理旧更新包失败: ${entity.path}: $e',
+            tag: 'Update',
+          );
+        }
       }
     }
   }
@@ -1195,7 +1231,13 @@ rm -rf "\$BACKUP_DIR"
           _loadingRepos = false;
         });
       }
-    } catch (e) {
+    } catch (e, stack) {
+      await LogService.instance.logException(
+        e,
+        stack,
+        tag: 'Settings',
+        context: '加载 GitHub 仓库列表失败',
+      );
       if (mounted) {
         setState(() {
           _loadingRepos = false;
@@ -1231,7 +1273,13 @@ rm -rf "\$BACKUP_DIR"
           _loadingBranches = false;
         });
       }
-    } catch (e) {
+    } catch (e, stack) {
+      await LogService.instance.logException(
+        e,
+        stack,
+        tag: 'Settings',
+        context: '加载 GitHub 分支列表失败',
+      );
       if (mounted) {
         setState(() {
           _loadingBranches = false;

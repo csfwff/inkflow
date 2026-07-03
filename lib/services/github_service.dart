@@ -2,12 +2,14 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../l10n/app_strings.dart';
+import 'log_service.dart';
 
 class GitHubService {
   final String token;
   final String owner;
   final String repo;
   final String branch;
+  static final _log = LogService.instance;
 
   GitHubService({
     required this.token,
@@ -19,10 +21,10 @@ class GitHubService {
   String get _baseUrl => 'https://api.github.com/repos/$owner/$repo/contents';
 
   Map<String, String> get _headers => {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json',
-      };
+    'Authorization': 'Bearer $token',
+    'Accept': 'application/vnd.github.v3+json',
+    'Content-Type': 'application/json',
+  };
 
   /// 在 source/_posts/ 目录下创建文章
   /// [fileName] 文件名，如 "hello-world.md"
@@ -79,7 +81,13 @@ class GitHubService {
               '${AppStrings.current.publishFailed}: ${data['message'] ?? response.statusCode}',
         );
       }
-    } catch (e) {
+    } catch (e, stack) {
+      await _log.logException(
+        e,
+        stack,
+        tag: 'GitHub',
+        context: '创建 GitHub 文件失败: $remotePath',
+      );
       return GitHubResult(
         success: false,
         message: '${AppStrings.current.networkError}: $e',
@@ -110,8 +118,14 @@ class GitHubService {
           '${response.statusCode}: ${_extractGitHubMessage(response.body)}';
       debugPrint('[GitHub] ERROR $path: $error');
       return GitHubDirectoryResult.failure(error);
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('[GitHub] EXCEPTION listing $path: $e');
+      await _log.logException(
+        e,
+        stack,
+        tag: 'GitHub',
+        context: '列出 GitHub 目录失败: $path',
+      );
       return GitHubDirectoryResult.failure(e.toString());
     }
   }
@@ -141,10 +155,17 @@ class GitHubService {
         return GitHubFileContent(content: content, sha: data['sha']);
       } else {
         debugPrint(
-            '[GitHub] file ERROR ${response.statusCode}: ${response.body}');
+          '[GitHub] file ERROR ${response.statusCode}: ${response.body}',
+        );
       }
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('[GitHub] EXCEPTION getting file $path: $e');
+      await _log.logException(
+        e,
+        stack,
+        tag: 'GitHub',
+        context: '获取 GitHub 文件失败: $path',
+      );
     }
     return null;
   }
@@ -204,7 +225,13 @@ class GitHubService {
               '${AppStrings.current.publishFailed}: ${data['message'] ?? response.statusCode}',
         );
       }
-    } catch (e) {
+    } catch (e, stack) {
+      await _log.logException(
+        e,
+        stack,
+        tag: 'GitHub',
+        context: '更新 GitHub 文件失败: $remotePath',
+      );
       return GitHubResult(
         success: false,
         message: '${AppStrings.current.networkError}: $e',
@@ -231,11 +258,7 @@ class GitHubService {
   }) async {
     final message = commitMessage ?? 'post: delete $remotePath';
 
-    final body = jsonEncode({
-      'message': message,
-      'sha': sha,
-      'branch': branch,
-    });
+    final body = jsonEncode({'message': message, 'sha': sha, 'branch': branch});
 
     final url = Uri.parse('$_baseUrl/$remotePath');
 
@@ -243,10 +266,7 @@ class GitHubService {
       final response = await http.delete(url, headers: _headers, body: body);
 
       if (response.statusCode == 200) {
-        return GitHubResult(
-          success: true,
-          message: 'Deleted',
-        );
+        return GitHubResult(success: true, message: 'Deleted');
       } else {
         final data = jsonDecode(response.body);
         return GitHubResult(
@@ -254,7 +274,13 @@ class GitHubService {
           message: data['message'] ?? 'Delete failed: ${response.statusCode}',
         );
       }
-    } catch (e) {
+    } catch (e, stack) {
+      await _log.logException(
+        e,
+        stack,
+        tag: 'GitHub',
+        context: '删除 GitHub 文件失败: $remotePath',
+      );
       return GitHubResult(
         success: false,
         message: '${AppStrings.current.networkError}: $e',
@@ -278,8 +304,14 @@ class GitHubService {
         return _parseCommit(jsonDecode(response.body));
       }
       debugPrint('[GitHub] commit detail ERROR: ${response.statusCode}');
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('[GitHub] commit detail EXCEPTION: $e');
+      await _log.logException(
+        e,
+        stack,
+        tag: 'GitHub',
+        context: '获取 GitHub commit 详情失败: $sha',
+      );
     }
     return null;
   }
@@ -297,15 +329,16 @@ class GitHubService {
     int page = 1;
 
     while (true) {
-      final uri = Uri.parse(
-        'https://api.github.com/repos/$owner/$repo/commits',
-      ).replace(queryParameters: {
-        'sha': branch,
-        'path': path,
-        'since': since.toUtc().toIso8601String(),
-        'per_page': perPage.toString(),
-        'page': page.toString(),
-      });
+      final uri = Uri.parse('https://api.github.com/repos/$owner/$repo/commits')
+          .replace(
+            queryParameters: {
+              'sha': branch,
+              'path': path,
+              'since': since.toUtc().toIso8601String(),
+              'per_page': perPage.toString(),
+              'page': page.toString(),
+            },
+          );
 
       debugPrint('[GitHub] GET commits $path since=$since page=$page');
 
@@ -331,8 +364,14 @@ class GitHubService {
         // 如果返回的数据少于 per_page，说明没有更多了
         if (data.length < perPage) break;
         page++;
-      } catch (e) {
+      } catch (e, stack) {
         debugPrint('[GitHub] commits EXCEPTION: $e');
+        await _log.logException(
+          e,
+          stack,
+          tag: 'GitHub',
+          context: '获取 GitHub commit 列表失败: $path page=$page',
+        );
         break;
       }
     }
@@ -340,7 +379,8 @@ class GitHubService {
     // commit 太多时跳过详情获取，让调用方降级到全量同步
     if (allCommits.length > maxDetailFetches) {
       debugPrint(
-          '[GitHub] Too many commits (${allCommits.length} > $maxDetailFetches), skipping detail fetch');
+        '[GitHub] Too many commits (${allCommits.length} > $maxDetailFetches), skipping detail fetch',
+      );
       return allCommits;
     }
 
@@ -383,31 +423,31 @@ class GitHubService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data is List) {
-          return data
-              .map((e) => GitHubRepo.fromJson(e))
-              .toList();
+          return data.map((e) => GitHubRepo.fromJson(e)).toList();
         }
       }
       debugPrint('[GitHub] repos ERROR: ${response.statusCode}');
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('[GitHub] repos EXCEPTION: $e');
+      await _log.logException(
+        e,
+        stack,
+        tag: 'GitHub',
+        context: '列出 GitHub 仓库失败',
+      );
     }
     return [];
   }
 
   /// 列出仓库的分支列表
-  Future<List<String>> listBranches({
-    int perPage = 100,
-    int page = 1,
-  }) async {
-    final uri = Uri.parse(
-      'https://api.github.com/repos/$owner/$repo/branches',
-    ).replace(
-      queryParameters: {
-        'per_page': perPage.toString(),
-        'page': page.toString(),
-      },
-    );
+  Future<List<String>> listBranches({int perPage = 100, int page = 1}) async {
+    final uri = Uri.parse('https://api.github.com/repos/$owner/$repo/branches')
+        .replace(
+          queryParameters: {
+            'per_page': perPage.toString(),
+            'page': page.toString(),
+          },
+        );
 
     debugPrint('[GitHub] GET branches page=$page');
 
@@ -422,8 +462,14 @@ class GitHubService {
         }
       }
       debugPrint('[GitHub] branches ERROR: ${response.statusCode}');
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('[GitHub] branches EXCEPTION: $e');
+      await _log.logException(
+        e,
+        stack,
+        tag: 'GitHub',
+        context: '列出 GitHub 分支失败: $owner/$repo',
+      );
     }
     return [];
   }
@@ -498,13 +544,11 @@ class GitHubDirectoryResult {
   final List<GitHubFileEntry> entries;
   final String? error;
 
-  GitHubDirectoryResult.success(this.entries)
-      : success = true,
-        error = null;
+  GitHubDirectoryResult.success(this.entries) : success = true, error = null;
 
   GitHubDirectoryResult.failure(this.error)
-      : success = false,
-        entries = const [];
+    : success = false,
+      entries = const [];
 }
 
 class GitHubFileEntry {
@@ -561,11 +605,7 @@ class GitHubCommit {
   final DateTime date;
   final List<GitHubCommitFile> files;
 
-  GitHubCommit({
-    required this.sha,
-    required this.date,
-    required this.files,
-  });
+  GitHubCommit({required this.sha, required this.date, required this.files});
 }
 
 /// 增量同步结果

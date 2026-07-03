@@ -22,8 +22,7 @@ class SyncService {
     final remotePath = local.remotePath;
     if (remotePath == null || remotePath.isEmpty) return null;
 
-    final remoteKind =
-        local.remoteKind ?? _remoteKindForPath(remotePath);
+    final remoteKind = local.remoteKind ?? _remoteKindForPath(remotePath);
     if (remoteKind == null) return null;
 
     final fileData = await github.getFileContent(remotePath);
@@ -69,7 +68,10 @@ class SyncService {
       _log.write('source/_drafts -> ${drafts.length} articles', tag: 'Sync');
       remoteArticles.addAll(drafts);
 
-      _log.write('Total remote articles: ${remoteArticles.length}', tag: 'Sync');
+      _log.write(
+        'Total remote articles: ${remoteArticles.length}',
+        tag: 'Sync',
+      );
 
       // 收集远程存在的完整路径，避免 posts/drafts 同名文件互相混淆。
       final remotePaths = <String>{};
@@ -96,7 +98,10 @@ class SyncService {
 
       // 检测远程已删除：本地 synced/repoDraft 但远程不存在的
       final localSynced = await articleService.getRemoteTracked();
-      _log.write('Local synced/repoDraft count: ${localSynced.length}', tag: 'Sync');
+      _log.write(
+        'Local synced/repoDraft count: ${localSynced.length}',
+        tag: 'Sync',
+      );
       int deletedCount = 0;
       for (final local in localSynced) {
         if (local.status == ArticleStatus.pendingPublish) {
@@ -105,25 +110,36 @@ class SyncService {
 
         final remotePath = local.remotePath;
         if (remotePath == null || !remotePaths.contains(remotePath)) {
-          _log.write('Remote deleted: "${local.title}" (${remotePath ?? local.filePath})', tag: 'Sync');
+          _log.write(
+            'Remote deleted: "${local.title}" (${remotePath ?? local.filePath})',
+            tag: 'Sync',
+          );
           await articleService.markAsRemoteDeleted(local.id!);
           deletedCount++;
         }
       }
       if (deletedCount > 0) {
-        _log.write('Marked $deletedCount articles as remote deleted', tag: 'Sync');
+        _log.write(
+          'Marked $deletedCount articles as remote deleted',
+          tag: 'Sync',
+        );
       }
 
       // 更新 lastSyncTime
       settingsService.settings.lastSyncTime = DateTime.now();
       await settingsService.save();
-      _log.write('Updated lastSyncTime: ${settingsService.settings.lastSyncTime}', tag: 'Sync');
+      _log.write(
+        'Updated lastSyncTime: ${settingsService.settings.lastSyncTime}',
+        tag: 'Sync',
+      );
 
-      _log.write('=== syncFromGitHub DONE: ${remoteArticles.length} synced, $deletedCount remote deleted ===', tag: 'Sync');
+      _log.write(
+        '=== syncFromGitHub DONE: ${remoteArticles.length} synced, $deletedCount remote deleted ===',
+        tag: 'Sync',
+      );
       return SyncResult(success: true, count: remoteArticles.length);
     } catch (e, stack) {
-      _log.write('EXCEPTION: $e', tag: 'Sync');
-      _log.write('STACK: $stack', tag: 'Sync');
+      await _log.logException(e, stack, tag: 'Sync', context: '全量同步异常');
       return SyncResult(success: false, error: e.toString());
     }
   }
@@ -151,14 +167,21 @@ class SyncService {
         since: lastSyncTime,
       );
 
-      _log.write('Commits: posts=${postsCommits.length}, drafts=${draftsCommits.length}', tag: 'Sync');
+      _log.write(
+        'Commits: posts=${postsCommits.length}, drafts=${draftsCommits.length}',
+        tag: 'Sync',
+      );
 
       // commit 太多时 getCommitsSince 会跳过详情获取（files 为空），降级到全量同步
-      final hasEmptyFiles = postsCommits.any((c) => c.files.isEmpty) ||
+      final hasEmptyFiles =
+          postsCommits.any((c) => c.files.isEmpty) ||
           draftsCommits.any((c) => c.files.isEmpty);
       if (hasEmptyFiles &&
           (postsCommits.isNotEmpty || draftsCommits.isNotEmpty)) {
-        _log.write('Commits missing file details (too many?), falling back to full sync', tag: 'Sync');
+        _log.write(
+          'Commits missing file details (too many?), falling back to full sync',
+          tag: 'Sync',
+        );
         return syncFromGitHub();
       }
 
@@ -166,16 +189,26 @@ class SyncService {
       final postsChanges = _extractChanges(postsCommits, 'source/_posts/');
       final draftsChanges = _extractChanges(draftsCommits, 'source/_drafts/');
 
-      _log.write('Changes: posts added/modified=${postsChanges.addedOrModified.length}, removed=${postsChanges.removed.length}', tag: 'Sync');
-      _log.write('Changes: drafts added/modified=${draftsChanges.addedOrModified.length}, removed=${draftsChanges.removed.length}', tag: 'Sync');
+      _log.write(
+        'Changes: posts added/modified=${postsChanges.addedOrModified.length}, removed=${postsChanges.removed.length}',
+        tag: 'Sync',
+      );
+      _log.write(
+        'Changes: drafts added/modified=${draftsChanges.addedOrModified.length}, removed=${draftsChanges.removed.length}',
+        tag: 'Sync',
+      );
 
       // 如果变更太多（>200个文件），降级到全量同步
-      final totalChanges = postsChanges.addedOrModified.length +
+      final totalChanges =
+          postsChanges.addedOrModified.length +
           postsChanges.removed.length +
           draftsChanges.addedOrModified.length +
           draftsChanges.removed.length;
       if (totalChanges > 200) {
-        _log.write('Too many changes ($totalChanges), falling back to full sync', tag: 'Sync');
+        _log.write(
+          'Too many changes ($totalChanges), falling back to full sync',
+          tag: 'Sync',
+        );
         return syncFromGitHub();
       }
 
@@ -234,11 +267,13 @@ class SyncService {
         _log.write('Updated lastSyncTime: $latestDate', tag: 'Sync');
       }
 
-      _log.write('=== syncIncremental DONE: $syncedCount synced, $deletedCount deleted ===', tag: 'Sync');
+      _log.write(
+        '=== syncIncremental DONE: $syncedCount synced, $deletedCount deleted ===',
+        tag: 'Sync',
+      );
       return SyncResult(success: true, count: syncedCount);
     } catch (e, stack) {
-      _log.write('Incremental sync EXCEPTION: $e', tag: 'Sync');
-      _log.write('STACK: $stack', tag: 'Sync');
+      await _log.logException(e, stack, tag: 'Sync', context: '增量同步异常');
       // 增量同步失败，降级到全量同步
       _log.write('Falling back to full sync', tag: 'Sync');
       return syncFromGitHub();
@@ -256,8 +291,7 @@ class SyncService {
         if (!file.filename.startsWith(prefix)) continue;
         if (!file.filename.endsWith('.md')) continue;
 
-        final relativePath =
-            file.filename.substring(prefix.length);
+        final relativePath = file.filename.substring(prefix.length);
 
         switch (file.status) {
           case 'added':
@@ -358,7 +392,10 @@ class SyncService {
     } on _SyncException catch (e) {
       // 根目录（source/_posts、source/_drafts）不存在时允许跳过
       if (e.message.contains('404')) {
-        _log.write('Directory not found (404), skipping: $dirPath', tag: 'Sync');
+        _log.write(
+          'Directory not found (404), skipping: $dirPath',
+          tag: 'Sync',
+        );
         return articles;
       }
       rethrow;
@@ -407,7 +444,10 @@ class SyncService {
     }
 
     final entries = result.entries;
-    _log.write('$currentPath -> ${entries.length} entries: ${entries.map((e) => '${e.name}(${e.type})').join(', ')}', tag: 'Sync');
+    _log.write(
+      '$currentPath -> ${entries.length} entries: ${entries.map((e) => '${e.name}(${e.type})').join(', ')}',
+      tag: 'Sync',
+    );
 
     for (final entry in entries) {
       // entry.path 是 API 返回的完整路径，如 source/_posts/2026/05/test.md
@@ -441,7 +481,10 @@ class SyncService {
           _log.write('  parsed: "${article.title}" ($filePath)', tag: 'Sync');
           articles.add(article);
         } else {
-          _log.write('  FAILED to parse frontmatter: ${entry.path}', tag: 'Sync');
+          _log.write(
+            '  FAILED to parse frontmatter: ${entry.path}',
+            tag: 'Sync',
+          );
         }
       }
     }
@@ -458,7 +501,8 @@ class SyncService {
     final meta = FrontmatterHelper.parseFrontmatter(rawContent);
 
     String title = (meta['title'] ?? '').toString();
-    final date = FrontmatterHelper.parseDate((meta['date'] ?? '').toString()) ??
+    final date =
+        FrontmatterHelper.parseDate((meta['date'] ?? '').toString()) ??
         DateTime.now();
     final tags = _toStringList(meta['tags']);
     final categories = _toStringList(meta['categories']);
@@ -471,8 +515,16 @@ class SyncService {
 
     // 提取自定义字段（排除已知字段）
     final knownKeys = {
-      'title', 'date', 'tags', 'categories', 'permalink',
-      'top_img', 'cover', 'excerpt', 'description', 'author',
+      'title',
+      'date',
+      'tags',
+      'categories',
+      'permalink',
+      'top_img',
+      'cover',
+      'excerpt',
+      'description',
+      'author',
     };
     final customFields = <String, String>{};
     for (final entry in meta.entries) {
@@ -509,7 +561,10 @@ class SyncService {
   /// 将 YAML 值转为字符串列表。
   static List<String> _toStringList(Object? value) {
     if (value is List) {
-      return value.map((e) => e.toString().trim()).where((s) => s.isNotEmpty).toList();
+      return value
+          .map((e) => e.toString().trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
     }
     return [];
   }
@@ -537,8 +592,5 @@ class _ChangeSet {
   final List<String> addedOrModified;
   final List<String> removed;
 
-  _ChangeSet({
-    required this.addedOrModified,
-    required this.removed,
-  });
+  _ChangeSet({required this.addedOrModified, required this.removed});
 }

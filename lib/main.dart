@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:ui';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -12,25 +15,47 @@ import 'services/article_service.dart';
 final settingsService = SettingsService();
 final articleService = ArticleService();
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+void main() {
+  runZonedGuarded(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+      _setupGlobalErrorLogging();
 
-  // 桌面平台需要初始化 sqflite FFI（Web 不需要）
-  if (!kIsWeb) {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  }
+      // 桌面平台需要初始化 sqflite FFI（Web 不需要）
+      if (!kIsWeb) {
+        sqfliteFfiInit();
+        databaseFactory = databaseFactoryFfi;
+      }
 
-  await articleService.init();
-  await settingsService.init();
-  AppStrings.setLocale(settingsService.settings.locale);
+      await articleService.init();
+      await settingsService.init();
+      AppStrings.setLocale(settingsService.settings.locale);
 
-  // 记录启动日志
+      // 记录启动日志
+      final log = LogService.instance;
+      final info = await PackageInfo.fromPlatform();
+      log.info('应用启动: ${info.version}+${info.buildNumber}', tag: 'App');
+
+      runApp(const MyApp());
+    },
+    (error, stack) {
+      unawaited(LogService.instance.logException(error, stack, tag: 'Zone'));
+    },
+  );
+}
+
+void _setupGlobalErrorLogging() {
   final log = LogService.instance;
-  final info = await PackageInfo.fromPlatform();
-  log.info('应用启动: ${info.version}+${info.buildNumber}', tag: 'App');
 
-  runApp(const MyApp());
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    unawaited(log.logFlutterError(details));
+  };
+
+  PlatformDispatcher.instance.onError = (error, stack) {
+    unawaited(log.logException(error, stack, tag: 'PlatformDispatcher'));
+    return true;
+  };
 }
 
 class MyApp extends StatefulWidget {
@@ -57,20 +82,25 @@ class _MyAppState extends State<MyApp> {
 
   ThemeData _buildTheme(Brightness brightness) {
     final isDark = brightness == Brightness.dark;
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF277568),
-      brightness: brightness,
-    ).copyWith(
-      surface: isDark ? const Color(0xFF111413) : const Color(0xFFF8FAF8),
-      surfaceContainerLowest:
-          isDark ? const Color(0xFF0C0F0E) : const Color(0xFFFFFFFF),
-      surfaceContainerLow:
-          isDark ? const Color(0xFF171B1A) : const Color(0xFFF1F4F2),
-      surfaceContainer:
-          isDark ? const Color(0xFF1D2220) : const Color(0xFFEAF0ED),
-      outlineVariant:
-          isDark ? const Color(0xFF343B38) : const Color(0xFFDCE4E0),
-    );
+    final colorScheme =
+        ColorScheme.fromSeed(
+          seedColor: const Color(0xFF277568),
+          brightness: brightness,
+        ).copyWith(
+          surface: isDark ? const Color(0xFF111413) : const Color(0xFFF8FAF8),
+          surfaceContainerLowest: isDark
+              ? const Color(0xFF0C0F0E)
+              : const Color(0xFFFFFFFF),
+          surfaceContainerLow: isDark
+              ? const Color(0xFF171B1A)
+              : const Color(0xFFF1F4F2),
+          surfaceContainer: isDark
+              ? const Color(0xFF1D2220)
+              : const Color(0xFFEAF0ED),
+          outlineVariant: isDark
+              ? const Color(0xFF343B38)
+              : const Color(0xFFDCE4E0),
+        );
 
     final base = ThemeData(
       colorScheme: colorScheme,
@@ -120,8 +150,10 @@ class _MyAppState extends State<MyApp> {
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(

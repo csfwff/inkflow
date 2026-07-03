@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../../models/settings.dart';
+import '../log_service.dart';
 import 'image_path_builder.dart';
 import 'image_uploader.dart';
 
@@ -13,6 +14,7 @@ class UpyunUploader implements ImageUploader {
   final String path;
   final ImageDateFolderMode dateFolderMode;
   final ImageNamingMode namingMode;
+  static final _log = LogService.instance;
 
   UpyunUploader({
     required this.bucket,
@@ -52,8 +54,12 @@ class UpyunUploader implements ImageUploader {
       );
 
       if (response.statusCode == 200) {
-        final cleanDomain = domain.endsWith('/') ? domain.substring(0, domain.length - 1) : domain;
-        final cleanRemote = remotePath.startsWith('/') ? remotePath : '/$remotePath';
+        final cleanDomain = domain.endsWith('/')
+            ? domain.substring(0, domain.length - 1)
+            : domain;
+        final cleanRemote = remotePath.startsWith('/')
+            ? remotePath
+            : '/$remotePath';
         final imageUrl = '$cleanDomain$cleanRemote';
         return UploadResult(success: true, url: imageUrl);
       } else {
@@ -63,7 +69,13 @@ class UpyunUploader implements ImageUploader {
           error: data['msg'] ?? 'Upload failed: ${response.statusCode}',
         );
       }
-    } catch (e) {
+    } catch (e, stack) {
+      await _log.logException(
+        e,
+        stack,
+        tag: 'ImageHost',
+        context: '又拍云图床上传失败: $remotePath',
+      );
       return UploadResult(success: false, error: 'Network error: $e');
     }
   }

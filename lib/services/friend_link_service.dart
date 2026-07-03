@@ -46,29 +46,32 @@ class FriendLinkService {
 
   /// 按 ID 获取
   Future<FriendLink?> getById(int id) async {
-    final row = await (_db.select(_db.friendLinkRows)
-          ..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
+    final row = await (_db.select(
+      _db.friendLinkRows,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     return row == null ? null : friendLinkFromRow(row);
   }
 
   /// 按名称获取
   Future<FriendLink?> getByName(String name) async {
-    final row = await (_db.select(_db.friendLinkRows)
-          ..where((t) => t.name.equals(name)))
-        .getSingleOrNull();
+    final row = await (_db.select(
+      _db.friendLinkRows,
+    )..where((t) => t.name.equals(name))).getSingleOrNull();
     return row == null ? null : friendLinkFromRow(row);
   }
 
   /// 插入友链
   Future<int> insert(FriendLink link) async {
-    return await _db.into(_db.friendLinkRows).insert(friendLinkToCompanion(link));
+    return await _db
+        .into(_db.friendLinkRows)
+        .insert(friendLinkToCompanion(link));
   }
 
   /// 更新友链
   Future<void> update(FriendLink link) async {
-    await (_db.update(_db.friendLinkRows)..where((t) => t.id.equals(link.id!)))
-        .write(friendLinkToCompanion(link));
+    await (_db.update(
+      _db.friendLinkRows,
+    )..where((t) => t.id.equals(link.id!))).write(friendLinkToCompanion(link));
   }
 
   /// 删除友链
@@ -94,7 +97,8 @@ class FriendLinkService {
   /// 检测单个链接是否可访问
   Future<LinkCheckResult> checkLink(FriendLink link) async {
     try {
-      final response = await http.head(Uri.parse(link.link))
+      final response = await http
+          .head(Uri.parse(link.link))
           .timeout(const Duration(seconds: 10));
       return LinkCheckResult(
         linkId: link.id,
@@ -136,7 +140,10 @@ class FriendLinkService {
   // ── GitHub 同步 ──
 
   /// 从 GitHub 拉取友链文件并解析
-  Future<SyncResult> syncFromGitHub(GitHubService github, String filePath) async {
+  Future<SyncResult> syncFromGitHub(
+    GitHubService github,
+    String filePath,
+  ) async {
     try {
       _log.logAction('同步友链', detail: '从 GitHub 拉取');
 
@@ -157,8 +164,8 @@ class FriendLinkService {
 
       _log.logAction('同步友链完成', detail: '${links.length} 条');
       return SyncResult(success: true, count: links.length);
-    } catch (e) {
-      _log.error('同步友链失败: $e', tag: 'FriendLink');
+    } catch (e, stack) {
+      await _log.logException(e, stack, tag: 'FriendLink', context: '同步友链失败');
       return SyncResult(success: false, error: e.toString());
     }
   }
@@ -192,8 +199,8 @@ class FriendLinkService {
 
       _log.logAction('推送友链完成', detail: '${links.length} 条');
       return SyncResult(success: true, count: links.length);
-    } catch (e) {
-      _log.error('推送友链失败: $e', tag: 'FriendLink');
+    } catch (e, stack) {
+      await _log.logException(e, stack, tag: 'FriendLink', context: '推送友链失败');
       return SyncResult(success: false, error: e.toString());
     }
   }
@@ -206,10 +213,5 @@ class SyncResult {
   final String? error;
   final String? message;
 
-  SyncResult({
-    required this.success,
-    this.count = 0,
-    this.error,
-    this.message,
-  });
+  SyncResult({required this.success, this.count = 0, this.error, this.message});
 }
