@@ -21,7 +21,7 @@ import '../widgets/responsive.dart';
 
 enum _Tab { general, github, imageHost, about }
 
-enum _UpdatePackageKind { androidApk, windowsZip }
+enum _UpdatePackageKind { androidApk, windowsZip, linuxTarGz }
 
 class _UpdatePackageAsset {
   final _UpdatePackageKind kind;
@@ -98,11 +98,21 @@ class _SettingsPageState extends State<SettingsPage> {
     _githubOwnerCtrl = TextEditingController(text: _settings.githubOwner);
     _githubRepoCtrl = TextEditingController(text: _settings.githubRepo);
     _githubBranchCtrl = TextEditingController(text: _settings.githubBranch);
-    _githubPathPatternCtrl = TextEditingController(text: _settings.githubPathPattern);
-    _permalinkPatternCtrl = TextEditingController(text: _settings.permalinkPattern);
-    _imageGithubRepoCtrl = TextEditingController(text: _settings.imageGithubRepo);
-    _imageGithubPathCtrl = TextEditingController(text: _settings.imageGithubPath);
-    _imageGithubDomainCtrl = TextEditingController(text: _settings.imageGithubDomain);
+    _githubPathPatternCtrl = TextEditingController(
+      text: _settings.githubPathPattern,
+    );
+    _permalinkPatternCtrl = TextEditingController(
+      text: _settings.permalinkPattern,
+    );
+    _imageGithubRepoCtrl = TextEditingController(
+      text: _settings.imageGithubRepo,
+    );
+    _imageGithubPathCtrl = TextEditingController(
+      text: _settings.imageGithubPath,
+    );
+    _imageGithubDomainCtrl = TextEditingController(
+      text: _settings.imageGithubDomain,
+    );
     _upyunBucketCtrl = TextEditingController(text: _settings.upyunBucket);
     _upyunOperatorCtrl = TextEditingController(text: _settings.upyunOperator);
     _upyunPasswordCtrl = TextEditingController(text: _settings.upyunPassword);
@@ -145,7 +155,9 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() => _checkingUpdate = true);
     try {
       final resp = await http.get(
-        Uri.parse('https://api.github.com/repos/csfwff/inkflow/releases/latest'),
+        Uri.parse(
+          'https://api.github.com/repos/csfwff/inkflow/releases/latest',
+        ),
         headers: {'Accept': 'application/vnd.github.v3+json'},
       );
       if (resp.statusCode != 200) {
@@ -161,7 +173,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
       // 提取当前平台的安装包下载链接
       _UpdatePackageAsset? updateAsset;
-      if (!kIsWeb && (Platform.isAndroid || Platform.isWindows)) {
+      if (!kIsWeb &&
+          (Platform.isAndroid || Platform.isWindows || Platform.isLinux)) {
         final assets = (data['assets'] as List<dynamic>?) ?? [];
         for (final asset in assets) {
           final assetMap = asset as Map<String, dynamic>;
@@ -188,7 +201,10 @@ class _SettingsPageState extends State<SettingsPage> {
         var packageCached = false;
         if (updateAsset != null) {
           final packageFile = await _getUpdatePackageFile(updateAsset);
-          packageCached = await _hasDownloadedPackage(packageFile, updateAsset.size);
+          packageCached = await _hasDownloadedPackage(
+            packageFile,
+            updateAsset.size,
+          );
         }
         _showUpdateDialog(
           zh,
@@ -234,6 +250,12 @@ class _SettingsPageState extends State<SettingsPage> {
         lowerName.endsWith('.zip') &&
         lowerName.contains('windows')) {
       return _UpdatePackageKind.windowsZip;
+    }
+    if (!kIsWeb &&
+        Platform.isLinux &&
+        lowerName.endsWith('.tar.gz') &&
+        lowerName.contains('linux')) {
+      return _UpdatePackageKind.linuxTarGz;
     }
     return null;
   }
@@ -327,7 +349,12 @@ class _SettingsPageState extends State<SettingsPage> {
 
     final packageFile = await _getUpdatePackageFile(updateAsset);
     if (await _hasDownloadedPackage(packageFile, updateAsset.size)) {
-      _showInstallPrompt(updateAsset, packageFile.path, zh, alreadyDownloaded: true);
+      _showInstallPrompt(
+        updateAsset,
+        packageFile.path,
+        zh,
+        alreadyDownloaded: true,
+      );
       return;
     }
 
@@ -511,7 +538,13 @@ class _SettingsPageState extends State<SettingsPage> {
               ? _readyPackageTitle(updateAsset, zh)
               : (zh ? '下载完成' : 'Download Complete'),
         ),
-        content: Text(_installPromptContent(updateAsset, zh, alreadyDownloaded: alreadyDownloaded)),
+        content: Text(
+          _installPromptContent(
+            updateAsset,
+            zh,
+            alreadyDownloaded: alreadyDownloaded,
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
@@ -531,13 +564,23 @@ class _SettingsPageState extends State<SettingsPage> {
 
   String _cachedPackageText(_UpdatePackageAsset? updateAsset, bool zh) {
     if (updateAsset?.kind == _UpdatePackageKind.windowsZip) {
-      return zh ? '已检测到下载好的 Windows 更新包，可直接安装。' : 'The Windows update package is already downloaded and ready to install.';
+      return zh
+          ? '已检测到下载好的 Windows 更新包，可直接安装。'
+          : 'The Windows update package is already downloaded and ready to install.';
     }
-    return zh ? '已检测到下载好的安装包，可直接安装。' : 'The APK is already downloaded and ready to install.';
+    if (updateAsset?.kind == _UpdatePackageKind.linuxTarGz) {
+      return zh
+          ? '已检测到下载好的 Linux 更新包，可直接安装。'
+          : 'The Linux update package is already downloaded and ready to install.';
+    }
+    return zh
+        ? '已检测到下载好的安装包，可直接安装。'
+        : 'The APK is already downloaded and ready to install.';
   }
 
   String _readyPackageTitle(_UpdatePackageAsset updateAsset, bool zh) {
-    if (updateAsset.kind == _UpdatePackageKind.windowsZip) {
+    if (updateAsset.kind == _UpdatePackageKind.windowsZip ||
+        updateAsset.kind == _UpdatePackageKind.linuxTarGz) {
       return zh ? '更新包已下载' : 'Update Ready';
     }
     return zh ? '安装包已下载' : 'APK Ready';
@@ -558,6 +601,16 @@ class _SettingsPageState extends State<SettingsPage> {
           ? 'Windows 更新包已下载完成。安装会关闭并重启应用。'
           : 'The Windows update package has been downloaded. Installing will close and restart the app.';
     }
+    if (updateAsset.kind == _UpdatePackageKind.linuxTarGz) {
+      if (alreadyDownloaded) {
+        return zh
+            ? '检测到之前下载的 Linux 更新包，无需重新下载。安装会关闭并重启应用。'
+            : 'A previously downloaded Linux update package was found. Installing will close and restart the app.';
+      }
+      return zh
+          ? 'Linux 更新包已下载完成。安装会关闭并重启应用。'
+          : 'The Linux update package has been downloaded. Installing will close and restart the app.';
+    }
     return alreadyDownloaded
         ? (zh
               ? '检测到之前下载的安装包，无需重新下载。'
@@ -568,18 +621,24 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   String _installButtonText(_UpdatePackageAsset updateAsset, bool zh) {
-    if (updateAsset.kind == _UpdatePackageKind.windowsZip) {
+    if (updateAsset.kind == _UpdatePackageKind.windowsZip ||
+        updateAsset.kind == _UpdatePackageKind.linuxTarGz) {
       return zh ? '立即安装并重启' : 'Install & Restart';
     }
     return zh ? '立即安装' : 'Install';
   }
 
-  Future<void> _installUpdatePackage(_UpdatePackageAsset updateAsset, String filePath) async {
+  Future<void> _installUpdatePackage(
+    _UpdatePackageAsset updateAsset,
+    String filePath,
+  ) async {
     switch (updateAsset.kind) {
       case _UpdatePackageKind.androidApk:
         await _installApk(filePath);
       case _UpdatePackageKind.windowsZip:
         await _installWindowsUpdate(filePath);
+      case _UpdatePackageKind.linuxTarGz:
+        await _installLinuxUpdate(filePath);
     }
   }
 
@@ -626,7 +685,75 @@ class _SettingsPageState extends State<SettingsPage> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(zh ? '启动 Windows 更新失败，请手动下载更新' : 'Failed to start Windows update. Please update manually.')),
+        SnackBar(
+          content: Text(
+            zh
+                ? '启动 Windows 更新失败，请手动下载更新'
+                : 'Failed to start Windows update. Please update manually.',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _installLinuxUpdate(String packagePath) async {
+    if (kIsWeb || !Platform.isLinux) {
+      await OpenFilex.open(packagePath);
+      return;
+    }
+
+    final zh = AppStrings.isZh;
+    final exeFile = File(Platform.resolvedExecutable);
+    final installDir = exeFile.parent;
+    final canWrite = await _canWriteToDirectory(installDir);
+    var usePkexec = false;
+    String? pkexecPath;
+
+    if (!canWrite) {
+      pkexecPath = await _findExecutable('pkexec');
+      if (pkexecPath == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              zh
+                  ? '当前安装目录不可写，且未找到 pkexec，请手动解压更新包'
+                  : 'The install directory is not writable and pkexec was not found. Please update manually.',
+            ),
+          ),
+        );
+        await OpenFilex.open(packagePath);
+        return;
+      }
+      if (!mounted) return;
+      final confirmed = await _confirmLinuxPrivilegedInstall(zh);
+      if (confirmed != true) return;
+      usePkexec = true;
+    }
+
+    try {
+      final script = await _createLinuxUpdateScript(
+        packagePath: packagePath,
+        exePath: exeFile.path,
+        installDir: installDir.path,
+      );
+      await _startLinuxUpdateScript(
+        script.path,
+        usePkexec: usePkexec,
+        pkexecPath: pkexecPath,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      exit(0);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            zh
+                ? '启动 Linux 更新失败，请手动下载更新'
+                : 'Failed to start Linux update. Please update manually.',
+          ),
+        ),
       );
     }
   }
@@ -651,6 +778,30 @@ class _SettingsPageState extends State<SettingsPage> {
           zh
               ? '当前安装目录不可写，更新需要以管理员权限运行安装脚本。是否继续？'
               : 'The current install directory is not writable. The updater needs administrator permission to continue.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(zh ? '取消' : 'Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(zh ? '继续' : 'Continue'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool?> _confirmLinuxPrivilegedInstall(bool zh) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(zh ? '需要管理员权限' : 'Administrator Permission Required'),
+        content: Text(
+          zh
+              ? '当前安装目录不可写，更新会通过 pkexec 请求管理员权限。安装完成后会关闭并重启应用，是否继续？'
+              : 'The current install directory is not writable. The updater will request administrator permission through pkexec, then close and restart the app.',
         ),
         actions: [
           TextButton(
@@ -738,32 +889,178 @@ try {
     return script;
   }
 
-  Future<void> _startWindowsUpdateScript(String scriptPath, {required bool runAsAdmin}) async {
+  Future<void> _startWindowsUpdateScript(
+    String scriptPath, {
+    required bool runAsAdmin,
+  }) async {
     if (runAsAdmin) {
-      final scriptArg = '-NoProfile -ExecutionPolicy Bypass -File "$scriptPath"';
-      await Process.start(
-        'powershell.exe',
-        [
-          '-NoProfile',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-Command',
-          'Start-Process -FilePath powershell.exe -ArgumentList ${_psQuote(scriptArg)} -Verb RunAs',
-        ],
-        mode: ProcessStartMode.detached,
-      );
+      final scriptArg =
+          '-NoProfile -ExecutionPolicy Bypass -File "$scriptPath"';
+      await Process.start('powershell.exe', [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        'Start-Process -FilePath powershell.exe -ArgumentList ${_psQuote(scriptArg)} -Verb RunAs',
+      ], mode: ProcessStartMode.detached);
       return;
     }
 
-    await Process.start(
-      'powershell.exe',
-      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath],
-      mode: ProcessStartMode.detached,
-    );
+    await Process.start('powershell.exe', [
+      '-NoProfile',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-File',
+      scriptPath,
+    ], mode: ProcessStartMode.detached);
   }
 
   String _psQuote(String value) {
     return "'${value.replaceAll("'", "''")}'";
+  }
+
+  Future<File> _createLinuxUpdateScript({
+    required String packagePath,
+    required String exePath,
+    required String installDir,
+  }) async {
+    final dir = await getApplicationSupportDirectory();
+    final updatesDir = Directory(p.join(dir.path, 'updates'));
+    await updatesDir.create(recursive: true);
+    final script = File(p.join(updatesDir.path, 'install_linux_update.sh'));
+    final exeName = p.basename(exePath);
+    final logPath = p.join(updatesDir.path, 'linux_update.log');
+    final env = Platform.environment;
+
+    await script.writeAsString('''
+#!/bin/sh
+set -u
+
+APP_PID=$pid
+ARCHIVE=${_shQuote(packagePath)}
+EXE_PATH=${_shQuote(exePath)}
+EXE_NAME=${_shQuote(exeName)}
+INSTALL_DIR=${_shQuote(installDir)}
+LOG_PATH=${_shQuote(logPath)}
+APP_USER=${_shQuote(env['USER'] ?? '')}
+APP_HOME=${_shQuote(env['HOME'] ?? '')}
+APP_DISPLAY=${_shQuote(env['DISPLAY'] ?? '')}
+APP_WAYLAND_DISPLAY=${_shQuote(env['WAYLAND_DISPLAY'] ?? '')}
+APP_XAUTHORITY=${_shQuote(env['XAUTHORITY'] ?? '')}
+APP_DBUS_SESSION_BUS_ADDRESS=${_shQuote(env['DBUS_SESSION_BUS_ADDRESS'] ?? '')}
+APP_XDG_RUNTIME_DIR=${_shQuote(env['XDG_RUNTIME_DIR'] ?? '')}
+STAGING_DIR=\$(mktemp -d "\${TMPDIR:-/tmp}/inkflow_update_XXXXXX")
+BACKUP_DIR=\$(mktemp -d "\${TMPDIR:-/tmp}/inkflow_backup_XXXXXX")
+
+log() {
+  printf '[%s] %s\\n' "\$(date '+%Y-%m-%d %H:%M:%S')" "\$1" >> "\$LOG_PATH" 2>/dev/null || true
+}
+
+cleanup() {
+  rm -rf "\$STAGING_DIR"
+}
+trap cleanup EXIT
+
+start_app() {
+  cd "\$INSTALL_DIR" 2>/dev/null || true
+  if [ "\$(id -u)" -eq 0 ] && [ -n "\$APP_USER" ] && command -v runuser >/dev/null 2>&1; then
+    runuser -u "\$APP_USER" -- env \\
+      HOME="\$APP_HOME" \\
+      DISPLAY="\$APP_DISPLAY" \\
+      WAYLAND_DISPLAY="\$APP_WAYLAND_DISPLAY" \\
+      XAUTHORITY="\$APP_XAUTHORITY" \\
+      DBUS_SESSION_BUS_ADDRESS="\$APP_DBUS_SESSION_BUS_ADDRESS" \\
+      XDG_RUNTIME_DIR="\$APP_XDG_RUNTIME_DIR" \\
+      "\$EXE_PATH" >/dev/null 2>&1 &
+    return
+  fi
+  nohup "\$EXE_PATH" >/dev/null 2>&1 &
+}
+
+restore_and_restart() {
+  log "\$1"
+  if [ -d "\$BACKUP_DIR" ]; then
+    cp -a "\$BACKUP_DIR"/. "\$INSTALL_DIR"/ 2>/dev/null || true
+  fi
+  start_app
+  exit 1
+}
+
+log 'Updater started.'
+i=0
+while kill -0 "\$APP_PID" 2>/dev/null; do
+  if [ "\$i" -ge 120 ]; then
+    log 'InkFlow did not exit in time.'
+    exit 1
+  fi
+  i=\$((i + 1))
+  sleep 0.5
+done
+
+if ! tar -xzf "\$ARCHIVE" -C "\$STAGING_DIR"; then
+  restore_and_restart 'Failed to extract update package.'
+fi
+
+UPDATED_EXE=\$(find "\$STAGING_DIR" -type f -name "\$EXE_NAME" -print -quit 2>/dev/null)
+if [ -z "\$UPDATED_EXE" ]; then
+  restore_and_restart "Cannot find \$EXE_NAME in update package."
+fi
+SOURCE_DIR=\$(dirname "\$UPDATED_EXE")
+
+if ! cp -a "\$INSTALL_DIR"/. "\$BACKUP_DIR"/; then
+  restore_and_restart 'Failed to create install backup.'
+fi
+
+if ! cp -a "\$SOURCE_DIR"/. "\$INSTALL_DIR"/; then
+  log 'Copy failed, restoring backup.'
+  cp -a "\$BACKUP_DIR"/. "\$INSTALL_DIR"/ 2>/dev/null || true
+  start_app
+  exit 1
+fi
+
+chmod +x "\$INSTALL_DIR/\$EXE_NAME" 2>/dev/null || true
+start_app
+log 'Updater finished.'
+rm -rf "\$BACKUP_DIR"
+''');
+    await Process.run('chmod', ['+x', script.path]);
+    return script;
+  }
+
+  Future<void> _startLinuxUpdateScript(
+    String scriptPath, {
+    required bool usePkexec,
+    String? pkexecPath,
+  }) async {
+    if (usePkexec) {
+      await Process.start(pkexecPath ?? 'pkexec', [
+        '/bin/sh',
+        scriptPath,
+      ], mode: ProcessStartMode.detached);
+      return;
+    }
+
+    await Process.start('/bin/sh', [
+      scriptPath,
+    ], mode: ProcessStartMode.detached);
+  }
+
+  Future<String?> _findExecutable(String name) async {
+    if (kIsWeb) return null;
+    try {
+      final result = await Process.run('which', [name]);
+      if (result.exitCode == 0) {
+        final output = result.stdout.toString().trim();
+        if (output.isNotEmpty) {
+          return output.split('\n').first.trim();
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  String _shQuote(String value) {
+    return "'${value.replaceAll("'", "'\"'\"'")}'";
   }
 
   Future<File> _getUpdatePackageFile(_UpdatePackageAsset updateAsset) async {
@@ -790,16 +1087,25 @@ try {
   Future<void> _cleanupOldUpdatePackages(File keepFile) async {
     final dir = keepFile.parent;
     if (!await dir.exists()) return;
-    final extension = p.extension(keepFile.path).toLowerCase();
     await for (final entity in dir.list()) {
       if (entity is File &&
           entity.path != keepFile.path &&
-          p.extension(entity.path).toLowerCase() == extension) {
+          _sameUpdatePackageFamily(entity.path, keepFile.path)) {
         try {
           await entity.delete();
         } catch (_) {}
       }
     }
+  }
+
+  bool _sameUpdatePackageFamily(String filePath, String keepPath) {
+    final fileName = p.basename(filePath).toLowerCase();
+    final keepName = p.basename(keepPath).toLowerCase();
+    if (keepName.endsWith('.tar.gz')) {
+      return fileName.endsWith('.tar.gz');
+    }
+    return p.extension(filePath).toLowerCase() ==
+        p.extension(keepPath).toLowerCase();
   }
 
   Future<bool> _ensureNotificationPermission() async {
@@ -948,9 +1254,7 @@ try {
     final wide = Responsive.isWide(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(AppStrings.current.settingsTitle),
-      ),
+      appBar: AppBar(title: Text(AppStrings.current.settingsTitle)),
       body: wide ? _buildWide() : _buildNarrow(),
     );
   }
@@ -979,7 +1283,11 @@ try {
             _sidebarItem(_Tab.general, Icons.tune, s.tabGeneral),
             _sidebarItem(_Tab.github, Icons.code, s.tabGithub),
             _sidebarItem(_Tab.imageHost, Icons.image, s.tabImageHost),
-            _sidebarItem(_Tab.about, Icons.info_outline, AppStrings.isZh ? '关于' : 'About'),
+            _sidebarItem(
+              _Tab.about,
+              Icons.info_outline,
+              AppStrings.isZh ? '关于' : 'About',
+            ),
           ],
         ),
       ),
@@ -1021,7 +1329,11 @@ try {
       (_Tab.general, Icons.tune, s.tabGeneral),
       (_Tab.github, Icons.code, s.tabGithub),
       (_Tab.imageHost, Icons.image, s.tabImageHost),
-      (_Tab.about, Icons.info_outline, identical(s, AppStrings.zh) ? '关于' : 'About'),
+      (
+        _Tab.about,
+        Icons.info_outline,
+        identical(s, AppStrings.zh) ? '关于' : 'About',
+      ),
     ];
 
     return Container(
@@ -1089,7 +1401,9 @@ try {
           value: _settings.locale,
           items: [
             DropdownMenuItem(
-                value: AppLocale.system, child: Text(s.langSystem)),
+              value: AppLocale.system,
+              child: Text(s.langSystem),
+            ),
             DropdownMenuItem(value: AppLocale.zh, child: Text(s.langZh)),
             DropdownMenuItem(value: AppLocale.en, child: Text(s.langEn)),
           ],
@@ -1103,7 +1417,9 @@ try {
         _sectionHeader(s.theme),
         _segmentedTheme(s),
         _divider(),
-        _sectionHeader(identical(s, AppStrings.zh) ? '永久链接格式' : 'Permalink pattern'),
+        _sectionHeader(
+          identical(s, AppStrings.zh) ? '永久链接格式' : 'Permalink pattern',
+        ),
         _inputRow(
           controller: _permalinkPatternCtrl,
           hint: identical(s, AppStrings.zh)
@@ -1120,8 +1436,8 @@ try {
           child: Text(
             _buildPermalinkExample(s),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
         _divider(),
@@ -1206,8 +1522,12 @@ try {
             children: [
               CheckboxListTile(
                 value: includeSensitive,
-                onChanged: (v) => setDialogState(() => includeSensitive = v ?? false),
-                title: Text(s.includeSensitive, style: const TextStyle(fontSize: 13)),
+                onChanged: (v) =>
+                    setDialogState(() => includeSensitive = v ?? false),
+                title: Text(
+                  s.includeSensitive,
+                  style: const TextStyle(fontSize: 13),
+                ),
                 contentPadding: EdgeInsets.zero,
                 controlAffinity: ListTileControlAffinity.leading,
                 dense: true,
@@ -1233,17 +1553,22 @@ try {
             ),
             FilledButton(
               onPressed: () {
-                final password = includeSensitive ? passwordCtrl.text.trim() : null;
-                if (includeSensitive && (password == null || password.isEmpty)) return;
+                final password = includeSensitive
+                    ? passwordCtrl.text.trim()
+                    : null;
+                if (includeSensitive &&
+                    (password == null || password.isEmpty)) {
+                  return;
+                }
                 final encoded = settingsService.exportConfig(
                   includeSensitive: includeSensitive,
                   password: password,
                 );
                 Navigator.of(ctx).pop();
                 _copyToClipboard(encoded);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(s.exportSuccess)),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text(s.exportSuccess)));
               },
               child: Text(s.exportConfig),
             ),
@@ -1268,9 +1593,7 @@ try {
             children: [
               TextField(
                 controller: dataCtrl,
-                decoration: InputDecoration(
-                  labelText: s.importConfigHint,
-                ),
+                decoration: InputDecoration(labelText: s.importConfigHint),
                 maxLines: 3,
               ),
               if (needPassword) ...[
@@ -1311,27 +1634,33 @@ try {
                   // 用密码解密导入
                   final password = passwordCtrl.text.trim();
                   if (password.isEmpty) return;
-                  success = await settingsService.importConfigEncrypted(data, password);
+                  success = await settingsService.importConfigEncrypted(
+                    data,
+                    password,
+                  );
                 }
 
                 if (success) {
+                  if (!ctx.mounted) return;
                   Navigator.of(ctx).pop();
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(s.importSuccess)),
-                    );
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(s.importSuccess)));
                     _refreshCtrlsFromSettings();
                     widget.onSettingsChanged?.call();
                   }
                 } else if (needPassword) {
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(s.importFailed)),
-                    );
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(s.importFailed)));
                   }
                 }
               },
-              child: Text(needPassword ? s.importConfigConfirm : s.importConfig),
+              child: Text(
+                needPassword ? s.importConfigConfirm : s.importConfig,
+              ),
             ),
           ],
         ),
@@ -1380,7 +1709,10 @@ try {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: OutlinedButton.icon(
-            icon: Icon(Icons.delete_forever, color: Theme.of(context).colorScheme.error),
+            icon: Icon(
+              Icons.delete_forever,
+              color: Theme.of(context).colorScheme.error,
+            ),
             label: Text(
               s.clearArticleData,
               style: TextStyle(color: Theme.of(context).colorScheme.error),
@@ -1396,8 +1728,8 @@ try {
           child: Text(
             s.clearArticleDataDesc,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
       ],
@@ -1436,7 +1768,9 @@ try {
               if (!kIsWeb) ...[
                 const SizedBox(width: 12),
                 FilledButton.tonal(
-                  onPressed: (_checkingUpdate || _downloading) ? null : () => _checkUpdate(zh),
+                  onPressed: (_checkingUpdate || _downloading)
+                      ? null
+                      : () => _checkUpdate(zh),
                   child: (_checkingUpdate || _downloading)
                       ? const SizedBox(
                           width: 16,
@@ -1464,10 +1798,8 @@ try {
                     width: 48,
                     height: 48,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => CircleAvatar(
-                      radius: 24,
-                      child: Icon(Icons.person),
-                    ),
+                    errorBuilder: (_, __, ___) =>
+                        CircleAvatar(radius: 24, child: Icon(Icons.person)),
                   ),
                 ),
               ),
@@ -1510,7 +1842,11 @@ try {
               _copyToClipboard(friendLinkYaml);
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(zh ? '已复制友链 YAML' : 'Friend link YAML copied')),
+                  SnackBar(
+                    content: Text(
+                      zh ? '已复制友链 YAML' : 'Friend link YAML copied',
+                    ),
+                  ),
                 );
               }
             },
@@ -1592,7 +1928,11 @@ try {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        icon: Icon(Icons.warning_amber_rounded, color: Theme.of(ctx).colorScheme.error, size: 40),
+        icon: Icon(
+          Icons.warning_amber_rounded,
+          color: Theme.of(ctx).colorScheme.error,
+          size: 40,
+        ),
         title: Text(s.clearArticleData),
         content: Text(s.clearArticleDataWarning),
         actions: [
@@ -1610,9 +1950,9 @@ try {
               _settings.lastSyncTime = null;
               _save();
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(s.clearArticleDataDesc)),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text(s.clearArticleDataDesc)));
               }
             },
             child: Text(s.clearArticleDataConfirm),
@@ -1627,12 +1967,9 @@ try {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: SegmentedButton<AppThemeMode>(
         segments: [
-          ButtonSegment(
-              value: AppThemeMode.system, label: Text(s.themeSystem)),
-          ButtonSegment(
-              value: AppThemeMode.light, label: Text(s.themeLight)),
-          ButtonSegment(
-              value: AppThemeMode.dark, label: Text(s.themeDark)),
+          ButtonSegment(value: AppThemeMode.system, label: Text(s.themeSystem)),
+          ButtonSegment(value: AppThemeMode.light, label: Text(s.themeLight)),
+          ButtonSegment(value: AppThemeMode.dark, label: Text(s.themeDark)),
         ],
         selected: {_settings.themeMode},
         onSelectionChanged: (v) {
@@ -1690,8 +2027,8 @@ try {
           child: Text(
             _buildPathPatternExample(s),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
         _divider(),
@@ -1726,7 +2063,9 @@ try {
                           isDense: true,
                           hintText: zh ? '输入仓库名' : 'Enter repo name',
                           contentPadding: EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 10),
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
                           border: OutlineInputBorder(),
                         ),
                         onChanged: (v) {
@@ -1738,40 +2077,47 @@ try {
                         decoration: const InputDecoration(
                           isDense: true,
                           contentPadding: EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 4),
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
                           border: OutlineInputBorder(),
                         ),
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<String>(
-                            value: _repos.any((r) => r.name == _settings.githubRepo)
+                            value:
+                                _repos.any(
+                                  (r) => r.name == _settings.githubRepo,
+                                )
                                 ? _settings.githubRepo
                                 : null,
                             isExpanded: true,
                             hint: Text(zh ? '选择仓库' : 'Select repository'),
                             items: _repos
-                                .map((repo) => DropdownMenuItem(
-                                      value: repo.name,
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            repo.private
-                                                ? Icons.lock_outline
-                                                : Icons.folder_outlined,
-                                            size: 16,
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSurfaceVariant,
+                                .map(
+                                  (repo) => DropdownMenuItem(
+                                    value: repo.name,
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          repo.private
+                                              ? Icons.lock_outline
+                                              : Icons.folder_outlined,
+                                          size: 16,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurfaceVariant,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            repo.name,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              repo.name,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ))
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                )
                                 .toList(),
                             onChanged: (v) {
                               if (v != null) {
@@ -1852,7 +2198,9 @@ try {
                           isDense: true,
                           hintText: zh ? '输入分支名' : 'Enter branch name',
                           contentPadding: EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 10),
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
                           border: OutlineInputBorder(),
                         ),
                         onChanged: (v) {
@@ -1864,7 +2212,9 @@ try {
                         decoration: const InputDecoration(
                           isDense: true,
                           contentPadding: EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 4),
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
                           border: OutlineInputBorder(),
                         ),
                         child: DropdownButtonHideUnderline(
@@ -1875,22 +2225,24 @@ try {
                             isExpanded: true,
                             hint: Text(zh ? '选择分支' : 'Select branch'),
                             items: _branches
-                                .map((branch) => DropdownMenuItem(
-                                      value: branch,
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.fork_right,
-                                            size: 16,
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSurfaceVariant,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(branch),
-                                        ],
-                                      ),
-                                    ))
+                                .map(
+                                  (branch) => DropdownMenuItem(
+                                    value: branch,
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.fork_right,
+                                          size: 16,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurfaceVariant,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(branch),
+                                      ],
+                                    ),
+                                  ),
+                                )
                                 .toList(),
                             onChanged: (v) {
                               if (v != null) {
@@ -1961,9 +2313,13 @@ try {
           value: _settings.imageHostType,
           items: [
             DropdownMenuItem(
-                value: ImageHostType.github, child: Text(s.imageHostGithub)),
+              value: ImageHostType.github,
+              child: Text(s.imageHostGithub),
+            ),
             DropdownMenuItem(
-                value: ImageHostType.upyun, child: Text(s.imageHostUpyun)),
+              value: ImageHostType.upyun,
+              child: Text(s.imageHostUpyun),
+            ),
           ],
           onChanged: (v) {
             if (v == null) return;
@@ -1979,14 +2335,17 @@ try {
           value: _settings.imageDateFolderMode,
           items: [
             DropdownMenuItem(
-                value: ImageDateFolderMode.none,
-                child: Text(zh ? '不使用' : 'None')),
+              value: ImageDateFolderMode.none,
+              child: Text(zh ? '不使用' : 'None'),
+            ),
             DropdownMenuItem(
-                value: ImageDateFolderMode.year,
-                child: Text(zh ? '年' : 'Year')),
+              value: ImageDateFolderMode.year,
+              child: Text(zh ? '年' : 'Year'),
+            ),
             DropdownMenuItem(
-                value: ImageDateFolderMode.yearMonth,
-                child: Text(zh ? '年 / 月' : 'Year / Month')),
+              value: ImageDateFolderMode.yearMonth,
+              child: Text(zh ? '年 / 月' : 'Year / Month'),
+            ),
           ],
           onChanged: (v) {
             if (v == null) return;
@@ -2000,14 +2359,17 @@ try {
           value: _settings.imageNamingMode,
           items: [
             DropdownMenuItem(
-                value: ImageNamingMode.timestamp,
-                child: Text(zh ? '时间戳' : 'Timestamp')),
+              value: ImageNamingMode.timestamp,
+              child: Text(zh ? '时间戳' : 'Timestamp'),
+            ),
             DropdownMenuItem(
-                value: ImageNamingMode.original,
-                child: Text(zh ? '源文件名' : 'Original name')),
+              value: ImageNamingMode.original,
+              child: Text(zh ? '源文件名' : 'Original name'),
+            ),
             DropdownMenuItem(
-                value: ImageNamingMode.timestampOriginal,
-                child: Text(zh ? '时间戳 _ 源文件名' : 'Timestamp _ Original')),
+              value: ImageNamingMode.timestampOriginal,
+              child: Text(zh ? '时间戳 _ 源文件名' : 'Timestamp _ Original'),
+            ),
           ],
           onChanged: (v) {
             if (v == null) return;
@@ -2048,8 +2410,8 @@ try {
           child: Text(
             '${zh ? '示例：' : 'Example: '}${_imagePathPreview()}',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
       ],
@@ -2184,11 +2546,18 @@ try {
   }
 
   /// 向指定输入框的光标位置插入文本
-  void _insertToken(TextEditingController ctrl, String token, ValueChanged<String> setter) {
+  void _insertToken(
+    TextEditingController ctrl,
+    String token,
+    ValueChanged<String> setter,
+  ) {
     final sel = ctrl.selection;
     final text = ctrl.text;
     final start = sel.start >= 0 ? sel.start : text.length;
-    final newText = text.substring(0, start) + token + text.substring(sel.end >= 0 ? sel.end : text.length);
+    final newText =
+        text.substring(0, start) +
+        token +
+        text.substring(sel.end >= 0 ? sel.end : text.length);
     ctrl.text = newText;
     ctrl.selection = TextSelection.collapsed(offset: start + token.length);
     setter(newText);
@@ -2220,7 +2589,12 @@ try {
     _save();
   }
 
-  Widget _buildQuickButtons(AppStrings s, TextEditingController ctrl, ValueChanged<String> setter, List<(String, String)> tokens) {
+  Widget _buildQuickButtons(
+    AppStrings s,
+    TextEditingController ctrl,
+    ValueChanged<String> setter,
+    List<(String, String)> tokens,
+  ) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
       child: Wrap(
@@ -2245,26 +2619,36 @@ try {
   }
 
   Widget _permalinkQuickButtons(AppStrings s) {
-    return _buildQuickButtons(s, _permalinkPatternCtrl, (v) => _settings.permalinkPattern = v, [
-      ('/', '/'),
-      ('{year}', '{year}'),
-      ('{month}', '{month}'),
-      ('{day}', '{day}'),
-      ('{timestamp}', '{timestamp}'),
-      ('{slug}', '{slug}'),
-      ('{category}', '{category}'),
-      ('.html', '.html'),
-    ]);
+    return _buildQuickButtons(
+      s,
+      _permalinkPatternCtrl,
+      (v) => _settings.permalinkPattern = v,
+      [
+        ('/', '/'),
+        ('{year}', '{year}'),
+        ('{month}', '{month}'),
+        ('{day}', '{day}'),
+        ('{timestamp}', '{timestamp}'),
+        ('{slug}', '{slug}'),
+        ('{category}', '{category}'),
+        ('.html', '.html'),
+      ],
+    );
   }
 
   Widget _pathPatternQuickButtons(AppStrings s) {
-    return _buildQuickButtons(s, _githubPathPatternCtrl, (v) => _settings.githubPathPattern = v, [
-      ('/', '/'),
-      ('{year}', '{year}'),
-      ('{month}', '{month}'),
-      ('{day}', '{day}'),
-      ('{category}', '{category}'),
-    ]);
+    return _buildQuickButtons(
+      s,
+      _githubPathPatternCtrl,
+      (v) => _settings.githubPathPattern = v,
+      [
+        ('/', '/'),
+        ('{year}', '{year}'),
+        ('{month}', '{month}'),
+        ('{day}', '{day}'),
+        ('{category}', '{category}'),
+      ],
+    );
   }
 
   String _buildPathPatternExample(AppStrings s) {
@@ -2296,7 +2680,10 @@ try {
         .replaceAll('{year}', now.year.toString())
         .replaceAll('{month}', now.month.toString().padLeft(2, '0'))
         .replaceAll('{day}', now.day.toString().padLeft(2, '0'))
-        .replaceAll('{timestamp}', (now.millisecondsSinceEpoch ~/ 1000).toString())
+        .replaceAll(
+          '{timestamp}',
+          (now.millisecondsSinceEpoch ~/ 1000).toString(),
+        )
         .replaceAll('{slug}', 'hello-world')
         .replaceAll('{category}', 'tech');
     return identical(s, AppStrings.zh) ? '示例：$example' : 'Example: $example';
@@ -2331,7 +2718,10 @@ try {
               decoration: InputDecoration(
                 isDense: true,
                 hintText: hint,
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 border: OutlineInputBorder(),
               ),
               obscureText: obscure,
@@ -2367,5 +2757,4 @@ try {
       ),
     );
   }
-
 }
