@@ -21,13 +21,17 @@ import '../widgets/responsive.dart';
 
 enum _Tab { general, github, imageHost, about }
 
-class _UpdateApkAsset {
+enum _UpdatePackageKind { androidApk, windowsZip }
+
+class _UpdatePackageAsset {
+  final _UpdatePackageKind kind;
   final String url;
   final String name;
   final String version;
   final int? size;
 
-  const _UpdateApkAsset({
+  const _UpdatePackageAsset({
+    required this.kind,
     required this.url,
     required this.name,
     required this.version,
@@ -155,18 +159,20 @@ class _SettingsPageState extends State<SettingsPage> {
       final body = (data['body'] as String?) ?? '';
       final htmlUrl = (data['html_url'] as String?) ?? '';
 
-      // 提取 APK 下载链接
-      _UpdateApkAsset? apkAsset;
-      if (!kIsWeb && Platform.isAndroid) {
+      // 提取当前平台的安装包下载链接
+      _UpdatePackageAsset? updateAsset;
+      if (!kIsWeb && (Platform.isAndroid || Platform.isWindows)) {
         final assets = (data['assets'] as List<dynamic>?) ?? [];
         for (final asset in assets) {
           final assetMap = asset as Map<String, dynamic>;
           final name = assetMap['name'] as String? ?? '';
-          if (name.endsWith('.apk')) {
+          final kind = _updatePackageKindForAsset(name);
+          if (kind != null) {
             final downloadUrl = assetMap['browser_download_url'] as String?;
             if (downloadUrl != null && downloadUrl.isNotEmpty) {
               final size = assetMap['size'];
-              apkAsset = _UpdateApkAsset(
+              updateAsset = _UpdatePackageAsset(
+                kind: kind,
                 url: downloadUrl,
                 name: name,
                 version: remoteVersion,
@@ -179,18 +185,18 @@ class _SettingsPageState extends State<SettingsPage> {
       }
 
       if (_isNewerVersion(remoteVersion, localVersion)) {
-        var apkCached = false;
-        if (apkAsset != null) {
-          final apkFile = await _getUpdateApkFile(apkAsset);
-          apkCached = await _hasDownloadedApk(apkFile, apkAsset.size);
+        var packageCached = false;
+        if (updateAsset != null) {
+          final packageFile = await _getUpdatePackageFile(updateAsset);
+          packageCached = await _hasDownloadedPackage(packageFile, updateAsset.size);
         }
         _showUpdateDialog(
           zh,
           remoteVersion,
           body,
           htmlUrl,
-          apkAsset,
-          apkCached: apkCached,
+          updateAsset,
+          packageCached: packageCached,
         );
       } else {
         if (mounted) {
@@ -218,13 +224,27 @@ class _SettingsPageState extends State<SettingsPage> {
     return false;
   }
 
+  _UpdatePackageKind? _updatePackageKindForAsset(String name) {
+    final lowerName = name.toLowerCase();
+    if (!kIsWeb && Platform.isAndroid && lowerName.endsWith('.apk')) {
+      return _UpdatePackageKind.androidApk;
+    }
+    if (!kIsWeb &&
+        Platform.isWindows &&
+        lowerName.endsWith('.zip') &&
+        lowerName.contains('windows')) {
+      return _UpdatePackageKind.windowsZip;
+    }
+    return null;
+  }
+
   void _showUpdateDialog(
     bool zh,
     String version,
     String body,
     String url,
-    _UpdateApkAsset? apkAsset, {
-    required bool apkCached,
+    _UpdatePackageAsset? updateAsset, {
+    required bool packageCached,
   }) {
     showDialog(
       context: context,
@@ -249,12 +269,10 @@ class _SettingsPageState extends State<SettingsPage> {
                         : (zh ? '有新版本可用' : 'A new version is available'),
                     style: const TextStyle(fontSize: 13),
                   ),
-                  if (apkCached) ...[
+                  if (packageCached) ...[
                     const SizedBox(height: 16),
                     Text(
-                      zh
-                          ? '已检测到下载好的安装包，可直接安装。'
-                          : 'The APK is already downloaded and ready to install.',
+                      _cachedPackageText(updateAsset, zh),
                       style: TextStyle(
                         fontSize: 12,
                         color: Theme.of(ctx).colorScheme.onSurfaceVariant,
@@ -271,19 +289,19 @@ class _SettingsPageState extends State<SettingsPage> {
                 onPressed: () => Navigator.of(ctx).pop(),
                 child: Text(zh ? '稍后再说' : 'Later'),
               ),
-            if (!_downloading && apkAsset != null)
+            if (!_downloading && updateAsset != null)
               FilledButton(
                 onPressed: () {
                   Navigator.of(ctx).pop();
-                  _downloadAndInstall(apkAsset);
+                  _downloadAndInstall(updateAsset);
                 },
                 child: Text(
-                  apkCached
-                      ? (zh ? '立即安装' : 'Install')
+                  packageCached
+                      ? _installButtonText(updateAsset, zh)
                       : (zh ? '下载安装' : 'Download & Install'),
                 ),
               ),
-            if (!_downloading && apkAsset == null)
+            if (!_downloading && updateAsset == null)
               FilledButton(
                 onPressed: () {
                   Navigator.of(ctx).pop();
@@ -300,16 +318,16 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Future<void> _downloadAndInstall(_UpdateApkAsset apkAsset) async {
+  Future<void> _downloadAndInstall(_UpdatePackageAsset updateAsset) async {
     final zh = AppStrings.isZh;
     if (_downloading) {
-      _showDownloadProgressDialog(zh, apkAsset.version);
+      _showDownloadProgressDialog(zh, updateAsset.version);
       return;
     }
 
-    final apkFile = await _getUpdateApkFile(apkAsset);
-    if (await _hasDownloadedApk(apkFile, apkAsset.size)) {
-      _showInstallPrompt(apkFile.path, zh, alreadyDownloaded: true);
+    final packageFile = await _getUpdatePackageFile(updateAsset);
+    if (await _hasDownloadedPackage(packageFile, updateAsset.size)) {
+      _showInstallPrompt(updateAsset, packageFile.path, zh, alreadyDownloaded: true);
       return;
     }
 
@@ -317,7 +335,7 @@ class _SettingsPageState extends State<SettingsPage> {
       _downloading = true;
     });
     _setDownloadProgress(0);
-    _showDownloadProgressDialog(zh, apkAsset.version);
+    _showDownloadProgressDialog(zh, updateAsset.version);
 
     final canNotify = await _ensureNotificationPermission();
     if (canNotify) {
@@ -325,22 +343,22 @@ class _SettingsPageState extends State<SettingsPage> {
     }
 
     final client = http.Client();
-    final tempFile = File('${apkFile.path}.part');
+    final tempFile = File('${packageFile.path}.part');
     IOSink? sink;
     try {
-      await apkFile.parent.create(recursive: true);
+      await packageFile.parent.create(recursive: true);
       if (await tempFile.exists()) {
         await tempFile.delete();
       }
 
-      final request = http.Request('GET', Uri.parse(apkAsset.url));
+      final request = http.Request('GET', Uri.parse(updateAsset.url));
       final response = await client.send(request);
 
       if (response.statusCode != 200) {
-        throw HttpException('APK download failed: ${response.statusCode}');
+        throw HttpException('Update download failed: ${response.statusCode}');
       }
 
-      final total = response.contentLength ?? apkAsset.size;
+      final total = response.contentLength ?? updateAsset.size;
       int received = 0;
       int? lastNotifiedPercent = 0;
       sink = tempFile.openWrite();
@@ -364,25 +382,25 @@ class _SettingsPageState extends State<SettingsPage> {
       await sink.close();
       sink = null;
 
-      if (apkAsset.size != null && apkAsset.size! > 0) {
+      if (updateAsset.size != null && updateAsset.size! > 0) {
         final downloadedSize = await tempFile.length();
-        if (downloadedSize != apkAsset.size) {
-          throw const FileSystemException('APK size mismatch');
+        if (downloadedSize != updateAsset.size) {
+          throw const FileSystemException('Update package size mismatch');
         }
       }
 
-      if (await apkFile.exists()) {
-        await apkFile.delete();
+      if (await packageFile.exists()) {
+        await packageFile.delete();
       }
-      await tempFile.rename(apkFile.path);
-      await _cleanupOldUpdateApks(apkFile);
+      await tempFile.rename(packageFile.path);
+      await _cleanupOldUpdatePackages(packageFile);
 
       _setDownloadProgress(1);
       if (canNotify) {
-        _postDownloadCompleteNotification(zh, apkFile.path);
+        _postDownloadCompleteNotification(zh, packageFile.path);
       }
       _closeDownloadProgressDialog();
-      _showInstallPrompt(apkFile.path, zh);
+      _showInstallPrompt(updateAsset, packageFile.path, zh);
     } catch (_) {
       try {
         await sink?.close();
@@ -473,6 +491,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void _showInstallPrompt(
+    _UpdatePackageAsset updateAsset,
     String filePath,
     bool zh, {
     bool alreadyDownloaded = false,
@@ -489,18 +508,10 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         title: Text(
           alreadyDownloaded
-              ? (zh ? '安装包已下载' : 'APK Ready')
+              ? _readyPackageTitle(updateAsset, zh)
               : (zh ? '下载完成' : 'Download Complete'),
         ),
-        content: Text(
-          alreadyDownloaded
-              ? (zh
-                    ? '检测到之前下载的安装包，无需重新下载。'
-                    : 'A previously downloaded APK was found. No need to download again.')
-              : (zh
-                    ? '安装包已下载完成，可以开始安装。'
-                    : 'The APK has been downloaded and is ready to install.'),
-        ),
+        content: Text(_installPromptContent(updateAsset, zh, alreadyDownloaded: alreadyDownloaded)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
@@ -509,13 +520,67 @@ class _SettingsPageState extends State<SettingsPage> {
           FilledButton(
             onPressed: () {
               Navigator.of(ctx).pop();
-              _installApk(filePath);
+              _installUpdatePackage(updateAsset, filePath);
             },
-            child: Text(zh ? '立即安装' : 'Install'),
+            child: Text(_installButtonText(updateAsset, zh)),
           ),
         ],
       ),
     );
+  }
+
+  String _cachedPackageText(_UpdatePackageAsset? updateAsset, bool zh) {
+    if (updateAsset?.kind == _UpdatePackageKind.windowsZip) {
+      return zh ? '已检测到下载好的 Windows 更新包，可直接安装。' : 'The Windows update package is already downloaded and ready to install.';
+    }
+    return zh ? '已检测到下载好的安装包，可直接安装。' : 'The APK is already downloaded and ready to install.';
+  }
+
+  String _readyPackageTitle(_UpdatePackageAsset updateAsset, bool zh) {
+    if (updateAsset.kind == _UpdatePackageKind.windowsZip) {
+      return zh ? '更新包已下载' : 'Update Ready';
+    }
+    return zh ? '安装包已下载' : 'APK Ready';
+  }
+
+  String _installPromptContent(
+    _UpdatePackageAsset updateAsset,
+    bool zh, {
+    required bool alreadyDownloaded,
+  }) {
+    if (updateAsset.kind == _UpdatePackageKind.windowsZip) {
+      if (alreadyDownloaded) {
+        return zh
+            ? '检测到之前下载的 Windows 更新包，无需重新下载。安装会关闭并重启应用。'
+            : 'A previously downloaded Windows update package was found. Installing will close and restart the app.';
+      }
+      return zh
+          ? 'Windows 更新包已下载完成。安装会关闭并重启应用。'
+          : 'The Windows update package has been downloaded. Installing will close and restart the app.';
+    }
+    return alreadyDownloaded
+        ? (zh
+              ? '检测到之前下载的安装包，无需重新下载。'
+              : 'A previously downloaded APK was found. No need to download again.')
+        : (zh
+              ? '安装包已下载完成，可以开始安装。'
+              : 'The APK has been downloaded and is ready to install.');
+  }
+
+  String _installButtonText(_UpdatePackageAsset updateAsset, bool zh) {
+    if (updateAsset.kind == _UpdatePackageKind.windowsZip) {
+      return zh ? '立即安装并重启' : 'Install & Restart';
+    }
+    return zh ? '立即安装' : 'Install';
+  }
+
+  Future<void> _installUpdatePackage(_UpdatePackageAsset updateAsset, String filePath) async {
+    switch (updateAsset.kind) {
+      case _UpdatePackageKind.androidApk:
+        await _installApk(filePath);
+      case _UpdatePackageKind.windowsZip:
+        await _installWindowsUpdate(filePath);
+    }
   }
 
   Future<void> _installApk(String filePath) async {
@@ -531,10 +596,180 @@ class _SettingsPageState extends State<SettingsPage> {
     await OpenFilex.open(filePath);
   }
 
-  Future<File> _getUpdateApkFile(_UpdateApkAsset apkAsset) async {
+  Future<void> _installWindowsUpdate(String packagePath) async {
+    if (kIsWeb || !Platform.isWindows) {
+      await OpenFilex.open(packagePath);
+      return;
+    }
+
+    final zh = AppStrings.isZh;
+    final exeFile = File(Platform.resolvedExecutable);
+    final installDir = exeFile.parent;
+    final canWrite = await _canWriteToDirectory(installDir);
+    var runAsAdmin = false;
+
+    if (!canWrite) {
+      final confirmed = await _confirmWindowsAdminInstall(zh);
+      if (confirmed != true) return;
+      runAsAdmin = true;
+    }
+
+    try {
+      final script = await _createWindowsUpdateScript(
+        packagePath: packagePath,
+        exePath: exeFile.path,
+        installDir: installDir.path,
+      );
+      await _startWindowsUpdateScript(script.path, runAsAdmin: runAsAdmin);
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      exit(0);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(zh ? '启动 Windows 更新失败，请手动下载更新' : 'Failed to start Windows update. Please update manually.')),
+      );
+    }
+  }
+
+  Future<bool> _canWriteToDirectory(Directory dir) async {
+    try {
+      final probe = File(p.join(dir.path, '.inkflow_update_write_test'));
+      await probe.writeAsString('ok');
+      await probe.delete();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool?> _confirmWindowsAdminInstall(bool zh) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(zh ? '需要管理员权限' : 'Administrator Permission Required'),
+        content: Text(
+          zh
+              ? '当前安装目录不可写，更新需要以管理员权限运行安装脚本。是否继续？'
+              : 'The current install directory is not writable. The updater needs administrator permission to continue.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(zh ? '取消' : 'Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(zh ? '继续' : 'Continue'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<File> _createWindowsUpdateScript({
+    required String packagePath,
+    required String exePath,
+    required String installDir,
+  }) async {
+    final dir = await getApplicationSupportDirectory();
+    final updatesDir = Directory(p.join(dir.path, 'updates'));
+    await updatesDir.create(recursive: true);
+    final script = File(p.join(updatesDir.path, 'install_windows_update.ps1'));
+    final exeName = p.basename(exePath);
+    final logPath = p.join(updatesDir.path, 'windows_update.log');
+
+    await script.writeAsString('''
+\$ErrorActionPreference = 'Stop'
+\$processId = $pid
+\$zipPath = ${_psQuote(packagePath)}
+\$exePath = ${_psQuote(exePath)}
+\$exeName = ${_psQuote(exeName)}
+\$installDir = ${_psQuote(installDir)}
+\$logPath = ${_psQuote(logPath)}
+\$stagingDir = Join-Path \$env:TEMP ('inkflow_update_' + [guid]::NewGuid().ToString('N'))
+\$backupDir = Join-Path \$env:TEMP ('inkflow_backup_' + [guid]::NewGuid().ToString('N'))
+
+function Write-UpdateLog([string]\$message) {
+  \$timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'
+  Add-Content -LiteralPath \$logPath -Value "[\$timestamp] \$message"
+}
+
+try {
+  Write-UpdateLog 'Updater started.'
+  for (\$i = 0; \$i -lt 120; \$i++) {
+    \$process = Get-Process -Id \$processId -ErrorAction SilentlyContinue
+    if (\$null -eq \$process) { break }
+    Start-Sleep -Milliseconds 500
+  }
+  if (\$null -ne (Get-Process -Id \$processId -ErrorAction SilentlyContinue)) {
+    throw 'InkFlow did not exit in time.'
+  }
+
+  New-Item -ItemType Directory -Path \$stagingDir -Force | Out-Null
+  New-Item -ItemType Directory -Path \$backupDir -Force | Out-Null
+  Expand-Archive -LiteralPath \$zipPath -DestinationPath \$stagingDir -Force
+
+  \$expandedExe = Get-ChildItem -LiteralPath \$stagingDir -Recurse -Filter \$exeName | Select-Object -First 1
+  if (\$null -eq \$expandedExe) {
+    throw "Cannot find \$exeName in update package."
+  }
+  \$sourceDir = Split-Path -Parent \$expandedExe.FullName
+
+  Get-ChildItem -LiteralPath \$installDir -Force | Copy-Item -Destination \$backupDir -Recurse -Force
+
+  try {
+    Get-ChildItem -LiteralPath \$sourceDir -Force | Copy-Item -Destination \$installDir -Recurse -Force
+  } catch {
+    Write-UpdateLog "Copy failed, restoring backup: \$(\$_.Exception.Message)"
+    Get-ChildItem -LiteralPath \$backupDir -Force | Copy-Item -Destination \$installDir -Recurse -Force
+    throw
+  }
+
+  \$newExe = Join-Path \$installDir \$exeName
+  Start-Process -FilePath \$newExe -WorkingDirectory \$installDir
+  Write-UpdateLog 'Updater finished.'
+} catch {
+  Write-UpdateLog "Updater failed: \$(\$_.Exception.Message)"
+  Start-Process -FilePath \$exePath -WorkingDirectory \$installDir
+} finally {
+  Remove-Item -LiteralPath \$stagingDir -Recurse -Force -ErrorAction SilentlyContinue
+}
+''');
+    return script;
+  }
+
+  Future<void> _startWindowsUpdateScript(String scriptPath, {required bool runAsAdmin}) async {
+    if (runAsAdmin) {
+      final scriptArg = '-NoProfile -ExecutionPolicy Bypass -File "$scriptPath"';
+      await Process.start(
+        'powershell.exe',
+        [
+          '-NoProfile',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          'Start-Process -FilePath powershell.exe -ArgumentList ${_psQuote(scriptArg)} -Verb RunAs',
+        ],
+        mode: ProcessStartMode.detached,
+      );
+      return;
+    }
+
+    await Process.start(
+      'powershell.exe',
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath],
+      mode: ProcessStartMode.detached,
+    );
+  }
+
+  String _psQuote(String value) {
+    return "'${value.replaceAll("'", "''")}'";
+  }
+
+  Future<File> _getUpdatePackageFile(_UpdatePackageAsset updateAsset) async {
     final dir = await getApplicationSupportDirectory();
     final fileName =
-        'inkflow_${_safeFilePart(apkAsset.version)}_${_safeFilePart(apkAsset.name)}';
+        'inkflow_${_safeFilePart(updateAsset.version)}_${_safeFilePart(updateAsset.name)}';
     return File(p.join(dir.path, 'updates', fileName));
   }
 
@@ -543,7 +778,7 @@ class _SettingsPageState extends State<SettingsPage> {
     return safe.isEmpty ? 'update.apk' : safe;
   }
 
-  Future<bool> _hasDownloadedApk(File file, int? expectedSize) async {
+  Future<bool> _hasDownloadedPackage(File file, int? expectedSize) async {
     if (!await file.exists()) return false;
     final length = await file.length();
     if (expectedSize != null && expectedSize > 0) {
@@ -552,13 +787,14 @@ class _SettingsPageState extends State<SettingsPage> {
     return length > 0;
   }
 
-  Future<void> _cleanupOldUpdateApks(File keepFile) async {
+  Future<void> _cleanupOldUpdatePackages(File keepFile) async {
     final dir = keepFile.parent;
     if (!await dir.exists()) return;
+    final extension = p.extension(keepFile.path).toLowerCase();
     await for (final entity in dir.list()) {
       if (entity is File &&
           entity.path != keepFile.path &&
-          p.extension(entity.path).toLowerCase() == '.apk') {
+          p.extension(entity.path).toLowerCase() == extension) {
         try {
           await entity.delete();
         } catch (_) {}
