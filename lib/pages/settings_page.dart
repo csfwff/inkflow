@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -6,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../l10n/app_strings.dart';
@@ -19,6 +21,20 @@ import '../widgets/responsive.dart';
 
 enum _Tab { general, github, imageHost, about }
 
+class _UpdateApkAsset {
+  final String url;
+  final String name;
+  final String version;
+  final int? size;
+
+  const _UpdateApkAsset({
+    required this.url,
+    required this.name,
+    required this.version,
+    this.size,
+  });
+}
+
 class SettingsPage extends StatefulWidget {
   final VoidCallback? onSettingsChanged;
 
@@ -29,13 +45,20 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
+  static const MethodChannel _updateChannel = MethodChannel(
+    'com.xiaomo.inkflow/update',
+  );
+
   _Tab _selectedTab = _Tab.general;
   late Settings _settings;
   String _version = '';
 
   bool _checkingUpdate = false;
   bool _downloading = false;
-  double _downloadProgress = 0;
+  final ValueNotifier<double?> _downloadProgressNotifier =
+      ValueNotifier<double?>(null);
+  bool _downloadDialogVisible = false;
+  BuildContext? _downloadDialogContext;
 
   // GitHub 仓库和分支列表
   List<GitHubRepo> _repos = [];
@@ -103,6 +126,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _upyunDomainCtrl.dispose();
     _upyunPathCtrl.dispose();
     _friendLinkPathCtrl.dispose();
+    _downloadProgressNotifier.dispose();
     super.dispose();
   }
 
@@ -132,20 +156,42 @@ class _SettingsPageState extends State<SettingsPage> {
       final htmlUrl = (data['html_url'] as String?) ?? '';
 
       // 提取 APK 下载链接
-      String? apkUrl;
+      _UpdateApkAsset? apkAsset;
       if (!kIsWeb && Platform.isAndroid) {
         final assets = (data['assets'] as List<dynamic>?) ?? [];
         for (final asset in assets) {
-          final name = (asset as Map<String, dynamic>)['name'] as String? ?? '';
+          final assetMap = asset as Map<String, dynamic>;
+          final name = assetMap['name'] as String? ?? '';
           if (name.endsWith('.apk')) {
-            apkUrl = asset['browser_download_url'] as String?;
+            final downloadUrl = assetMap['browser_download_url'] as String?;
+            if (downloadUrl != null && downloadUrl.isNotEmpty) {
+              final size = assetMap['size'];
+              apkAsset = _UpdateApkAsset(
+                url: downloadUrl,
+                name: name,
+                version: remoteVersion,
+                size: size is int ? size : int.tryParse('$size'),
+              );
+            }
             break;
           }
         }
       }
 
       if (_isNewerVersion(remoteVersion, localVersion)) {
-        _showUpdateDialog(zh, remoteVersion, body, htmlUrl, apkUrl);
+        var apkCached = false;
+        if (apkAsset != null) {
+          final apkFile = await _getUpdateApkFile(apkAsset);
+          apkCached = await _hasDownloadedApk(apkFile, apkAsset.size);
+        }
+        _showUpdateDialog(
+          zh,
+          remoteVersion,
+          body,
+          htmlUrl,
+          apkAsset,
+          apkCached: apkCached,
+        );
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -172,12 +218,23 @@ class _SettingsPageState extends State<SettingsPage> {
     return false;
   }
 
-  void _showUpdateDialog(bool zh, String version, String body, String url, String? apkUrl) {
+  void _showUpdateDialog(
+    bool zh,
+    String version,
+    String body,
+    String url,
+    _UpdateApkAsset? apkAsset, {
+    required bool apkCached,
+  }) {
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          icon: Icon(Icons.system_update, color: Theme.of(ctx).colorScheme.primary, size: 40),
+          icon: Icon(
+            Icons.system_update,
+            color: Theme.of(ctx).colorScheme.primary,
+            size: 40,
+          ),
           title: Text(zh ? '发现新版本 v$version' : 'New version v$version'),
           content: SizedBox(
             width: double.maxFinite,
@@ -187,15 +244,17 @@ class _SettingsPageState extends State<SettingsPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    body.isNotEmpty ? body : (zh ? '有新版本可用' : 'A new version is available'),
+                    body.isNotEmpty
+                        ? body
+                        : (zh ? '有新版本可用' : 'A new version is available'),
                     style: const TextStyle(fontSize: 13),
                   ),
-                  if (_downloading) ...[
+                  if (apkCached) ...[
                     const SizedBox(height: 16),
-                    LinearProgressIndicator(value: _downloadProgress),
-                    const SizedBox(height: 4),
                     Text(
-                      '${(_downloadProgress * 100).toInt()}%',
+                      zh
+                          ? '已检测到下载好的安装包，可直接安装。'
+                          : 'The APK is already downloaded and ready to install.',
                       style: TextStyle(
                         fontSize: 12,
                         color: Theme.of(ctx).colorScheme.onSurfaceVariant,
@@ -212,16 +271,26 @@ class _SettingsPageState extends State<SettingsPage> {
                 onPressed: () => Navigator.of(ctx).pop(),
                 child: Text(zh ? '稍后再说' : 'Later'),
               ),
-            if (!_downloading && apkUrl != null)
-              FilledButton(
-                onPressed: () => _downloadAndInstall(apkUrl, ctx),
-                child: Text(zh ? '下载安装' : 'Download & Install'),
-              ),
-            if (!_downloading && apkUrl == null)
+            if (!_downloading && apkAsset != null)
               FilledButton(
                 onPressed: () {
                   Navigator.of(ctx).pop();
-                  launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                  _downloadAndInstall(apkAsset);
+                },
+                child: Text(
+                  apkCached
+                      ? (zh ? '立即安装' : 'Install')
+                      : (zh ? '下载安装' : 'Download & Install'),
+                ),
+              ),
+            if (!_downloading && apkAsset == null)
+              FilledButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  launchUrl(
+                    Uri.parse(url),
+                    mode: LaunchMode.externalApplication,
+                  );
                 },
                 child: Text(zh ? '前往下载' : 'Download'),
               ),
@@ -231,58 +300,331 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Future<void> _downloadAndInstall(String url, BuildContext dialogCtx) async {
+  Future<void> _downloadAndInstall(_UpdateApkAsset apkAsset) async {
     final zh = AppStrings.isZh;
+    if (_downloading) {
+      _showDownloadProgressDialog(zh, apkAsset.version);
+      return;
+    }
+
+    final apkFile = await _getUpdateApkFile(apkAsset);
+    if (await _hasDownloadedApk(apkFile, apkAsset.size)) {
+      _showInstallPrompt(apkFile.path, zh, alreadyDownloaded: true);
+      return;
+    }
+
     setState(() {
       _downloading = true;
-      _downloadProgress = 0;
     });
+    _setDownloadProgress(0);
+    _showDownloadProgressDialog(zh, apkAsset.version);
 
+    final canNotify = await _ensureNotificationPermission();
+    if (canNotify) {
+      _postDownloadProgressNotification(zh, 0);
+    }
+
+    final client = http.Client();
+    final tempFile = File('${apkFile.path}.part');
+    IOSink? sink;
     try {
-      final dir = await getTemporaryDirectory();
-      final filePath = '${dir.path}/inkflow_update.apk';
-      final file = File(filePath);
+      await apkFile.parent.create(recursive: true);
+      if (await tempFile.exists()) {
+        await tempFile.delete();
+      }
 
-      final request = http.Request('GET', Uri.parse(url));
-      final response = await http.Client().send(request);
+      final request = http.Request('GET', Uri.parse(apkAsset.url));
+      final response = await client.send(request);
 
       if (response.statusCode != 200) {
-        _showUpdateError(zh);
-        return;
+        throw HttpException('APK download failed: ${response.statusCode}');
       }
 
-      final total = response.contentLength;
+      final total = response.contentLength ?? apkAsset.size;
       int received = 0;
-      final sink = file.openWrite();
+      int? lastNotifiedPercent = 0;
+      sink = tempFile.openWrite();
 
-      await response.stream.forEach((chunk) {
+      await for (final chunk in response.stream) {
         sink.add(chunk);
         received += chunk.length;
-        if (total != null && total > 0) {
-          setState(() => _downloadProgress = received / total);
+        final progress = total != null && total > 0 ? received / total : null;
+        _setDownloadProgress(progress);
+
+        final percent = progress == null
+            ? null
+            : (progress * 100).floor().clamp(0, 100).toInt();
+        if (canNotify && percent != lastNotifiedPercent) {
+          lastNotifiedPercent = percent;
+          _postDownloadProgressNotification(zh, percent);
         }
-      });
-
-      await sink.close();
-
-      if (mounted && dialogCtx.mounted) {
-        setState(() => _downloading = false);
-        Navigator.of(dialogCtx).pop();
-        await OpenFilex.open(filePath);
       }
+
+      await sink.flush();
+      await sink.close();
+      sink = null;
+
+      if (apkAsset.size != null && apkAsset.size! > 0) {
+        final downloadedSize = await tempFile.length();
+        if (downloadedSize != apkAsset.size) {
+          throw const FileSystemException('APK size mismatch');
+        }
+      }
+
+      if (await apkFile.exists()) {
+        await apkFile.delete();
+      }
+      await tempFile.rename(apkFile.path);
+      await _cleanupOldUpdateApks(apkFile);
+
+      _setDownloadProgress(1);
+      if (canNotify) {
+        _postDownloadCompleteNotification(zh, apkFile.path);
+      }
+      _closeDownloadProgressDialog();
+      _showInstallPrompt(apkFile.path, zh);
     } catch (_) {
-      if (mounted && dialogCtx.mounted) {
+      try {
+        await sink?.close();
+      } catch (_) {}
+      if (await tempFile.exists()) {
+        await tempFile.delete();
+      }
+      if (canNotify) {
+        _postDownloadFailedNotification(zh);
+      }
+      _closeDownloadProgressDialog();
+      _showUpdateError(zh, downloading: true);
+    } finally {
+      client.close();
+      if (mounted) {
         setState(() => _downloading = false);
-        Navigator.of(dialogCtx).pop();
-        _showUpdateError(zh);
       }
     }
   }
 
-  void _showUpdateError(bool zh) {
+  void _setDownloadProgress(double? progress) {
+    if (!mounted) return;
+    _downloadProgressNotifier.value = progress?.clamp(0.0, 1.0).toDouble();
+  }
+
+  void _showDownloadProgressDialog(bool zh, String version) {
+    if (!mounted || _downloadDialogVisible) return;
+    _downloadDialogVisible = true;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        _downloadDialogContext = ctx;
+        return AlertDialog(
+          icon: Icon(
+            Icons.downloading,
+            color: Theme.of(ctx).colorScheme.primary,
+            size: 40,
+          ),
+          title: Text(zh ? '正在下载 v$version' : 'Downloading v$version'),
+          content: ValueListenableBuilder<double?>(
+            valueListenable: _downloadProgressNotifier,
+            builder: (context, progress, _) {
+              final percent = progress == null
+                  ? null
+                  : (progress * 100).floor().clamp(0, 100).toInt();
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  LinearProgressIndicator(value: progress),
+                  const SizedBox(height: 8),
+                  Text(
+                    percent == null
+                        ? (zh ? '正在下载...' : 'Downloading...')
+                        : '$percent%',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(zh ? '隐藏' : 'Hide'),
+            ),
+          ],
+        );
+      },
+    ).whenComplete(() {
+      _downloadDialogContext = null;
+      _downloadDialogVisible = false;
+    });
+  }
+
+  void _closeDownloadProgressDialog() {
+    final dialogContext = _downloadDialogContext;
+    if (dialogContext != null && dialogContext.mounted) {
+      Navigator.of(dialogContext).pop();
+    }
+    _downloadDialogContext = null;
+    _downloadDialogVisible = false;
+  }
+
+  void _showInstallPrompt(
+    String filePath,
+    bool zh, {
+    bool alreadyDownloaded = false,
+  }) {
+    if (!mounted) return;
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: Icon(
+          Icons.download_done,
+          color: Theme.of(ctx).colorScheme.primary,
+          size: 40,
+        ),
+        title: Text(
+          alreadyDownloaded
+              ? (zh ? '安装包已下载' : 'APK Ready')
+              : (zh ? '下载完成' : 'Download Complete'),
+        ),
+        content: Text(
+          alreadyDownloaded
+              ? (zh
+                    ? '检测到之前下载的安装包，无需重新下载。'
+                    : 'A previously downloaded APK was found. No need to download again.')
+              : (zh
+                    ? '安装包已下载完成，可以开始安装。'
+                    : 'The APK has been downloaded and is ready to install.'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(zh ? '稍后安装' : 'Later'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _installApk(filePath);
+            },
+            child: Text(zh ? '立即安装' : 'Install'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _installApk(String filePath) async {
+    if (!kIsWeb && Platform.isAndroid) {
+      try {
+        await _updateChannel.invokeMethod<void>('cancelDownloadNotification');
+        await _updateChannel.invokeMethod<void>('installApk', {
+          'filePath': filePath,
+        });
+        return;
+      } catch (_) {}
+    }
+    await OpenFilex.open(filePath);
+  }
+
+  Future<File> _getUpdateApkFile(_UpdateApkAsset apkAsset) async {
+    final dir = await getApplicationSupportDirectory();
+    final fileName =
+        'inkflow_${_safeFilePart(apkAsset.version)}_${_safeFilePart(apkAsset.name)}';
+    return File(p.join(dir.path, 'updates', fileName));
+  }
+
+  String _safeFilePart(String value) {
+    final safe = value.replaceAll(RegExp(r'[^A-Za-z0-9._-]+'), '_');
+    return safe.isEmpty ? 'update.apk' : safe;
+  }
+
+  Future<bool> _hasDownloadedApk(File file, int? expectedSize) async {
+    if (!await file.exists()) return false;
+    final length = await file.length();
+    if (expectedSize != null && expectedSize > 0) {
+      return length == expectedSize;
+    }
+    return length > 0;
+  }
+
+  Future<void> _cleanupOldUpdateApks(File keepFile) async {
+    final dir = keepFile.parent;
+    if (!await dir.exists()) return;
+    await for (final entity in dir.list()) {
+      if (entity is File &&
+          entity.path != keepFile.path &&
+          p.extension(entity.path).toLowerCase() == '.apk') {
+        try {
+          await entity.delete();
+        } catch (_) {}
+      }
+    }
+  }
+
+  Future<bool> _ensureNotificationPermission() async {
+    if (kIsWeb || !Platform.isAndroid) return false;
+    try {
+      return await _updateChannel.invokeMethod<bool>(
+            'ensureNotificationPermission',
+          ) ??
+          false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void _postDownloadProgressNotification(bool zh, int? percent) {
+    _invokeUpdateChannel('showDownloadProgress', {
+      'title': zh ? '正在下载 InkFlow 更新' : 'Downloading InkFlow Update',
+      'text': percent == null
+          ? (zh ? '正在下载...' : 'Downloading...')
+          : '$percent%',
+      'progress': percent ?? 0,
+      'indeterminate': percent == null,
+    });
+  }
+
+  void _postDownloadCompleteNotification(bool zh, String filePath) {
+    _invokeUpdateChannel('showDownloadComplete', {
+      'title': zh ? 'InkFlow 更新已下载' : 'InkFlow Update Downloaded',
+      'text': zh ? '点击安装新版本' : 'Tap to install the new version',
+      'filePath': filePath,
+    });
+  }
+
+  void _postDownloadFailedNotification(bool zh) {
+    _invokeUpdateChannel('showDownloadFailed', {
+      'title': zh ? 'InkFlow 更新下载失败' : 'InkFlow Update Failed',
+      'text': zh ? '请稍后重试' : 'Please try again later',
+    });
+  }
+
+  void _invokeUpdateChannel(String method, Map<String, Object?> arguments) {
+    if (kIsWeb || !Platform.isAndroid) return;
+    unawaited(
+      _updateChannel.invokeMethod<void>(method, arguments).catchError((_) {}),
+    );
+  }
+
+  void _showUpdateError(bool zh, {bool downloading = false}) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(zh ? '检查更新失败，请稍后重试' : 'Update check failed, please try later')),
+        SnackBar(
+          content: Text(
+            downloading
+                ? (zh
+                      ? '更新下载失败，请稍后重试'
+                      : 'Update download failed, please try later')
+                : (zh
+                      ? '检查更新失败，请稍后重试'
+                      : 'Update check failed, please try later'),
+          ),
+        ),
       );
     }
   }
