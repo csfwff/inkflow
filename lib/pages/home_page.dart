@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../l10n/app_strings.dart';
 import '../main.dart';
 import '../models/article.dart';
+import '../services/article_url_service.dart';
 import '../services/github_service.dart';
 import '../services/log_service.dart';
 import '../services/sync_service.dart';
 import '../widgets/responsive.dart';
+import 'article_web_view_page.dart';
 import 'editor_page.dart';
 import 'friend_link_page.dart';
 import 'settings_page.dart';
 
 enum _ArticleFilter { all, draft, synced, repoDraft }
 
-enum _ArticleAction { edit, delete }
+enum _ArticleAction { preview, edit, delete }
 
 class HomePage extends StatefulWidget {
   final VoidCallback? onSettingsChanged;
@@ -60,16 +63,19 @@ class _HomePageState extends State<HomePage> {
   Future<void> _syncFromGitHub({bool incremental = false}) async {
     if (_syncing) return;
 
-    LogService.instance.logAction('同步文章', detail: incremental ? '增量同步' : '全量同步');
+    LogService.instance.logAction(
+      '同步文章',
+      detail: incremental ? '增量同步' : '全量同步',
+    );
 
     final s = AppStrings.current;
     final settings = settingsService.settings;
     if (settings.githubToken.isEmpty ||
         settings.githubOwner.isEmpty ||
         settings.githubRepo.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(s.githubNotConfigured)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(s.githubNotConfigured)));
       return;
     }
 
@@ -111,7 +117,8 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _deleteArticle(Article article) async {
     final s = AppStrings.current;
-    final hasRemote = article.remotePath != null &&
+    final hasRemote =
+        article.remotePath != null &&
         article.githubSha != null &&
         article.githubSha!.isNotEmpty &&
         article.status != ArticleStatus.draft &&
@@ -143,7 +150,8 @@ class _HomePageState extends State<HomePage> {
 
     // 如果有远程文件（synced 或 repoDraft），先删除远程
     final remotePath = article.remotePath;
-    if (hasRemote && remotePath != null &&
+    if (hasRemote &&
+        remotePath != null &&
         article.githubSha != null &&
         article.githubSha!.isNotEmpty &&
         article.status != ArticleStatus.draft &&
@@ -184,6 +192,51 @@ class _HomePageState extends State<HomePage> {
       MaterialPageRoute(builder: (_) => EditorPage(articleId: articleId)),
     );
     _loadArticles();
+  }
+
+  Future<void> _openArticlePreview(Article article) async {
+    final s = AppStrings.current;
+    final url = await ArticleUrlService.resolveArticleUrl(
+      article,
+      settingsService.settings,
+    );
+    if (!mounted) return;
+
+    if (url == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _label(
+              '无法推测文章链接，请确认 GitHub 仓库设置和文章发布状态',
+              'Cannot infer the article URL. Check GitHub settings and publish status.',
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+
+    LogService.instance.logAction('预览文章网页', detail: url.toString());
+    if (ArticleWebViewPage.supportsEmbeddedWebView) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ArticleWebViewPage(
+            url: url,
+            title: article.title.isEmpty ? s.appTitle : article.title,
+          ),
+        ),
+      );
+      return;
+    }
+
+    final launched = await launchUrl(url, mode: LaunchMode.externalApplication);
+    if (!mounted || launched) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(_label('无法打开链接：$url', 'Failed to open URL: $url')),
+      ),
+    );
   }
 
   List<Article> get _visibleArticles {
@@ -280,9 +333,8 @@ class _HomePageState extends State<HomePage> {
               await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => SettingsPage(
-                    onSettingsChanged: widget.onSettingsChanged,
-                  ),
+                  builder: (_) =>
+                      SettingsPage(onSettingsChanged: widget.onSettingsChanged),
                 ),
               );
               _loadArticles();
@@ -353,18 +405,18 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     Text(
                       _label('写作空间', 'Writing desk'),
-                      style:
-                          Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0,
-                              ),
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0,
+                          ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       s.subtitle,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -432,9 +484,9 @@ class _HomePageState extends State<HomePage> {
               filtered
                   ? _label('没有匹配的文章', 'No matching articles')
                   : s.noArticles,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
             Text(
@@ -494,6 +546,10 @@ class _HomePageState extends State<HomePage> {
             article: article,
             excerpt: _excerptFor(article),
             onTap: () => _openEditor(articleId: article.id),
+            onPreview:
+                ArticleUrlService.canInferUrl(article, settingsService.settings)
+                ? () => _openArticlePreview(article)
+                : null,
             onDelete: () => _deleteArticle(article),
           );
         },
@@ -607,12 +663,14 @@ class _ArticleListItem extends StatelessWidget {
   final Article article;
   final String excerpt;
   final VoidCallback onTap;
+  final VoidCallback? onPreview;
   final VoidCallback onDelete;
 
   const _ArticleListItem({
     required this.article,
     required this.excerpt,
     required this.onTap,
+    required this.onPreview,
     required this.onDelete,
   });
 
@@ -623,26 +681,32 @@ class _ArticleListItem extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final screenWidth = MediaQuery.sizeOf(context).width;
     // 窄屏(<600)图片缩小，宽屏保持原尺寸
-    final imgWidth = screenWidth < 400 ? 80.0 : (screenWidth < 600 ? 110.0 : 180.0);
-    final imgHeight = screenWidth < 400 ? 56.0 : (screenWidth < 600 ? 70.0 : 100.0);
+    final imgWidth = screenWidth < 400
+        ? 80.0
+        : (screenWidth < 600 ? 110.0 : 180.0);
+    final imgHeight = screenWidth < 400
+        ? 56.0
+        : (screenWidth < 600 ? 70.0 : 100.0);
+    final contentLeftPadding = _hasCover ? 8.0 : 84.0;
     final dateStr =
         '${article.date.year}-${article.date.month.toString().padLeft(2, '0')}-${article.date.day.toString().padLeft(2, '0')}';
 
     return Card(
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: screenWidth < 600 ? CrossAxisAlignment.start : CrossAxisAlignment.stretch,
-            children: [
-              if (_hasCover)
-                Padding(
-                  padding: EdgeInsets.all(screenWidth < 400 ? 8 : 12),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ClipRRect(
+      child: Stack(
+        children: [
+          InkWell(
+            onTap: onTap,
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: screenWidth < 600
+                    ? CrossAxisAlignment.start
+                    : CrossAxisAlignment.stretch,
+                children: [
+                  if (_hasCover)
+                    Padding(
+                      padding: EdgeInsets.all(screenWidth < 400 ? 8 : 12),
+                      child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: Image.network(
                           article.cover!,
@@ -663,178 +727,226 @@ class _ArticleListItem extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (screenWidth < 600) ...[
-                        const SizedBox(height: 6),
-                        _StatusPill(article: article),
-                      ],
-                    ],
-                  ),
-                ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 14, 8, 14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                    ),
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        contentLeftPadding,
+                        14,
+                        8,
+                        14,
+                      ),
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  article.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                              if (onPreview != null)
+                                IconButton(
+                                  onPressed: onPreview,
+                                  icon: const Icon(
+                                    Icons.travel_explore_outlined,
+                                  ),
+                                  tooltip: AppStrings.isZh
+                                      ? '查看已部署网页'
+                                      : 'View deployed page',
+                                ),
+                              PopupMenuButton<_ArticleAction>(
+                                tooltip: MaterialLocalizations.of(
+                                  context,
+                                ).showMenuTooltip,
+                                onSelected: (action) {
+                                  switch (action) {
+                                    case _ArticleAction.preview:
+                                      onPreview?.call();
+                                    case _ArticleAction.edit:
+                                      onTap();
+                                    case _ArticleAction.delete:
+                                      onDelete();
+                                  }
+                                },
+                                itemBuilder: (context) {
+                                  final s = AppStrings.current;
+                                  return [
+                                    if (onPreview != null)
+                                      PopupMenuItem(
+                                        value: _ArticleAction.preview,
+                                        child: ListTile(
+                                          leading: const Icon(
+                                            Icons.travel_explore_outlined,
+                                          ),
+                                          title: Text(
+                                            AppStrings.isZh
+                                                ? '查看已部署网页'
+                                                : 'View deployed page',
+                                          ),
+                                          dense: true,
+                                          contentPadding: EdgeInsets.zero,
+                                        ),
+                                      ),
+                                    PopupMenuItem(
+                                      value: _ArticleAction.edit,
+                                      child: ListTile(
+                                        leading: const Icon(
+                                          Icons.edit_outlined,
+                                        ),
+                                        title: Text(s.editorTitle),
+                                        dense: true,
+                                        contentPadding: EdgeInsets.zero,
+                                      ),
+                                    ),
+                                    PopupMenuItem(
+                                      value: _ArticleAction.delete,
+                                      child: ListTile(
+                                        leading: const Icon(
+                                          Icons.delete_outline,
+                                        ),
+                                        title: Text(s.deleteArticle),
+                                        dense: true,
+                                        contentPadding: EdgeInsets.zero,
+                                      ),
+                                    ),
+                                  ];
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
                           Expanded(
                             child: Text(
-                              article.title,
-                              maxLines: 2,
+                              excerpt,
+                              maxLines: 3,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
+                              style: Theme.of(context).textTheme.bodyMedium
                                   ?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                            ),
-                          ),
-                          if (screenWidth >= 600) ...[
-                            const SizedBox(width: 8),
-                            _StatusPill(article: article),
-                          ],
-                          PopupMenuButton<_ArticleAction>(
-                            tooltip: MaterialLocalizations.of(context)
-                                .showMenuTooltip,
-                            onSelected: (action) {
-                              switch (action) {
-                                case _ArticleAction.edit:
-                                  onTap();
-                                case _ArticleAction.delete:
-                                  onDelete();
-                              }
-                            },
-                            itemBuilder: (context) {
-                              final s = AppStrings.current;
-                              return [
-                                PopupMenuItem(
-                                  value: _ArticleAction.edit,
-                                  child: ListTile(
-                                    leading:
-                                        const Icon(Icons.edit_outlined),
-                                    title: Text(s.editorTitle),
-                                    dense: true,
-                                    contentPadding: EdgeInsets.zero,
-                                  ),
-                                ),
-                                PopupMenuItem(
-                                  value: _ArticleAction.delete,
-                                  child: ListTile(
-                                    leading:
-                                        const Icon(Icons.delete_outline),
-                                    title: Text(s.deleteArticle),
-                                    dense: true,
-                                    contentPadding: EdgeInsets.zero,
-                                  ),
-                                ),
-                              ];
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Expanded(
-                        child: Text(
-                          excerpt,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
                                     color: colorScheme.onSurfaceVariant,
                                     height: 1.35,
                                   ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          _MetaPill(
-                              icon: Icons.calendar_today, text: dateStr),
-                          if (article.tags.isNotEmpty)
-                            ...article.tags.take(3).map(
-                                  (tag) => _MetaPill(
-                                    icon: Icons.tag,
-                                    text: tag,
-                                    dense: true,
-                                  ),
-                                ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              _MetaPill(
+                                icon: Icons.calendar_today,
+                                text: dateStr,
+                              ),
+                              if (article.tags.isNotEmpty)
+                                ...article.tags
+                                    .take(3)
+                                    .map(
+                                      (tag) => _MetaPill(
+                                        icon: Icons.tag,
+                                        text: tag,
+                                        dense: true,
+                                      ),
+                                    ),
+                            ],
+                          ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
+          Positioned(
+            top: 0,
+            left: 0,
+            child: IgnorePointer(child: _StatusCornerBadge(article: article)),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _StatusPill extends StatelessWidget {
+class _StatusCornerBadge extends StatelessWidget {
   final Article article;
 
-  const _StatusPill({required this.article});
+  const _StatusCornerBadge({required this.article});
 
   @override
   Widget build(BuildContext context) {
     final s = AppStrings.current;
     final (label, color, icon) = switch (article.status) {
       ArticleStatus.synced => (
-          s.synced,
-          const Color(0xFF2F7D57),
-          Icons.cloud_done
-        ),
+        s.synced,
+        const Color(0xFF2F7D57),
+        Icons.cloud_done,
+      ),
       ArticleStatus.repoDraft => (
-          s.repoDraft,
-          const Color(0xFF9A6A1F),
-          Icons.drafts_outlined,
-        ),
+        AppStrings.isZh ? s.repoDraft : 'Repo',
+        const Color(0xFF9A6A1F),
+        Icons.drafts_outlined,
+      ),
       ArticleStatus.pendingPublish => (
-          s.pendingPublish,
-          const Color(0xFF7A5CDB),
-          Icons.cloud_upload_outlined,
-        ),
+        AppStrings.isZh ? s.pendingPublish : 'Pending',
+        const Color(0xFF7A5CDB),
+        Icons.cloud_upload_outlined,
+      ),
       ArticleStatus.remoteDeleted => (
-          s.remoteDeleted,
-          const Color(0xFFB64B45),
-          Icons.cloud_off_outlined,
-        ),
+        AppStrings.isZh ? s.remoteDeleted : 'Deleted',
+        const Color(0xFFB64B45),
+        Icons.cloud_off_outlined,
+      ),
       ArticleStatus.draft => (
-          s.draftStatus,
-          const Color(0xFF6F7672),
-          Icons.edit_note,
-        ),
+        s.draftStatus,
+        const Color(0xFF6F7672),
+        Icons.edit_note,
+      ),
     };
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.28)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 84),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(8, 5, 10, 5),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: const BorderRadius.only(
+            bottomRight: Radius.circular(8),
           ),
-        ],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: Colors.white),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -845,11 +957,7 @@ class _MetaPill extends StatelessWidget {
   final String text;
   final bool dense;
 
-  const _MetaPill({
-    required this.icon,
-    required this.text,
-    this.dense = false,
-  });
+  const _MetaPill({required this.icon, required this.text, this.dense = false});
 
   @override
   Widget build(BuildContext context) {
@@ -871,10 +979,7 @@ class _MetaPill extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             text,
-            style: TextStyle(
-              fontSize: 12,
-              color: colorScheme.onSurfaceVariant,
-            ),
+            style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
           ),
         ],
       ),

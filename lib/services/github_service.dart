@@ -26,6 +26,51 @@ class GitHubService {
     'Content-Type': 'application/json',
   };
 
+  Future<Uri?> getPagesBaseUrl() async {
+    final uri = Uri.parse('https://api.github.com/repos/$owner/$repo/pages');
+    debugPrint('[GitHub] GET pages $owner/$repo');
+
+    try {
+      final response = await http.get(uri, headers: _headers);
+      debugPrint('[GitHub] pages ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is Map) {
+          final htmlUrl = data['html_url']?.toString();
+          if (htmlUrl != null && htmlUrl.isNotEmpty) {
+            return _parseBaseUri(htmlUrl);
+          }
+
+          final cname = data['cname']?.toString();
+          if (cname != null && cname.isNotEmpty) {
+            return _parseBaseUri('https://$cname');
+          }
+        }
+      } else if (response.statusCode != 404) {
+        debugPrint('[GitHub] pages ERROR: ${response.statusCode}');
+      }
+    } catch (e, stack) {
+      debugPrint('[GitHub] pages EXCEPTION: $e');
+      await _log.logException(
+        e,
+        stack,
+        tag: 'GitHub',
+        context: '获取 GitHub Pages 设置失败: $owner/$repo',
+      );
+    }
+    return null;
+  }
+
+  Uri? _parseBaseUri(String value) {
+    final parsed = Uri.tryParse(value.trim());
+    if (parsed == null || !parsed.hasScheme || parsed.host.isEmpty) {
+      return null;
+    }
+    if (parsed.path.endsWith('/')) return parsed;
+    return parsed.replace(path: '${parsed.path}/');
+  }
+
   /// 在 source/_posts/ 目录下创建文章
   /// [fileName] 文件名，如 "hello-world.md"
   /// [content] Markdown 内容
