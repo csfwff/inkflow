@@ -204,11 +204,14 @@ class FriendLinkService {
       _log.logAction('推送友链', detail: '推送到 GitHub');
 
       final links = await getAll();
-      final yaml = FriendLinkParser.generateYaml(links);
 
       // 检查文件是否存在
       final existing = await github.getFileContent(filePath);
       if (existing != null) {
+        final yaml = FriendLinkParser.generateYamlPreservingHeader(
+          links,
+          existing.content,
+        );
         await github.updateFile(
           remotePath: filePath,
           content: yaml,
@@ -217,6 +220,7 @@ class FriendLinkService {
         );
         _log.info('更新友链文件: $filePath', tag: 'FriendLink');
       } else {
+        final yaml = FriendLinkParser.generateYamlWithDefaultHeader(links);
         await github.createFile(
           remotePath: filePath,
           content: yaml,
