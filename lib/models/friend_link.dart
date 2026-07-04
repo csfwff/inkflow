@@ -7,6 +7,7 @@ class FriendLink {
   String descr;
   bool isCommented; // 是否被注释（禁用）
   bool isDev; // 是否为开发者友链
+  int sortOrder; // 列表排序（按文件中的顺序）
   DateTime createdAt;
 
   FriendLink({
@@ -17,6 +18,7 @@ class FriendLink {
     this.descr = '',
     this.isCommented = false,
     this.isDev = false,
+    this.sortOrder = 0,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
@@ -30,6 +32,7 @@ class FriendLink {
       descr: map['descr'] ?? '',
       isCommented: map['isCommented'] ?? false,
       isDev: map['isDev'] ?? false,
+      sortOrder: map['sortOrder'] ?? 0,
       createdAt: map['createdAt'] != null
           ? DateTime.parse(map['createdAt'])
           : DateTime.now(),
@@ -46,6 +49,7 @@ class FriendLink {
       'descr': descr,
       'isCommented': isCommented,
       'isDev': isDev,
+      'sortOrder': sortOrder,
       'createdAt': createdAt.toIso8601String(),
     };
   }
@@ -59,6 +63,7 @@ class FriendLink {
     String? descr,
     bool? isCommented,
     bool? isDev,
+    int? sortOrder,
     DateTime? createdAt,
   }) {
     return FriendLink(
@@ -69,6 +74,7 @@ class FriendLink {
       descr: descr ?? this.descr,
       isCommented: isCommented ?? this.isCommented,
       isDev: isDev ?? this.isDev,
+      sortOrder: sortOrder ?? this.sortOrder,
       createdAt: createdAt ?? this.createdAt,
     );
   }

@@ -36,10 +36,13 @@ class FriendLinkService {
 
   // ── CRUD ──
 
-  /// 获取所有友链
+  /// 获取所有友链（按列表顺序，即文件中的顺序）
   Future<List<FriendLink>> getAll() async {
     final query = _db.select(_db.friendLinkRows)
-      ..orderBy([(t) => OrderingTerm.asc(t.name)]);
+      ..orderBy([
+        (t) => OrderingTerm.asc(t.sortOrder),
+        (t) => OrderingTerm.asc(t.id),
+      ]);
     final rows = await query.get();
     return rows.map(friendLinkFromRow).toList();
   }
@@ -60,11 +63,21 @@ class FriendLinkService {
     return row == null ? null : friendLinkFromRow(row);
   }
 
-  /// 插入友链
+  /// 插入友链（自动追加到列表末尾）
   Future<int> insert(FriendLink link) async {
+    link.sortOrder = await _nextSortOrder();
     return await _db
         .into(_db.friendLinkRows)
         .insert(friendLinkToCompanion(link));
+  }
+
+  /// 下一个可用的排序序号（追加到末尾用）
+  Future<int> _nextSortOrder() async {
+    final query = _db.select(_db.friendLinkRows)
+      ..orderBy([(t) => OrderingTerm.desc(t.sortOrder)])
+      ..limit(1);
+    final row = await query.getSingleOrNull();
+    return (row?.sortOrder ?? -1) + 1;
   }
 
   /// 更新友链
@@ -79,17 +92,31 @@ class FriendLinkService {
     await (_db.delete(_db.friendLinkRows)..where((t) => t.id.equals(id))).go();
   }
 
-  /// 批量插入（跳过已存在的同名友链）
+  /// 批量插入（跳过已存在的同名友链，按传入顺序追加到末尾）
   Future<int> insertBatch(List<FriendLink> links) async {
     var count = 0;
+    var order = await _nextSortOrder();
     for (final link in links) {
       final existing = await getByName(link.name);
       if (existing == null) {
-        await insert(link);
+        link.sortOrder = order++;
+        await _db.into(_db.friendLinkRows).insert(friendLinkToCompanion(link));
         count++;
       }
     }
     return count;
+  }
+
+  /// 持久化新的列表顺序（拖拽排序后调用）
+  ///
+  /// [orderedLinks] 为排序后的完整列表，仅写入序号发生变化的行。
+  Future<void> saveOrder(List<FriendLink> orderedLinks) async {
+    for (var i = 0; i < orderedLinks.length; i++) {
+      final link = orderedLinks[i];
+      if (link.id != null && link.sortOrder != i) {
+        await update(link.copyWith(sortOrder: i));
+      }
+    }
   }
 
   // ── 链接检测 ──
@@ -156,10 +183,11 @@ class FriendLinkService {
       final links = FriendLinkParser.parseYaml(fileData.content);
       _log.info('解析到 ${links.length} 条友链', tag: 'FriendLink');
 
-      // 清空本地数据并重新插入
+      // 清空本地数据并按文件中的顺序重新插入
       await _db.delete(_db.friendLinkRows).go();
-      for (final link in links) {
-        await insert(link);
+      for (var i = 0; i < links.length; i++) {
+        final link = links[i]..sortOrder = i;
+        await _db.into(_db.friendLinkRows).insert(friendLinkToCompanion(link));
       }
 
       _log.logAction('同步友链完成', detail: '${links.length} 条');

@@ -60,6 +60,7 @@ class FriendLinkRows extends Table {
   TextColumn get descr => text().withDefault(const Constant(''))();
   BoolColumn get isCommented => boolean().withDefault(const Constant(false))();
   BoolColumn get isDev => boolean().withDefault(const Constant(false))();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
   TextColumn get createdAt => text()();
 
   @override
@@ -71,7 +72,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -81,6 +82,11 @@ class AppDatabase extends _$AppDatabase {
         onUpgrade: (Migrator m, int from, int to) async {
           if (from < 2) {
             await m.createTable(friendLinkRows);
+          }
+          if (from < 3) {
+            // 友链排序字段；旧数据保持 0，getAll 按 (sortOrder, id) 兜底，
+            // 旧记录顺次落在 id（插入）序，下次同步会用文件顺序覆盖。
+            await m.addColumn(friendLinkRows, friendLinkRows.sortOrder);
           }
         },
       );
@@ -163,6 +169,7 @@ FriendLinkRowsCompanion friendLinkToCompanion(FriendLink fl) => FriendLinkRowsCo
       descr: Value(fl.descr),
       isCommented: Value(fl.isCommented),
       isDev: Value(fl.isDev),
+      sortOrder: Value(fl.sortOrder),
       createdAt: Value(fl.createdAt.toIso8601String()),
     );
 
@@ -174,5 +181,6 @@ FriendLink friendLinkFromRow(FriendLinkRow row) => FriendLink(
       descr: row.descr,
       isCommented: row.isCommented,
       isDev: row.isDev,
+      sortOrder: row.sortOrder,
       createdAt: DateTime.parse(row.createdAt),
     );

@@ -27,7 +27,8 @@
       "Bash(flutter --version)",
       "Bash(flutter test *)",
       "mcp__codegraph__codegraph_node",
-      "mcp__codegraph__codegraph_callers"
+      "mcp__codegraph__codegraph_callers",
+      "Bash(dart run *)"
     ]
   }
 }

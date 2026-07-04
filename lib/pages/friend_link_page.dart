@@ -617,14 +617,35 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
 
   Widget _buildLinkList() {
     final links = _filteredLinks;
-    return ListView.builder(
+    // 仅在「全部」视图下支持拖拽排序；对筛选子集重排语义不清晰。
+    if (_filter != _FriendLinkFilter.all) {
+      return ListView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        itemCount: links.length,
+        itemBuilder: (ctx, index) => _buildLinkCard(links[index], null),
+      );
+    }
+    return ReorderableListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 8),
+      buildDefaultDragHandles: false,
       itemCount: links.length,
-      itemBuilder: (ctx, index) => _buildLinkCard(links[index]),
+      onReorderItem: _onReorder,
+      itemBuilder: (ctx, index) => _buildLinkCard(links[index], index),
     );
   }
 
-  Widget _buildLinkCard(FriendLink link) {
+  Future<void> _onReorder(int oldIndex, int newIndex) async {
+    // 「全部」视图下 _filteredLinks 就是 _lists，索引一致。
+    // onReorderItem 已自动处理下移时的索引调整，这里直接用 newIndex。
+    setState(() {
+      final link = _links.removeAt(oldIndex);
+      _links.insert(newIndex.clamp(0, _links.length), link);
+    });
+    await _service.saveOrder(_links);
+    _markUnpushedChanges();
+  }
+
+  Widget _buildLinkCard(FriendLink link, int? reorderIndex) {
     final s = AppStrings.current;
     final isDisabled = link.isCommented;
     final checkKey = _linkKey(link);
@@ -633,6 +654,7 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
     final compact = _isCompactLayout;
 
     return Card(
+      key: reorderIndex != null ? ValueKey(link.id) : null,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       clipBehavior: Clip.antiAlias,
       color: isDisabled
@@ -647,6 +669,18 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
               padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
+                  // 拖拽手柄（仅在可排序时显示）
+                  if (reorderIndex != null)
+                    ReorderableDragStartListener(
+                      index: reorderIndex,
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Icon(
+                          Icons.drag_handle,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
                   // Avatar
                   CircleAvatar(
                     radius: 24,

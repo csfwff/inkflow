@@ -1735,6 +1735,18 @@ class $FriendLinkRowsTable extends FriendLinkRows
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -1755,6 +1767,7 @@ class $FriendLinkRowsTable extends FriendLinkRows
     descr,
     isCommented,
     isDev,
+    sortOrder,
     createdAt,
   ];
   @override
@@ -1813,6 +1826,12 @@ class $FriendLinkRowsTable extends FriendLinkRows
         isDev.isAcceptableOrUnknown(data['is_dev']!, _isDevMeta),
       );
     }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -1862,6 +1881,10 @@ class $FriendLinkRowsTable extends FriendLinkRows
         DriftSqlType.bool,
         data['${effectivePrefix}is_dev'],
       )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}created_at'],
@@ -1883,6 +1906,7 @@ class FriendLinkRow extends DataClass implements Insertable<FriendLinkRow> {
   final String descr;
   final bool isCommented;
   final bool isDev;
+  final int sortOrder;
   final String createdAt;
   const FriendLinkRow({
     required this.id,
@@ -1892,6 +1916,7 @@ class FriendLinkRow extends DataClass implements Insertable<FriendLinkRow> {
     required this.descr,
     required this.isCommented,
     required this.isDev,
+    required this.sortOrder,
     required this.createdAt,
   });
   @override
@@ -1904,6 +1929,7 @@ class FriendLinkRow extends DataClass implements Insertable<FriendLinkRow> {
     map['descr'] = Variable<String>(descr);
     map['is_commented'] = Variable<bool>(isCommented);
     map['is_dev'] = Variable<bool>(isDev);
+    map['sort_order'] = Variable<int>(sortOrder);
     map['created_at'] = Variable<String>(createdAt);
     return map;
   }
@@ -1917,6 +1943,7 @@ class FriendLinkRow extends DataClass implements Insertable<FriendLinkRow> {
       descr: Value(descr),
       isCommented: Value(isCommented),
       isDev: Value(isDev),
+      sortOrder: Value(sortOrder),
       createdAt: Value(createdAt),
     );
   }
@@ -1934,6 +1961,7 @@ class FriendLinkRow extends DataClass implements Insertable<FriendLinkRow> {
       descr: serializer.fromJson<String>(json['descr']),
       isCommented: serializer.fromJson<bool>(json['isCommented']),
       isDev: serializer.fromJson<bool>(json['isDev']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
       createdAt: serializer.fromJson<String>(json['createdAt']),
     );
   }
@@ -1948,6 +1976,7 @@ class FriendLinkRow extends DataClass implements Insertable<FriendLinkRow> {
       'descr': serializer.toJson<String>(descr),
       'isCommented': serializer.toJson<bool>(isCommented),
       'isDev': serializer.toJson<bool>(isDev),
+      'sortOrder': serializer.toJson<int>(sortOrder),
       'createdAt': serializer.toJson<String>(createdAt),
     };
   }
@@ -1960,6 +1989,7 @@ class FriendLinkRow extends DataClass implements Insertable<FriendLinkRow> {
     String? descr,
     bool? isCommented,
     bool? isDev,
+    int? sortOrder,
     String? createdAt,
   }) => FriendLinkRow(
     id: id ?? this.id,
@@ -1969,6 +1999,7 @@ class FriendLinkRow extends DataClass implements Insertable<FriendLinkRow> {
     descr: descr ?? this.descr,
     isCommented: isCommented ?? this.isCommented,
     isDev: isDev ?? this.isDev,
+    sortOrder: sortOrder ?? this.sortOrder,
     createdAt: createdAt ?? this.createdAt,
   );
   FriendLinkRow copyWithCompanion(FriendLinkRowsCompanion data) {
@@ -1982,6 +2013,7 @@ class FriendLinkRow extends DataClass implements Insertable<FriendLinkRow> {
           ? data.isCommented.value
           : this.isCommented,
       isDev: data.isDev.present ? data.isDev.value : this.isDev,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -1996,14 +2028,24 @@ class FriendLinkRow extends DataClass implements Insertable<FriendLinkRow> {
           ..write('descr: $descr, ')
           ..write('isCommented: $isCommented, ')
           ..write('isDev: $isDev, ')
+          ..write('sortOrder: $sortOrder, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, name, link, avatar, descr, isCommented, isDev, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    name,
+    link,
+    avatar,
+    descr,
+    isCommented,
+    isDev,
+    sortOrder,
+    createdAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2015,6 +2057,7 @@ class FriendLinkRow extends DataClass implements Insertable<FriendLinkRow> {
           other.descr == this.descr &&
           other.isCommented == this.isCommented &&
           other.isDev == this.isDev &&
+          other.sortOrder == this.sortOrder &&
           other.createdAt == this.createdAt);
 }
 
@@ -2026,6 +2069,7 @@ class FriendLinkRowsCompanion extends UpdateCompanion<FriendLinkRow> {
   final Value<String> descr;
   final Value<bool> isCommented;
   final Value<bool> isDev;
+  final Value<int> sortOrder;
   final Value<String> createdAt;
   const FriendLinkRowsCompanion({
     this.id = const Value.absent(),
@@ -2035,6 +2079,7 @@ class FriendLinkRowsCompanion extends UpdateCompanion<FriendLinkRow> {
     this.descr = const Value.absent(),
     this.isCommented = const Value.absent(),
     this.isDev = const Value.absent(),
+    this.sortOrder = const Value.absent(),
     this.createdAt = const Value.absent(),
   });
   FriendLinkRowsCompanion.insert({
@@ -2045,6 +2090,7 @@ class FriendLinkRowsCompanion extends UpdateCompanion<FriendLinkRow> {
     this.descr = const Value.absent(),
     this.isCommented = const Value.absent(),
     this.isDev = const Value.absent(),
+    this.sortOrder = const Value.absent(),
     required String createdAt,
   }) : name = Value(name),
        createdAt = Value(createdAt);
@@ -2056,6 +2102,7 @@ class FriendLinkRowsCompanion extends UpdateCompanion<FriendLinkRow> {
     Expression<String>? descr,
     Expression<bool>? isCommented,
     Expression<bool>? isDev,
+    Expression<int>? sortOrder,
     Expression<String>? createdAt,
   }) {
     return RawValuesInsertable({
@@ -2066,6 +2113,7 @@ class FriendLinkRowsCompanion extends UpdateCompanion<FriendLinkRow> {
       if (descr != null) 'descr': descr,
       if (isCommented != null) 'is_commented': isCommented,
       if (isDev != null) 'is_dev': isDev,
+      if (sortOrder != null) 'sort_order': sortOrder,
       if (createdAt != null) 'created_at': createdAt,
     });
   }
@@ -2078,6 +2126,7 @@ class FriendLinkRowsCompanion extends UpdateCompanion<FriendLinkRow> {
     Value<String>? descr,
     Value<bool>? isCommented,
     Value<bool>? isDev,
+    Value<int>? sortOrder,
     Value<String>? createdAt,
   }) {
     return FriendLinkRowsCompanion(
@@ -2088,6 +2137,7 @@ class FriendLinkRowsCompanion extends UpdateCompanion<FriendLinkRow> {
       descr: descr ?? this.descr,
       isCommented: isCommented ?? this.isCommented,
       isDev: isDev ?? this.isDev,
+      sortOrder: sortOrder ?? this.sortOrder,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -2116,6 +2166,9 @@ class FriendLinkRowsCompanion extends UpdateCompanion<FriendLinkRow> {
     if (isDev.present) {
       map['is_dev'] = Variable<bool>(isDev.value);
     }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<String>(createdAt.value);
     }
@@ -2132,6 +2185,7 @@ class FriendLinkRowsCompanion extends UpdateCompanion<FriendLinkRow> {
           ..write('descr: $descr, ')
           ..write('isCommented: $isCommented, ')
           ..write('isDev: $isDev, ')
+          ..write('sortOrder: $sortOrder, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -2979,6 +3033,7 @@ typedef $$FriendLinkRowsTableCreateCompanionBuilder =
       Value<String> descr,
       Value<bool> isCommented,
       Value<bool> isDev,
+      Value<int> sortOrder,
       required String createdAt,
     });
 typedef $$FriendLinkRowsTableUpdateCompanionBuilder =
@@ -2990,6 +3045,7 @@ typedef $$FriendLinkRowsTableUpdateCompanionBuilder =
       Value<String> descr,
       Value<bool> isCommented,
       Value<bool> isDev,
+      Value<int> sortOrder,
       Value<String> createdAt,
     });
 
@@ -3034,6 +3090,11 @@ class $$FriendLinkRowsTableFilterComposer
 
   ColumnFilters<bool> get isDev => $composableBuilder(
     column: $table.isDev,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3087,6 +3148,11 @@ class $$FriendLinkRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -3124,6 +3190,9 @@ class $$FriendLinkRowsTableAnnotationComposer
 
   GeneratedColumn<bool> get isDev =>
       $composableBuilder(column: $table.isDev, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
 
   GeneratedColumn<String> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -3169,6 +3238,7 @@ class $$FriendLinkRowsTableTableManager
                 Value<String> descr = const Value.absent(),
                 Value<bool> isCommented = const Value.absent(),
                 Value<bool> isDev = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
               }) => FriendLinkRowsCompanion(
                 id: id,
@@ -3178,6 +3248,7 @@ class $$FriendLinkRowsTableTableManager
                 descr: descr,
                 isCommented: isCommented,
                 isDev: isDev,
+                sortOrder: sortOrder,
                 createdAt: createdAt,
               ),
           createCompanionCallback:
@@ -3189,6 +3260,7 @@ class $$FriendLinkRowsTableTableManager
                 Value<String> descr = const Value.absent(),
                 Value<bool> isCommented = const Value.absent(),
                 Value<bool> isDev = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
                 required String createdAt,
               }) => FriendLinkRowsCompanion.insert(
                 id: id,
@@ -3198,6 +3270,7 @@ class $$FriendLinkRowsTableTableManager
                 descr: descr,
                 isCommented: isCommented,
                 isDev: isDev,
+                sortOrder: sortOrder,
                 createdAt: createdAt,
               ),
           withReferenceMapper: (p0) => p0
