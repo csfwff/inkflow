@@ -28,10 +28,17 @@ class ArticleUrlService {
     final absolute = Uri.tryParse(pathOrUrl);
     if (absolute != null &&
         (absolute.scheme == 'http' || absolute.scheme == 'https')) {
-      return absolute;
+      return _ensureHttps(absolute);
     }
 
-    return _joinBaseAndPath(baseUrl, pathOrUrl);
+    return _ensureHttps(_joinBaseAndPath(baseUrl, pathOrUrl));
+  }
+
+  /// 统一升级为 https，避免 WebView 加载 http 明文流量时
+  /// 报错 err_cleartext_not_permitted（GitHub Pages 始终支持 https）。
+  static Uri _ensureHttps(Uri uri) {
+    if (uri.scheme == 'http') return uri.replace(scheme: 'https');
+    return uri;
   }
 
   static bool _isPublishedPost(Article article) {

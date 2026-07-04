@@ -681,13 +681,18 @@ class _ArticleListItem extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final screenWidth = MediaQuery.sizeOf(context).width;
     // 窄屏(<600)图片缩小，宽屏保持原尺寸
+    final narrow = screenWidth < 600;
     final imgWidth = screenWidth < 400
         ? 80.0
-        : (screenWidth < 600 ? 110.0 : 180.0);
+        : (narrow ? 110.0 : 180.0);
     final imgHeight = screenWidth < 400
         ? 56.0
-        : (screenWidth < 600 ? 70.0 : 100.0);
-    final contentLeftPadding = _hasCover ? 8.0 : 84.0;
+        : (narrow ? 70.0 : 100.0);
+    // 窄屏时把预览按钮挪出标题行，放到封面图下方（无图则单独成列），
+    // 避免它挤占标题的横向空间。
+    final previewInLeading = narrow && onPreview != null;
+    final hasLeading = _hasCover || previewInLeading;
+    final contentLeftPadding = hasLeading ? 8.0 : 84.0;
     final dateStr =
         '${article.date.year}-${article.date.month.toString().padLeft(2, '0')}-${article.date.day.toString().padLeft(2, '0')}';
 
@@ -703,30 +708,13 @@ class _ArticleListItem extends StatelessWidget {
                     ? CrossAxisAlignment.start
                     : CrossAxisAlignment.stretch,
                 children: [
-                  if (_hasCover)
-                    Padding(
-                      padding: EdgeInsets.all(screenWidth < 400 ? 8 : 12),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          article.cover!,
-                          width: imgWidth,
-                          height: imgHeight,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            width: imgWidth,
-                            height: imgHeight,
-                            color: colorScheme.surfaceContainerLow,
-                            child: Center(
-                              child: Icon(
-                                Icons.image_not_supported_outlined,
-                                size: 24,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
+                  if (hasLeading)
+                    _buildLeading(
+                      screenWidth: screenWidth,
+                      imgWidth: imgWidth,
+                      imgHeight: imgHeight,
+                      previewInLeading: previewInLeading,
+                      colorScheme: colorScheme,
                     ),
                   Expanded(
                     child: Padding(
@@ -751,7 +739,7 @@ class _ArticleListItem extends StatelessWidget {
                                       ?.copyWith(fontWeight: FontWeight.w700),
                                 ),
                               ),
-                              if (onPreview != null)
+                              if (onPreview != null && !previewInLeading)
                                 IconButton(
                                   onPressed: onPreview,
                                   icon: const Icon(
@@ -868,6 +856,70 @@ class _ArticleListItem extends StatelessWidget {
             top: 0,
             left: 0,
             child: IgnorePointer(child: _StatusCornerBadge(article: article)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCoverImage(
+    double imgWidth,
+    double imgHeight,
+    ColorScheme colorScheme,
+  ) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.network(
+        article.cover!,
+        width: imgWidth,
+        height: imgHeight,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          width: imgWidth,
+          height: imgHeight,
+          color: colorScheme.surfaceContainerLow,
+          child: Center(
+            child: Icon(
+              Icons.image_not_supported_outlined,
+              size: 24,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 左侧引导列：宽屏只放封面图；窄屏把预览按钮放到封面图下方，
+  /// 没有封面图时单独显示按钮，从而不再挤占标题空间。
+  Widget _buildLeading({
+    required double screenWidth,
+    required double imgWidth,
+    required double imgHeight,
+    required bool previewInLeading,
+    required ColorScheme colorScheme,
+  }) {
+    final padAll = screenWidth < 400 ? 8.0 : 12.0;
+    if (!previewInLeading) {
+      return Padding(
+        padding: EdgeInsets.all(padAll),
+        child: _buildCoverImage(imgWidth, imgHeight, colorScheme),
+      );
+    }
+    return Padding(
+      padding: EdgeInsets.all(padAll),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_hasCover) ...[
+            _buildCoverImage(imgWidth, imgHeight, colorScheme),
+            const SizedBox(height: 2),
+          ],
+          IconButton(
+            onPressed: onPreview,
+            icon: const Icon(Icons.travel_explore_outlined),
+            tooltip: AppStrings.isZh ? '查看已部署网页' : 'View deployed page',
+            visualDensity: VisualDensity.compact,
           ),
         ],
       ),

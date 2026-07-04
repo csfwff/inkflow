@@ -25,7 +25,9 @@
       "mcp__codegraph__codegraph_explore",
       "mcp__codegraph__codegraph_search",
       "Bash(flutter --version)",
-      "Bash(flutter test *)"
+      "Bash(flutter test *)",
+      "mcp__codegraph__codegraph_node",
+      "mcp__codegraph__codegraph_callers"
     ]
   }
 }
