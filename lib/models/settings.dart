@@ -9,6 +9,8 @@ enum AppThemeMode { system, light, dark }
 enum AppLocale { system, zh, en }
 
 class Settings {
+  static const defaultThemePresetId = 'inkGreen';
+
   // GitHub
   String githubToken;
   String githubOwner;
@@ -43,6 +45,7 @@ class Settings {
 
   // App
   AppThemeMode themeMode;
+  String themePresetId;
   AppLocale locale;
 
   // Sync
@@ -70,6 +73,7 @@ class Settings {
     this.imageCompressTargetKB = 1024,
     this.friendLinkPath = 'source/_data/link.yml',
     this.themeMode = AppThemeMode.system,
+    this.themePresetId = defaultThemePresetId,
     this.locale = AppLocale.system,
     this.lastSyncTime,
   });
@@ -97,31 +101,62 @@ class Settings {
       'imageCompressEnabled': imageCompressEnabled,
       'imageCompressTargetKB': imageCompressTargetKB,
       'friendLinkPath': friendLinkPath,
+      'themeMode': themeMode.index,
+      'themePresetId': themePresetId,
+      'locale': locale.index,
     };
   }
 
   /// 从导入的 JSON 应用配置
   void applyExportJson(Map<String, dynamic> json) {
-    if (json.containsKey('githubToken')) githubToken = json['githubToken'] ?? '';
-    if (json.containsKey('githubOwner')) githubOwner = json['githubOwner'] ?? '';
-    if (json.containsKey('githubRepo')) githubRepo = json['githubRepo'] ?? '';
-    if (json.containsKey('githubBranch')) githubBranch = json['githubBranch'] ?? 'main';
-    if (json.containsKey('githubPathPattern')) githubPathPattern = json['githubPathPattern'] ?? '';
-    if (json.containsKey('permalinkPattern')) permalinkPattern = json['permalinkPattern'] ?? '';
+    if (json.containsKey('githubToken')) {
+      githubToken = json['githubToken'] ?? '';
+    }
+    if (json.containsKey('githubOwner')) {
+      githubOwner = json['githubOwner'] ?? '';
+    }
+    if (json.containsKey('githubRepo')) {
+      githubRepo = json['githubRepo'] ?? '';
+    }
+    if (json.containsKey('githubBranch')) {
+      githubBranch = json['githubBranch'] ?? 'main';
+    }
+    if (json.containsKey('githubPathPattern')) {
+      githubPathPattern = json['githubPathPattern'] ?? '';
+    }
+    if (json.containsKey('permalinkPattern')) {
+      permalinkPattern = json['permalinkPattern'] ?? '';
+    }
     if (json.containsKey('imageHostType')) {
       final idx = json['imageHostType'] as int? ?? 0;
       if (idx >= 0 && idx < ImageHostType.values.length) {
         imageHostType = ImageHostType.values[idx];
       }
     }
-    if (json.containsKey('imageGithubRepo')) imageGithubRepo = json['imageGithubRepo'] ?? '';
-    if (json.containsKey('imageGithubPath')) imageGithubPath = json['imageGithubPath'] ?? 'images';
-    if (json.containsKey('imageGithubDomain')) imageGithubDomain = json['imageGithubDomain'] ?? '';
-    if (json.containsKey('upyunBucket')) upyunBucket = json['upyunBucket'] ?? '';
-    if (json.containsKey('upyunOperator')) upyunOperator = json['upyunOperator'] ?? '';
-    if (json.containsKey('upyunPassword')) upyunPassword = json['upyunPassword'] ?? '';
-    if (json.containsKey('upyunDomain')) upyunDomain = json['upyunDomain'] ?? '';
-    if (json.containsKey('upyunPath')) upyunPath = json['upyunPath'] ?? '';
+    if (json.containsKey('imageGithubRepo')) {
+      imageGithubRepo = json['imageGithubRepo'] ?? '';
+    }
+    if (json.containsKey('imageGithubPath')) {
+      imageGithubPath = json['imageGithubPath'] ?? 'images';
+    }
+    if (json.containsKey('imageGithubDomain')) {
+      imageGithubDomain = json['imageGithubDomain'] ?? '';
+    }
+    if (json.containsKey('upyunBucket')) {
+      upyunBucket = json['upyunBucket'] ?? '';
+    }
+    if (json.containsKey('upyunOperator')) {
+      upyunOperator = json['upyunOperator'] ?? '';
+    }
+    if (json.containsKey('upyunPassword')) {
+      upyunPassword = json['upyunPassword'] ?? '';
+    }
+    if (json.containsKey('upyunDomain')) {
+      upyunDomain = json['upyunDomain'] ?? '';
+    }
+    if (json.containsKey('upyunPath')) {
+      upyunPath = json['upyunPath'] ?? '';
+    }
     if (json.containsKey('imageDateFolderMode')) {
       final idx = json['imageDateFolderMode'] as int? ?? 0;
       if (idx >= 0 && idx < ImageDateFolderMode.values.length) {
@@ -142,6 +177,24 @@ class Settings {
     }
     if (json.containsKey('friendLinkPath')) {
       friendLinkPath = json['friendLinkPath'] ?? 'source/_data/link.yml';
+    }
+    if (json.containsKey('themeMode')) {
+      final idx = json['themeMode'] as int? ?? AppThemeMode.system.index;
+      if (idx >= 0 && idx < AppThemeMode.values.length) {
+        themeMode = AppThemeMode.values[idx];
+      }
+    }
+    if (json.containsKey('themePresetId')) {
+      final value = json['themePresetId'];
+      themePresetId = value is String && value.isNotEmpty
+          ? value
+          : defaultThemePresetId;
+    }
+    if (json.containsKey('locale')) {
+      final idx = json['locale'] as int? ?? AppLocale.system.index;
+      if (idx >= 0 && idx < AppLocale.values.length) {
+        locale = AppLocale.values[idx];
+      }
     }
   }
 }

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'l10n/app_strings.dart';
+import 'models/app_theme_preset.dart';
 import 'models/settings.dart';
 import 'pages/home_page.dart';
 import 'services/log_service.dart';
@@ -69,22 +70,23 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     final settings = settingsService.settings;
+    final themePreset = AppThemePresets.byId(settings.themePresetId);
 
     return MaterialApp(
       title: AppStrings.current.appTitle,
-      theme: _buildTheme(Brightness.light),
-      darkTheme: _buildTheme(Brightness.dark),
+      theme: _buildTheme(Brightness.light, themePreset),
+      darkTheme: _buildTheme(Brightness.dark, themePreset),
       themeMode: _resolveThemeMode(settings.themeMode),
       locale: _resolveLocale(settings.locale),
       home: HomePage(onSettingsChanged: _onSettingsChanged),
     );
   }
 
-  ThemeData _buildTheme(Brightness brightness) {
+  ThemeData _buildTheme(Brightness brightness, AppThemePreset preset) {
     final isDark = brightness == Brightness.dark;
     final colorScheme =
         ColorScheme.fromSeed(
-          seedColor: const Color(0xFF277568),
+          seedColor: preset.seedColor,
           brightness: brightness,
         ).copyWith(
           surface: isDark ? const Color(0xFF111413) : const Color(0xFFF8FAF8),

@@ -7,7 +7,7 @@
 >
 > - [x] 1. 图床上传路径配置优化
 > - [x] 2. GitHub 文件列表树展示
-> - [ ] 3. 主题支持扩展
+> - [x] 3. 主题支持扩展
 > - [x] 4. 减少手动输入，增加选择/点击交互
 > - [x] 5. 基于 commit 记录的增量同步
 > - [x] 6. 网易云音乐外链播放器插入
@@ -67,6 +67,8 @@
 
 ## 3. 主题支持扩展
 
+> 调研文档：[功能 3：主题支持扩展调研](theme-support-research.md)
+
 **现状**
 
 - `AppThemeMode` 只有 `system / light / dark` 三选一
@@ -75,13 +77,14 @@
 
 **方案**
 
-- 引入主题配置模型：`AppTheme { name, seedColor, brightness }`
-- 内置几套预设主题（如当前的墨绿、蓝色、紫色等）
-- 支持从 JSON/YAML 配置文件加载自定义主题：
+- 保留现有 `AppThemeMode { system, light, dark }` 负责亮暗模式
+- 新增主题预设模型：`AppThemePreset { id, name, seedColor }`
+- 第一阶段先内置几套预设主题（如当前的墨绿、蓝色、紫色等），并持久化 `themePresetId`
+- 第二阶段支持从 YAML 配置文件加载自定义主题：
   - 应用目录下放 `themes/custom_themes.yaml`
-  - 格式：`[{name: "Ocean", seedColor: "#0077B6", brightness: light}]`
+  - 格式：`themes: [{id: "ocean", name: "Ocean", seedColor: "#0077B6"}]`
 - 设置页的主题选择改为列表/卡片选择器，展示主题预览色块
-- 自定义主题文件在应用启动时扫描加载
+- 自定义主题文件在应用启动或设置页进入时扫描加载
 
 **可行性：中**
 
@@ -536,4 +539,3 @@ upload(bytes, filename)
 
 | 优先级 | 功能 | 理由 |
 |---|---|---|
-| 1 | 3. 主题扩展 | 独立功能，不影响核心流程，提升使用体验 |

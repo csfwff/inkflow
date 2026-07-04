@@ -61,6 +61,8 @@ class AppStrings {
   final String themeSystem;
   final String themeLight;
   final String themeDark;
+  final String themeMode;
+  final String themeColor;
   final String langSystem;
   final String langZh;
   final String langEn;
@@ -237,6 +239,8 @@ class AppStrings {
     required this.themeSystem,
     required this.themeLight,
     required this.themeDark,
+    required this.themeMode,
+    required this.themeColor,
     required this.langSystem,
     required this.langZh,
     required this.langEn,
@@ -397,6 +401,8 @@ class AppStrings {
     themeSystem: 'System',
     themeLight: 'Light',
     themeDark: 'Dark',
+    themeMode: 'Mode',
+    themeColor: 'Theme Color',
     langSystem: 'System',
     langZh: 'Chinese',
     langEn: 'English',
@@ -410,7 +416,8 @@ class AppStrings {
     noArticles: 'No articles yet',
     deleteArticle: 'Delete',
     deleteConfirm: 'Are you sure you want to delete this article?',
-    deleteConfirmRemote: 'This article is synced to the remote repository. Deleting will also remove the remote file. Continue?',
+    deleteConfirmRemote:
+        'This article is synced to the remote repository. Deleting will also remove the remote file. Continue?',
     cancel: 'Cancel',
     pushToDraft: 'Save as Draft',
     repoDraft: 'Repo Draft',
@@ -457,7 +464,8 @@ class AppStrings {
     dangerZone: 'Danger Zone',
     clearArticleData: 'Clear Article Data',
     clearArticleDataDesc: 'Delete all local articles, tags, and categories',
-    clearArticleDataWarning: 'This will permanently delete all local article data and cannot be undone. Remote articles will not be affected.',
+    clearArticleDataWarning:
+        'This will permanently delete all local article data and cannot be undone. Remote articles will not be affected.',
     clearArticleDataConfirm: 'Clear All',
     exportConfig: 'Export Config',
     importConfig: 'Import Config',
@@ -470,7 +478,8 @@ class AppStrings {
     importConfigHint: 'Paste the exported config string',
     importConfigConfirm: 'Decrypt & Import',
     unsavedChanges: 'Unsaved Changes',
-    unsavedChangesDesc: 'You have unsaved changes. Are you sure you want to leave?',
+    unsavedChangesDesc:
+        'You have unsaved changes. Are you sure you want to leave?',
     discard: 'Discard',
     // Log viewer
     logViewer: 'View Logs',
@@ -557,6 +566,8 @@ class AppStrings {
     themeSystem: '跟随系统',
     themeLight: '浅色',
     themeDark: '深色',
+    themeMode: '模式',
+    themeColor: '主题色',
     langSystem: '跟随系统',
     langZh: '中文',
     langEn: '英文',

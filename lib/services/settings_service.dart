@@ -27,6 +27,7 @@ class SettingsService {
   static const _keyImageCompressTargetKB = 'image_compress_target_kb';
   static const _keyFriendLinkPath = 'friend_link_path';
   static const _keyThemeMode = 'theme_mode';
+  static const _keyThemePresetId = 'theme_preset_id';
   static const _keyLocale = 'locale';
   static const _keyLastSyncTime = 'last_sync_time';
 
@@ -54,27 +55,31 @@ class SettingsService {
       githubOwner: _prefs.getString(_keyGithubOwner) ?? '',
       githubRepo: _prefs.getString(_keyGithubRepo) ?? '',
       githubBranch: _prefs.getString(_keyGithubBranch) ?? 'main',
-      githubPathPattern:
-          _prefs.getString(_keyGithubPathPattern) ?? '',
+      githubPathPattern: _prefs.getString(_keyGithubPathPattern) ?? '',
       permalinkPattern: _prefs.getString(_keyPermalinkPattern) ?? '',
       imageHostType:
           ImageHostType.values[_prefs.getInt(_keyImageHostType) ?? 0],
       imageGithubRepo: _prefs.getString(_keyImageGithubRepo) ?? '',
-      imageGithubPath: _cleanPath(_prefs.getString(_keyImageGithubPath) ?? 'images'),
+      imageGithubPath: _cleanPath(
+        _prefs.getString(_keyImageGithubPath) ?? 'images',
+      ),
       imageGithubDomain: _prefs.getString(_keyImageGithubDomain) ?? '',
       upyunBucket: _prefs.getString(_keyUpyunBucket) ?? '',
       upyunOperator: _prefs.getString(_keyUpyunOperator) ?? '',
       upyunPassword: upyunPassword,
       upyunDomain: _prefs.getString(_keyUpyunDomain) ?? '',
       upyunPath: _cleanPath(_prefs.getString(_keyUpyunPath) ?? ''),
-      imageDateFolderMode:
-          ImageDateFolderMode.values[_prefs.getInt(_keyImageDateFolderMode) ?? 0],
+      imageDateFolderMode: ImageDateFolderMode
+          .values[_prefs.getInt(_keyImageDateFolderMode) ?? 0],
       imageNamingMode:
           ImageNamingMode.values[_prefs.getInt(_keyImageNamingMode) ?? 0],
       imageCompressEnabled: _prefs.getBool(_keyImageCompressEnabled) ?? false,
       imageCompressTargetKB: _prefs.getInt(_keyImageCompressTargetKB) ?? 1024,
-      friendLinkPath: _prefs.getString(_keyFriendLinkPath) ?? 'source/_data/link.yml',
+      friendLinkPath:
+          _prefs.getString(_keyFriendLinkPath) ?? 'source/_data/link.yml',
       themeMode: AppThemeMode.values[_prefs.getInt(_keyThemeMode) ?? 0],
+      themePresetId:
+          _prefs.getString(_keyThemePresetId) ?? Settings.defaultThemePresetId,
       locale: AppLocale.values[_prefs.getInt(_keyLocale) ?? 0],
       lastSyncTime: _loadDateTime(_prefs.getString(_keyLastSyncTime)),
     );
@@ -102,12 +107,16 @@ class SettingsService {
       _prefs.setString(_keyUpyunOperator, settings.upyunOperator),
       _prefs.setString(_keyUpyunDomain, settings.upyunDomain),
       _prefs.setString(_keyUpyunPath, settings.upyunPath),
-      _prefs.setInt(_keyImageDateFolderMode, settings.imageDateFolderMode.index),
+      _prefs.setInt(
+        _keyImageDateFolderMode,
+        settings.imageDateFolderMode.index,
+      ),
       _prefs.setInt(_keyImageNamingMode, settings.imageNamingMode.index),
       _prefs.setBool(_keyImageCompressEnabled, settings.imageCompressEnabled),
       _prefs.setInt(_keyImageCompressTargetKB, settings.imageCompressTargetKB),
       _prefs.setString(_keyFriendLinkPath, settings.friendLinkPath),
       _prefs.setInt(_keyThemeMode, settings.themeMode.index),
+      _prefs.setString(_keyThemePresetId, settings.themePresetId),
       _prefs.setInt(_keyLocale, settings.locale.index),
       _prefs.setString(
         _keyLastSyncTime,
@@ -132,7 +141,9 @@ class SettingsService {
     final keyBytes = sha256.convert(utf8.encode(password!)).bytes;
     final key = encrypt.Key(Uint8List.fromList(keyBytes));
     final iv = encrypt.IV.fromSecureRandom(16);
-    final encrypter = encrypt.Encrypter(encrypt.AES(key, mode: encrypt.AESMode.cbc));
+    final encrypter = encrypt.Encrypter(
+      encrypt.AES(key, mode: encrypt.AESMode.cbc),
+    );
     final encrypted = encrypter.encrypt(plainText, iv: iv);
     final combined = Uint8List.fromList(iv.bytes + encrypted.bytes);
     return base64Encode(combined);
@@ -160,8 +171,13 @@ class SettingsService {
       final cipherBytes = Uint8List.fromList(combined.sublist(16));
       final keyBytes = sha256.convert(utf8.encode(password)).bytes;
       final key = encrypt.Key(Uint8List.fromList(keyBytes));
-      final encrypter = encrypt.Encrypter(encrypt.AES(key, mode: encrypt.AESMode.cbc));
-      final plainText = encrypter.decrypt(encrypt.Encrypted(cipherBytes), iv: iv);
+      final encrypter = encrypt.Encrypter(
+        encrypt.AES(key, mode: encrypt.AESMode.cbc),
+      );
+      final plainText = encrypter.decrypt(
+        encrypt.Encrypted(cipherBytes),
+        iv: iv,
+      );
       final json = jsonDecode(plainText) as Map<String, dynamic>;
       settings.applyExportJson(json);
       await save();

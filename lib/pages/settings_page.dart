@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../l10n/app_strings.dart';
 import '../main.dart';
+import '../models/app_theme_preset.dart';
 import '../models/settings.dart';
 import 'log_viewer_page.dart';
 import '../services/github_service.dart';
@@ -1464,6 +1465,7 @@ rm -rf "\$BACKUP_DIR"
         _divider(),
         _sectionHeader(s.theme),
         _segmentedTheme(s),
+        _themePresetSelector(s),
         _divider(),
         _sectionHeader(
           identical(s, AppStrings.zh) ? '永久链接格式' : 'Permalink pattern',
@@ -2013,17 +2015,169 @@ rm -rf "\$BACKUP_DIR"
   Widget _segmentedTheme(AppStrings s) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: SegmentedButton<AppThemeMode>(
-        segments: [
-          ButtonSegment(value: AppThemeMode.system, label: Text(s.themeSystem)),
-          ButtonSegment(value: AppThemeMode.light, label: Text(s.themeLight)),
-          ButtonSegment(value: AppThemeMode.dark, label: Text(s.themeDark)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _settingSubLabel(s.themeMode),
+          const SizedBox(height: 8),
+          SegmentedButton<AppThemeMode>(
+            segments: [
+              ButtonSegment(
+                value: AppThemeMode.system,
+                label: Text(s.themeSystem),
+              ),
+              ButtonSegment(
+                value: AppThemeMode.light,
+                label: Text(s.themeLight),
+              ),
+              ButtonSegment(value: AppThemeMode.dark, label: Text(s.themeDark)),
+            ],
+            selected: {_settings.themeMode},
+            onSelectionChanged: (v) {
+              setState(() => _settings.themeMode = v.first);
+              _save();
+            },
+          ),
         ],
-        selected: {_settings.themeMode},
-        onSelectionChanged: (v) {
-          setState(() => _settings.themeMode = v.first);
+      ),
+    );
+  }
+
+  Widget _themePresetSelector(AppStrings s) {
+    final effectivePreset = AppThemePresets.byId(_settings.themePresetId);
+    final zh = identical(s, AppStrings.zh);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _settingSubLabel(s.themeColor),
+          const SizedBox(height: 8),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columnCount = constraints.maxWidth < 360
+                  ? 1
+                  : (constraints.maxWidth < 560 ? 2 : 3);
+              final spacing = 8.0;
+              final itemWidth =
+                  (constraints.maxWidth - spacing * (columnCount - 1)) /
+                  columnCount;
+
+              return Wrap(
+                spacing: spacing,
+                runSpacing: spacing,
+                children: [
+                  for (final preset in AppThemePresets.all)
+                    SizedBox(
+                      width: itemWidth,
+                      child: _themePresetCard(
+                        preset,
+                        selected: preset.id == effectivePreset.id,
+                        zh: zh,
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _themePresetCard(
+    AppThemePreset preset, {
+    required bool selected,
+    required bool zh,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final previewScheme = ColorScheme.fromSeed(
+      seedColor: preset.seedColor,
+      brightness: Theme.of(context).brightness,
+    );
+    final borderColor = selected
+        ? colorScheme.primary
+        : colorScheme.outlineVariant;
+
+    return Material(
+      color: selected
+          ? colorScheme.primaryContainer.withValues(alpha: 0.42)
+          : colorScheme.surfaceContainerLowest,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: borderColor, width: selected ? 1.5 : 1),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () {
+          if (_settings.themePresetId == preset.id) return;
+          setState(() => _settings.themePresetId = preset.id);
           _save();
         },
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: preset.seedColor,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: colorScheme.outlineVariant),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      preset.label(zh: zh),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: selected ? colorScheme.primary : null,
+                      ),
+                    ),
+                  ),
+                  if (selected)
+                    Icon(
+                      Icons.check_circle,
+                      size: 18,
+                      color: colorScheme.primary,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _themeSwatch(previewScheme.primary),
+                  const SizedBox(width: 6),
+                  _themeSwatch(previewScheme.secondary),
+                  const SizedBox(width: 6),
+                  _themeSwatch(previewScheme.tertiary),
+                  const SizedBox(width: 6),
+                  _themeSwatch(previewScheme.surfaceContainerHighest),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _themeSwatch(Color color) {
+    return Expanded(
+      child: Container(
+        height: 8,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(4),
+        ),
       ),
     );
   }
@@ -2589,6 +2743,16 @@ rm -rf "\$BACKUP_DIR"
           fontWeight: FontWeight.w600,
           color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
+      ),
+    );
+  }
+
+  Widget _settingSubLabel(String title) {
+    return Text(
+      title,
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        fontWeight: FontWeight.w600,
       ),
     );
   }
