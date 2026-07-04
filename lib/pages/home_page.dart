@@ -10,6 +10,7 @@ import '../services/sync_service.dart';
 import '../widgets/responsive.dart';
 import 'article_web_view_page.dart';
 import 'editor_page.dart';
+import 'file_tree_page.dart';
 import 'friend_link_page.dart';
 import 'settings_page.dart';
 
@@ -194,6 +195,14 @@ class _HomePageState extends State<HomePage> {
     _loadArticles();
   }
 
+  Future<void> _openFileTree() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const FileTreePage()),
+    );
+    _loadArticles();
+  }
+
   Future<void> _openArticlePreview(Article article) async {
     final s = AppStrings.current;
     final url = await ArticleUrlService.resolveArticleUrl(
@@ -316,6 +325,11 @@ class _HomePageState extends State<HomePage> {
                 ),
               ],
             ),
+          IconButton(
+            icon: const Icon(Icons.account_tree_outlined),
+            tooltip: _label('GitHub 文件', 'GitHub files'),
+            onPressed: _openFileTree,
+          ),
           IconButton(
             icon: const Icon(Icons.people_outline),
             tooltip: s.friendLinks,
@@ -682,12 +696,8 @@ class _ArticleListItem extends StatelessWidget {
     final screenWidth = MediaQuery.sizeOf(context).width;
     // 窄屏(<600)图片缩小，宽屏保持原尺寸
     final narrow = screenWidth < 600;
-    final imgWidth = screenWidth < 400
-        ? 80.0
-        : (narrow ? 110.0 : 180.0);
-    final imgHeight = screenWidth < 400
-        ? 56.0
-        : (narrow ? 70.0 : 100.0);
+    final imgWidth = screenWidth < 400 ? 80.0 : (narrow ? 110.0 : 180.0);
+    final imgHeight = screenWidth < 400 ? 56.0 : (narrow ? 70.0 : 100.0);
     // 窄屏时把预览按钮挪出标题行，放到封面图下方（无图则单独成列），
     // 避免它挤占标题的横向空间。
     final previewInLeading = narrow && onPreview != null;

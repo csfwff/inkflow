@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import '../models/article.dart';
 import 'database/app_database.dart';
@@ -17,8 +19,9 @@ class ArticleService {
   }
 
   Future<void> update(Article article) async {
-    await (_db.update(_db.articleRows)..where((t) => t.id.equals(article.id!)))
-        .write(toCompanion(article));
+    await (_db.update(
+      _db.articleRows,
+    )..where((t) => t.id.equals(article.id!))).write(toCompanion(article));
   }
 
   Future<void> delete(int id) async {
@@ -33,9 +36,18 @@ class ArticleService {
   }
 
   Future<Article?> getById(int id) async {
-    final row = await (_db.select(_db.articleRows)
-          ..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
+    final row = await (_db.select(
+      _db.articleRows,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
+    return row == null ? null : articleFromRow(row);
+  }
+
+  Future<Article?> getByRemotePath(String remotePath) async {
+    final row =
+        await (_db.select(_db.articleRows)
+              ..where((t) => t.remotePath.equals(remotePath))
+              ..limit(1))
+            .getSingleOrNull();
     return row == null ? null : articleFromRow(row);
   }
 
@@ -57,13 +69,16 @@ class ArticleService {
       getAll(status: ArticleStatus.repoDraft);
 
   Future<List<Article>> getRemoteTracked() async {
-    final rows = await (_db.select(_db.articleRows)
-          ..where((t) =>
-              t.status.equalsValue(ArticleStatus.synced) |
-              t.status.equalsValue(ArticleStatus.repoDraft) |
-              t.status.equalsValue(ArticleStatus.pendingPublish))
-          ..orderBy([(t) => OrderingTerm.desc(t.date)]))
-        .get();
+    final rows =
+        await (_db.select(_db.articleRows)
+              ..where(
+                (t) =>
+                    t.status.equalsValue(ArticleStatus.synced) |
+                    t.status.equalsValue(ArticleStatus.repoDraft) |
+                    t.status.equalsValue(ArticleStatus.pendingPublish),
+              )
+              ..orderBy([(t) => OrderingTerm.desc(t.date)]))
+            .get();
     return rows.map(articleFromRow).toList();
   }
 
@@ -113,6 +128,7 @@ class ArticleService {
         excerpt: Value(article.excerpt),
         description: Value(article.description),
         author: Value(article.author),
+        customFields: Value(jsonEncode(article.customFields)),
       ),
     );
   }
@@ -120,17 +136,20 @@ class ArticleService {
   Future<ArticleRow?> _findExistingRemoteArticle(Article article) async {
     final remotePath = article.remotePath;
     if (remotePath != null && remotePath.isNotEmpty) {
-      final row = await (_db.select(_db.articleRows)
-            ..where((t) => t.remotePath.equals(remotePath))
-            ..limit(1))
-          .getSingleOrNull();
+      final row =
+          await (_db.select(_db.articleRows)
+                ..where((t) => t.remotePath.equals(remotePath))
+                ..limit(1))
+              .getSingleOrNull();
       if (row != null) return row;
     }
 
     return await (_db.select(_db.articleRows)
-          ..where((t) =>
-              t.filePath.equals(article.filePath) &
-              t.status.equalsValue(article.status))
+          ..where(
+            (t) =>
+                t.filePath.equals(article.filePath) &
+                t.status.equalsValue(article.status),
+          )
           ..limit(1))
         .getSingleOrNull();
   }
@@ -144,8 +163,9 @@ class ArticleService {
       ArticleRowsCompanion(
         status: const Value(ArticleStatus.synced),
         githubSha: Value(githubSha),
-        remotePath:
-            remotePath != null ? Value(remotePath) : const Value.absent(),
+        remotePath: remotePath != null
+            ? Value(remotePath)
+            : const Value.absent(),
         remoteKind: const Value(ArticleRemoteKind.post),
         updatedAt: Value(DateTime.now().toIso8601String()),
       ),
@@ -161,8 +181,9 @@ class ArticleService {
       ArticleRowsCompanion(
         status: const Value(ArticleStatus.repoDraft),
         githubSha: Value(githubSha),
-        remotePath:
-            remotePath != null ? Value(remotePath) : const Value.absent(),
+        remotePath: remotePath != null
+            ? Value(remotePath)
+            : const Value.absent(),
         remoteKind: const Value(ArticleRemoteKind.repoDraft),
         updatedAt: Value(DateTime.now().toIso8601String()),
       ),
@@ -202,9 +223,9 @@ class ArticleService {
   // --- Tag CRUD ---
 
   Future<List<TagRow>> getAllTags() async {
-    return await (_db.select(_db.tagRows)
-          ..orderBy([(t) => OrderingTerm.asc(t.name)]))
-        .get();
+    return await (_db.select(
+      _db.tagRows,
+    )..orderBy([(t) => OrderingTerm.asc(t.name)])).get();
   }
 
   Future<List<String>> getAllTagNames() async {
@@ -213,7 +234,9 @@ class ArticleService {
   }
 
   Future<int> addTag(String name) async {
-    return await _db.into(_db.tagRows).insert(
+    return await _db
+        .into(_db.tagRows)
+        .insert(
           TagRowsCompanion.insert(
             name: name,
             createdAt: DateTime.now().toIso8601String(),
@@ -222,10 +245,11 @@ class ArticleService {
   }
 
   Future<void> addTagIfNotExists(String name) async {
-    final existing = await (_db.select(_db.tagRows)
-          ..where((t) => t.name.equals(name))
-          ..limit(1))
-        .getSingleOrNull();
+    final existing =
+        await (_db.select(_db.tagRows)
+              ..where((t) => t.name.equals(name))
+              ..limit(1))
+            .getSingleOrNull();
     if (existing == null) {
       await addTag(name);
     }
@@ -244,9 +268,9 @@ class ArticleService {
   // --- Category CRUD ---
 
   Future<List<CategoryRow>> getAllCategories() async {
-    return await (_db.select(_db.categoryRows)
-          ..orderBy([(t) => OrderingTerm.asc(t.name)]))
-        .get();
+    return await (_db.select(
+      _db.categoryRows,
+    )..orderBy([(t) => OrderingTerm.asc(t.name)])).get();
   }
 
   Future<List<String>> getAllCategoryNames() async {
@@ -255,7 +279,9 @@ class ArticleService {
   }
 
   Future<int> addCategory(String name) async {
-    return await _db.into(_db.categoryRows).insert(
+    return await _db
+        .into(_db.categoryRows)
+        .insert(
           CategoryRowsCompanion.insert(
             name: name,
             createdAt: DateTime.now().toIso8601String(),
@@ -264,10 +290,11 @@ class ArticleService {
   }
 
   Future<void> addCategoryIfNotExists(String name) async {
-    final existing = await (_db.select(_db.categoryRows)
-          ..where((t) => t.name.equals(name))
-          ..limit(1))
-        .getSingleOrNull();
+    final existing =
+        await (_db.select(_db.categoryRows)
+              ..where((t) => t.name.equals(name))
+              ..limit(1))
+            .getSingleOrNull();
     if (existing == null) {
       await addCategory(name);
     }
