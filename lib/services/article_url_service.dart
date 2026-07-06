@@ -13,6 +13,20 @@ class ArticleUrlService {
         _isPublishedPost(article);
   }
 
+  static bool canInferBlogHomeUrl(Settings settings) {
+    return settings.githubOwner.trim().isNotEmpty &&
+        settings.githubRepo.trim().isNotEmpty;
+  }
+
+  static Future<Uri?> resolveBlogHomeUrl(Settings settings) async {
+    if (!canInferBlogHomeUrl(settings)) return null;
+
+    final baseUrl = await _resolvePagesBaseUrl(settings);
+    if (baseUrl == null) return null;
+
+    return _ensureHttps(_ensureTrailingSlash(baseUrl));
+  }
+
   static Future<Uri?> resolveArticleUrl(
     Article article,
     Settings settings,

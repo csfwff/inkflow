@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../l10n/app_strings.dart';
 import '../main.dart';
 import '../models/friend_link.dart';
@@ -6,6 +7,7 @@ import '../services/friend_link_parser.dart';
 import '../services/friend_link_service.dart';
 import '../services/github_service.dart';
 import '../services/log_service.dart';
+import 'article_web_view_page.dart';
 import 'friend_link_edit_page.dart';
 
 /// 友链筛选
@@ -13,7 +15,7 @@ enum _FriendLinkFilter { all, enabled, disabled }
 
 enum _FriendLinkToolbarAction { check, pull, push, addDev }
 
-enum _FriendLinkItemAction { edit, check, delete }
+enum _FriendLinkItemAction { visit, edit, check, delete }
 
 class FriendLinkPage extends StatefulWidget {
   const FriendLinkPage({super.key});
@@ -74,9 +76,9 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
     if (settings.githubToken.isEmpty ||
         settings.githubOwner.isEmpty ||
         settings.githubRepo.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(s.githubNotConfigured)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(s.githubNotConfigured)));
       return;
     }
 
@@ -89,7 +91,10 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
       branch: settings.githubBranch,
     );
 
-    final result = await _service.syncFromGitHub(github, settings.friendLinkPath);
+    final result = await _service.syncFromGitHub(
+      github,
+      settings.friendLinkPath,
+    );
 
     if (!mounted) return;
     setState(() => _syncing = false);
@@ -116,9 +121,9 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
     if (settings.githubToken.isEmpty ||
         settings.githubOwner.isEmpty ||
         settings.githubRepo.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(s.githubNotConfigured)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(s.githubNotConfigured)));
       return;
     }
 
@@ -193,20 +198,22 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
     LogService.instance.logAction('检测友链', detail: '${enabledLinks.length} 条');
 
     var accessible = 0;
-    await Future.wait(enabledLinks.map((link) async {
-      final key = _linkKey(link);
-      final result = await _service.checkLink(link);
+    await Future.wait(
+      enabledLinks.map((link) async {
+        final key = _linkKey(link);
+        final result = await _service.checkLink(link);
 
-      if (!mounted) return;
-      if (result.isAccessible) {
-        accessible++;
-      }
+        if (!mounted) return;
+        if (result.isAccessible) {
+          accessible++;
+        }
 
-      setState(() {
-        _checkingLinks.remove(key);
-        _checkResults[_resultKey(result)] = result;
-      });
-    }));
+        setState(() {
+          _checkingLinks.remove(key);
+          _checkResults[_resultKey(result)] = result;
+        });
+      }),
+    );
 
     if (!mounted) return;
     setState(() {
@@ -234,6 +241,67 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
       _checkingLinks.remove(key);
       _checkResults[_resultKey(result)] = result;
     });
+  }
+
+  Future<void> _openFriendLink(FriendLink link) async {
+    final s = AppStrings.current;
+    final url = _parseFriendLinkUrl(link.link);
+
+    if (url == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppStrings.isZh
+                ? '友链地址无效：${link.link}'
+                : 'Invalid friend link URL: ${link.link}',
+          ),
+        ),
+      );
+      return;
+    }
+
+    LogService.instance.logAction('访问友链', detail: '${link.name}: $url');
+    if (ArticleWebViewPage.supportsEmbeddedWebView) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ArticleWebViewPage(
+            url: url,
+            title: link.name.isEmpty ? s.friendLinks : link.name,
+          ),
+        ),
+      );
+      return;
+    }
+
+    final launched = await launchUrl(url, mode: LaunchMode.externalApplication);
+    if (!mounted || launched) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          AppStrings.isZh ? '无法打开链接：$url' : 'Failed to open URL: $url',
+        ),
+      ),
+    );
+  }
+
+  Uri? _parseFriendLinkUrl(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+
+    final parsed = Uri.tryParse(trimmed);
+    if (_isHttpUrl(parsed)) return parsed;
+
+    final withScheme = Uri.tryParse('https://$trimmed');
+    if (_isHttpUrl(withScheme)) return withScheme;
+
+    return null;
+  }
+
+  bool _isHttpUrl(Uri? uri) {
+    return uri != null &&
+        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.host.isNotEmpty;
   }
 
   String _linkKey(FriendLink link) => '${link.id ?? link.name}|${link.link}';
@@ -316,7 +384,10 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(s.deleteFriendLink, style: const TextStyle(color: Colors.red)),
+            child: Text(
+              s.deleteFriendLink,
+              style: const TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
@@ -333,10 +404,7 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
   Future<void> _toggleLinkEnabled(FriendLink link, bool enabled) async {
     final updated = link.copyWith(isCommented: !enabled);
     await _service.update(updated);
-    LogService.instance.logAction(
-      enabled ? '启用友链' : '禁用友链',
-      detail: link.name,
-    );
+    LogService.instance.logAction(enabled ? '启用友链' : '禁用友链', detail: link.name);
 
     if (!mounted) return;
     setState(() {
@@ -360,9 +428,9 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
     final existing = await _service.getByName(devLink.name);
     if (existing != null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${devLink.name} 已存在')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('${devLink.name} 已存在')));
       }
       return;
     }
@@ -387,7 +455,8 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
             controller: controller,
             maxLines: 10,
             decoration: InputDecoration(
-              hintText: '- name: xxx\n  link: https://xxx\n  avatar: https://xxx\n  descr: xxx',
+              hintText:
+                  '- name: xxx\n  link: https://xxx\n  avatar: https://xxx\n  descr: xxx',
               border: const OutlineInputBorder(),
             ),
           ),
@@ -415,9 +484,9 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('已添加 $count 条友链')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('已添加 $count 条友链')));
       }
     }
   }
@@ -449,13 +518,13 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _filteredLinks.isEmpty
-                      ? Center(
-                          child: Text(
-                            s.noItemsAvailable,
-                            style: const TextStyle(color: Colors.grey),
-                          ),
-                        )
-                      : _buildLinkList(),
+                  ? Center(
+                      child: Text(
+                        s.noItemsAvailable,
+                        style: const TextStyle(color: Colors.grey),
+                      ),
+                    )
+                  : _buildLinkList(),
             ),
           ],
         ),
@@ -476,7 +545,11 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
-          Icon(Icons.cloud_upload_outlined, size: 18, color: colorScheme.onTertiaryContainer),
+          Icon(
+            Icons.cloud_upload_outlined,
+            size: 18,
+            color: colorScheme.onTertiaryContainer,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -497,7 +570,8 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
     );
   }
 
-  bool get _isCompactLayout => MediaQuery.sizeOf(context).width < _compactBreakpoint;
+  bool get _isCompactLayout =>
+      MediaQuery.sizeOf(context).width < _compactBreakpoint;
 
   List<Widget> _buildAppBarActions(AppStrings s) {
     if (_isCompactLayout) {
@@ -591,7 +665,10 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
-          _buildFilterChip('${s.logAll} (${_links.length})', _FriendLinkFilter.all),
+          _buildFilterChip(
+            '${s.logAll} (${_links.length})',
+            _FriendLinkFilter.all,
+          ),
           const SizedBox(width: 8),
           _buildFilterChip(
             '${s.friendLinkEnabled} (${_links.where((l) => !l.isCommented).length})',
@@ -658,7 +735,9 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       clipBehavior: Clip.antiAlias,
       color: isDisabled
-          ? Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)
+          ? Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)
           : null,
       child: Stack(
         children: [
@@ -684,7 +763,9 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
                   // Avatar
                   CircleAvatar(
                     radius: 24,
-                    backgroundImage: link.avatar.isNotEmpty ? NetworkImage(link.avatar) : null,
+                    backgroundImage: link.avatar.isNotEmpty
+                        ? NetworkImage(link.avatar)
+                        : null,
                     child: link.avatar.isEmpty
                         ? Text(link.name.isNotEmpty ? link.name[0] : '?')
                         : null,
@@ -702,23 +783,32 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
                                 link.name,
                                 style: TextStyle(
                                   fontWeight: FontWeight.w600,
-                                  decoration: isDisabled ? TextDecoration.lineThrough : null,
+                                  decoration: isDisabled
+                                      ? TextDecoration.lineThrough
+                                      : null,
                                 ),
                               ),
                             ),
                             if (link.isDev)
                               Container(
                                 margin: const EdgeInsets.only(left: 4),
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.primaryContainer,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.primaryContainer,
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
                                   'DEV',
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onPrimaryContainer,
                                   ),
                                 ),
                               ),
@@ -730,7 +820,9 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
                             link.descr,
                             style: TextStyle(
                               fontSize: 12,
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -757,15 +849,26 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
                     ),
                   ),
                   Tooltip(
-                    message: isDisabled ? s.friendLinkDisabled : s.friendLinkEnabled,
-                    child: Switch(
-                      value: !isDisabled,
-                      onChanged: (enabled) => _toggleLinkEnabled(link, enabled),
+                    message: isDisabled
+                        ? s.friendLinkDisabled
+                        : s.friendLinkEnabled,
+                    child: Transform.scale(
+                      scale: 0.7,
+                      child: Switch(
+                        value: !isDisabled,
+                        onChanged: (enabled) =>
+                            _toggleLinkEnabled(link, enabled),
+                      ),
                     ),
                   ),
                   if (compact)
                     _buildLinkMoreButton(link, isChecking)
                   else ...[
+                    IconButton(
+                      icon: const Icon(Icons.public, size: 20),
+                      tooltip: AppStrings.isZh ? '访问友链' : 'Visit Link',
+                      onPressed: () => _openFriendLink(link),
+                    ),
                     IconButton(
                       icon: const Icon(Icons.edit_outlined, size: 20),
                       tooltip: s.editFriendLink,
@@ -780,7 +883,9 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
                             )
                           : const Icon(Icons.link, size: 20),
                       tooltip: '检测链接',
-                      onPressed: isChecking ? null : () => _checkSingleLink(link),
+                      onPressed: isChecking
+                          ? null
+                          : () => _checkSingleLink(link),
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete_outline, size: 20),
@@ -829,6 +934,8 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
       tooltip: AppStrings.isZh ? '更多' : 'More',
       onSelected: (action) {
         switch (action) {
+          case _FriendLinkItemAction.visit:
+            _openFriendLink(link);
           case _FriendLinkItemAction.edit:
             _editLink(link);
           case _FriendLinkItemAction.check:
@@ -838,6 +945,13 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
         }
       },
       itemBuilder: (context) => [
+        PopupMenuItem(
+          value: _FriendLinkItemAction.visit,
+          child: _menuItem(
+            icon: Icons.public,
+            label: AppStrings.isZh ? '访问友链' : 'Visit Link',
+          ),
+        ),
         PopupMenuItem(
           value: _FriendLinkItemAction.edit,
           child: _menuItem(icon: Icons.edit_outlined, label: s.editFriendLink),

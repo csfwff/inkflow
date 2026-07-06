@@ -203,6 +203,47 @@ class _HomePageState extends State<HomePage> {
     _loadArticles();
   }
 
+  Future<void> _openBlogHome() async {
+    final url = await ArticleUrlService.resolveBlogHomeUrl(
+      settingsService.settings,
+    );
+    if (!mounted) return;
+
+    if (url == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _label(
+              '无法推测博客首页链接，请先配置 GitHub 仓库',
+              'Cannot infer the blog URL. Configure the GitHub repository first.',
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+
+    LogService.instance.logAction('访问博客首页', detail: url.toString());
+    if (ArticleWebViewPage.supportsEmbeddedWebView) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              ArticleWebViewPage(url: url, title: _label('博客', 'Blog')),
+        ),
+      );
+      return;
+    }
+
+    final launched = await launchUrl(url, mode: LaunchMode.externalApplication);
+    if (!mounted || launched) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(_label('无法打开链接：$url', 'Failed to open URL: $url')),
+      ),
+    );
+  }
+
   Future<void> _openArticlePreview(Article article) async {
     final s = AppStrings.current;
     final url = await ArticleUrlService.resolveArticleUrl(
@@ -325,6 +366,11 @@ class _HomePageState extends State<HomePage> {
                 ),
               ],
             ),
+          IconButton(
+            icon: const Icon(Icons.public),
+            tooltip: _label('访问博客', 'Visit blog'),
+            onPressed: _openBlogHome,
+          ),
           IconButton(
             icon: const Icon(Icons.account_tree_outlined),
             tooltip: _label('GitHub 文件', 'GitHub files'),
