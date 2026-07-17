@@ -26,6 +26,7 @@ class SettingsService {
   static const _keyImageCompressEnabled = 'image_compress_enabled';
   static const _keyImageCompressTargetKB = 'image_compress_target_kb';
   static const _keyFriendLinkPath = 'friend_link_path';
+  static const _keyFriendLinkNewFileFormat = 'friend_link_new_file_format';
   static const _keyThemeMode = 'theme_mode';
   static const _keyThemePresetId = 'theme_preset_id';
   static const _keyLocale = 'locale';
@@ -77,6 +78,10 @@ class SettingsService {
       imageCompressTargetKB: _prefs.getInt(_keyImageCompressTargetKB) ?? 1024,
       friendLinkPath:
           _prefs.getString(_keyFriendLinkPath) ?? 'source/_data/link.yml',
+      friendLinkNewFileFormat: FriendLinkFileFormat.values[
+        _prefs.getInt(_keyFriendLinkNewFileFormat) ??
+            FriendLinkFileFormat.butterfly.index
+      ],
       themeMode: AppThemeMode.values[_prefs.getInt(_keyThemeMode) ?? 0],
       themePresetId:
           _prefs.getString(_keyThemePresetId) ?? Settings.defaultThemePresetId,
@@ -115,6 +120,10 @@ class SettingsService {
       _prefs.setBool(_keyImageCompressEnabled, settings.imageCompressEnabled),
       _prefs.setInt(_keyImageCompressTargetKB, settings.imageCompressTargetKB),
       _prefs.setString(_keyFriendLinkPath, settings.friendLinkPath),
+      _prefs.setInt(
+        _keyFriendLinkNewFileFormat,
+        settings.friendLinkNewFileFormat.index,
+      ),
       _prefs.setInt(_keyThemeMode, settings.themeMode.index),
       _prefs.setString(_keyThemePresetId, settings.themePresetId),
       _prefs.setInt(_keyLocale, settings.locale.index),

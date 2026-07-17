@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:http/http.dart' as http;
 import '../models/friend_link.dart';
+import '../models/settings.dart' show FriendLinkFileFormat;
 import 'database/app_database.dart';
 import 'friend_link_parser.dart';
 import 'github_service.dart';
@@ -199,7 +200,11 @@ class FriendLinkService {
   }
 
   /// 推送友链到 GitHub
-  Future<SyncResult> pushToGitHub(GitHubService github, String filePath) async {
+  Future<SyncResult> pushToGitHub(
+    GitHubService github,
+    String filePath, {
+    FriendLinkFileFormat newFileFormat = FriendLinkFileFormat.butterfly,
+  }) async {
     try {
       _log.logAction('推送友链', detail: '推送到 GitHub');
 
@@ -208,24 +213,42 @@ class FriendLinkService {
       // 检查文件是否存在
       final existing = await github.getFileContent(filePath);
       if (existing != null) {
+        final validationError = FriendLinkParser.validateWritableContent(
+          existing.content,
+        );
+        if (validationError != null) {
+          _log.warn(validationError, tag: 'FriendLink');
+          return SyncResult(success: false, error: validationError);
+        }
+
         final yaml = FriendLinkParser.generateYamlPreservingHeader(
           links,
           existing.content,
+          fallbackFormat: newFileFormat,
         );
-        await github.updateFile(
+        final updateResult = await github.updateFile(
           remotePath: filePath,
           content: yaml,
           sha: existing.sha,
           commitMessage: 'update friend links',
         );
+        if (!updateResult.success) {
+          return SyncResult(success: false, error: updateResult.message);
+        }
         _log.info('更新友链文件: $filePath', tag: 'FriendLink');
       } else {
-        final yaml = FriendLinkParser.generateYamlWithDefaultHeader(links);
-        await github.createFile(
+        final yaml = FriendLinkParser.generateYamlForFormat(
+          links,
+          newFileFormat,
+        );
+        final createResult = await github.createFile(
           remotePath: filePath,
           content: yaml,
           commitMessage: 'add friend links',
         );
+        if (!createResult.success) {
+          return SyncResult(success: false, error: createResult.message);
+        }
         _log.info('创建友链文件: $filePath', tag: 'FriendLink');
       }
 

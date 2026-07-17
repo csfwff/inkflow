@@ -9,6 +9,7 @@ class GitHubService {
   final String owner;
   final String repo;
   final String branch;
+  final http.Client? client;
   static final _log = LogService.instance;
 
   GitHubService({
@@ -16,6 +17,7 @@ class GitHubService {
     required this.owner,
     required this.repo,
     this.branch = 'main',
+    this.client,
   });
 
   String get _baseUrl => 'https://api.github.com/repos/$owner/$repo/contents';
@@ -25,6 +27,19 @@ class GitHubService {
     'Accept': 'application/vnd.github.v3+json',
     'Content-Type': 'application/json',
   };
+
+  /// GitHub Contents API 默认读取仓库默认分支，必须显式传入 ref。
+  Uri _contentReadUri(String path) => Uri.parse(
+    '$_baseUrl/$path',
+  ).replace(queryParameters: {'ref': branch});
+
+  Future<http.Response> _get(Uri uri) {
+    final configuredClient = client;
+    if (configuredClient != null) {
+      return configuredClient.get(uri, headers: _headers);
+    }
+    return http.get(uri, headers: _headers);
+  }
 
   Future<Uri?> getPagesBaseUrl() async {
     final uri = Uri.parse('https://api.github.com/repos/$owner/$repo/pages');
@@ -141,10 +156,10 @@ class GitHubService {
   }
 
   Future<GitHubDirectoryResult> listDirectoryContents(String path) async {
-    final url = Uri.parse('$_baseUrl/$path');
+    final url = _contentReadUri(path);
     debugPrint('[GitHub] GET $url');
     try {
-      final response = await http.get(url, headers: _headers);
+      final response = await _get(url);
       debugPrint('[GitHub] ${response.statusCode} $path');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -188,10 +203,10 @@ class GitHubService {
   }
 
   Future<GitHubFileContent?> getFileContent(String path) async {
-    final url = Uri.parse('$_baseUrl/$path');
-    debugPrint('[GitHub] GET file $path');
+    final url = _contentReadUri(path);
+    debugPrint('[GitHub] GET file $url');
     try {
-      final response = await http.get(url, headers: _headers);
+      final response = await _get(url);
       debugPrint('[GitHub] file ${response.statusCode} $path');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);

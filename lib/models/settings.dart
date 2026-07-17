@@ -4,6 +4,11 @@ enum ImageNamingMode { timestamp, original, timestampOriginal }
 
 enum ImageDateFolderMode { none, year, yearMonth }
 
+/// 仅在需要新建友链文件时使用的 YAML 布局。
+///
+/// 已存在的文件始终由其实际内容自动识别，避免设置与远端文件不一致。
+enum FriendLinkFileFormat { butterfly, flat }
+
 enum AppThemeMode { system, light, dark }
 
 enum AppLocale { system, zh, en }
@@ -42,6 +47,7 @@ class Settings {
 
   // Friend links
   String friendLinkPath;
+  FriendLinkFileFormat friendLinkNewFileFormat;
 
   // App
   AppThemeMode themeMode;
@@ -72,6 +78,7 @@ class Settings {
     this.imageCompressEnabled = false,
     this.imageCompressTargetKB = 1024,
     this.friendLinkPath = 'source/_data/link.yml',
+    this.friendLinkNewFileFormat = FriendLinkFileFormat.butterfly,
     this.themeMode = AppThemeMode.system,
     this.themePresetId = defaultThemePresetId,
     this.locale = AppLocale.system,
@@ -101,6 +108,7 @@ class Settings {
       'imageCompressEnabled': imageCompressEnabled,
       'imageCompressTargetKB': imageCompressTargetKB,
       'friendLinkPath': friendLinkPath,
+      'friendLinkNewFileFormat': friendLinkNewFileFormat.index,
       'themeMode': themeMode.index,
       'themePresetId': themePresetId,
       'locale': locale.index,
@@ -177,6 +185,13 @@ class Settings {
     }
     if (json.containsKey('friendLinkPath')) {
       friendLinkPath = json['friendLinkPath'] ?? 'source/_data/link.yml';
+    }
+    if (json.containsKey('friendLinkNewFileFormat')) {
+      final idx = json['friendLinkNewFileFormat'] as int? ??
+          FriendLinkFileFormat.butterfly.index;
+      if (idx >= 0 && idx < FriendLinkFileFormat.values.length) {
+        friendLinkNewFileFormat = FriendLinkFileFormat.values[idx];
+      }
     }
     if (json.containsKey('themeMode')) {
       final idx = json['themeMode'] as int? ?? AppThemeMode.system.index;

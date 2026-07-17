@@ -136,7 +136,11 @@ class _FriendLinkPageState extends State<FriendLinkPage> {
       branch: settings.githubBranch,
     );
 
-    final result = await _service.pushToGitHub(github, settings.friendLinkPath);
+    final result = await _service.pushToGitHub(
+      github,
+      settings.friendLinkPath,
+      newFileFormat: settings.friendLinkNewFileFormat,
+    );
 
     if (!mounted) return;
     setState(() => _syncing = false);

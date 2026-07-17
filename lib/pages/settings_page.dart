@@ -2243,6 +2243,45 @@ rm -rf "\$BACKUP_DIR"
             _save();
           },
         ),
+        _divider(),
+        _sectionHeader(zh ? '新建友链文件格式' : 'New friend link file format'),
+        _dropdownRow<FriendLinkFileFormat>(
+          value: _settings.friendLinkNewFileFormat,
+          items: [
+            DropdownMenuItem(
+              value: FriendLinkFileFormat.butterfly,
+              child: Text(
+                zh
+                    ? '分组格式（class_name / link_list）'
+                    : 'Grouped (class_name / link_list)',
+              ),
+            ),
+            DropdownMenuItem(
+              value: FriendLinkFileFormat.flat,
+              child: Text(
+                zh
+                    ? '扁平格式（url / desc / image）'
+                    : 'Flat (url / desc / image)',
+              ),
+            ),
+          ],
+          onChanged: (value) {
+            if (value == null) return;
+            setState(() => _settings.friendLinkNewFileFormat = value);
+            _save();
+          },
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: Text(
+            zh
+                ? '仅在远端文件不存在或为空时使用；已有文件会自动识别并保持原格式。'
+                : 'Used only when the remote file is missing or empty. Existing files are detected and kept in their current format.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
       ],
     );
   }
