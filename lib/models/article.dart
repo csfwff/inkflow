@@ -133,7 +133,36 @@ class Article {
       ArticleRemoteKind.post => 'source/_posts',
       ArticleRemoteKind.repoDraft => 'source/_drafts',
     };
-    return '$dir/$filePath';
+    final cleanFilePath = normalizeRelativeFilePath(filePath);
+    return cleanFilePath.isEmpty ? dir : '$dir/$cleanFilePath';
+  }
+
+  /// 根据“文章目录格式”生成相对于 `source/_posts` 或 `source/_drafts`
+  /// 的文章路径。目录格式可留空，此时文章直接保存在目录根部。
+  static String buildArticleFilePath({
+    required String directoryPattern,
+    required DateTime date,
+    required String slug,
+    String category = '',
+  }) {
+    final directory = directoryPattern
+        .replaceAll('{year}', '${date.year}')
+        .replaceAll('{month}', date.month.toString().padLeft(2, '0'))
+        .replaceAll('{day}', date.day.toString().padLeft(2, '0'))
+        .replaceAll('{category}', category)
+        .replaceAll('{slug}', slug)
+        .replaceAll('{timestamp}', '${date.millisecondsSinceEpoch ~/ 1000}');
+    final cleanDirectory = normalizeRelativeFilePath(directory);
+    final filename = '${slug.trim()}.md';
+    return cleanDirectory.isEmpty ? filename : '$cleanDirectory/$filename';
+  }
+
+  /// GitHub 文件路径始终使用相对路径；兼容旧数据和用户输入中的多余斜杠。
+  static String normalizeRelativeFilePath(String value) {
+    return value
+        .trim()
+        .replaceAll(RegExp(r'^/+|/+$'), '')
+        .replaceAll(RegExp(r'/+'), '/');
   }
 
   String buildFrontmatter() {

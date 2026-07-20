@@ -141,23 +141,6 @@ class _EditorPageState extends State<EditorPage> {
     return slug;
   }
 
-  String _resolvePathPattern(
-    String pattern, {
-    required String slug,
-    String category = '',
-    bool appendSlug = true,
-  }) {
-    final d = _selectedDate;
-    final result = pattern
-        .replaceAll('{year}', '${d.year}')
-        .replaceAll('{month}', d.month.toString().padLeft(2, '0'))
-        .replaceAll('{day}', d.day.toString().padLeft(2, '0'))
-        .replaceAll('{category}', category)
-        .replaceAll('{slug}', slug)
-        .replaceAll('{timestamp}', '${d.millisecondsSinceEpoch ~/ 1000}');
-    return appendSlug ? '$result/$slug.md' : result;
-  }
-
   String _formatDate(DateTime d) {
     return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
   }
@@ -188,9 +171,10 @@ class _EditorPageState extends State<EditorPage> {
     final filePath =
         (_editingArticle?.githubSha != null &&
             _editingArticle!.filePath.isNotEmpty)
-        ? _editingArticle!.filePath
-        : _resolvePathPattern(
-            settingsService.settings.githubPathPattern,
+        ? Article.normalizeRelativeFilePath(_editingArticle!.filePath)
+        : Article.buildArticleFilePath(
+            directoryPattern: settingsService.settings.githubPathPattern,
+            date: _selectedDate,
             slug: slug,
             category: category,
           );

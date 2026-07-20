@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../l10n/app_strings.dart';
 import '../main.dart';
+import '../models/article.dart';
 import '../models/app_theme_preset.dart';
 import '../models/settings.dart';
 import 'log_viewer_page.dart';
@@ -2217,7 +2218,9 @@ rm -rf "\$BACKUP_DIR"
         _sectionHeader(zh ? '文章目录格式' : 'Post directory pattern'),
         _inputRow(
           controller: _githubPathPatternCtrl,
-          hint: zh ? '点击下方按钮插入占位符' : 'Tap buttons below to insert placeholders',
+          hint: zh
+              ? '可留空；仅填写相对目录，不含文件名'
+              : 'Optional; enter a relative directory only, without filename',
           onChanged: (v) {
             _settings.githubPathPattern = v;
             _save();
@@ -2906,16 +2909,23 @@ rm -rf "\$BACKUP_DIR"
     final pattern = _githubPathPatternCtrl.text.trim();
     if (pattern.isEmpty) {
       return identical(s, AppStrings.zh)
-          ? '示例：输入 {year}/{month} → 2026/06'
-          : 'Example: {year}/{month} → 2026/06';
+          ? '留空时：保存为 source/_posts/hello-world.md'
+          : 'When empty: saved as source/_posts/hello-world.md';
     }
     final now = DateTime.now();
-    final example = pattern
-        .replaceAll('{year}', now.year.toString())
-        .replaceAll('{month}', now.month.toString().padLeft(2, '0'))
-        .replaceAll('{day}', now.day.toString().padLeft(2, '0'))
-        .replaceAll('{category}', 'tech');
-    return identical(s, AppStrings.zh) ? '示例：$example' : 'Example: $example';
+    final example = Article.normalizeRelativeFilePath(
+      pattern
+          .replaceAll('{year}', now.year.toString())
+          .replaceAll('{month}', now.month.toString().padLeft(2, '0'))
+          .replaceAll('{day}', now.day.toString().padLeft(2, '0'))
+          .replaceAll('{category}', 'tech'),
+    );
+    final examplePath = example.isEmpty
+        ? 'source/_posts/hello-world.md'
+        : 'source/_posts/$example/hello-world.md';
+    return identical(s, AppStrings.zh)
+        ? '示例：$examplePath（首尾 / 会自动忽略）'
+        : 'Example: $examplePath (leading/trailing / is ignored)';
   }
 
   String _buildPermalinkExample(AppStrings s) {
