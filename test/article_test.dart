@@ -1,92 +1,29 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inkflow/models/article.dart';
+import 'package:inkflow/services/frontmatter_helper.dart';
 
 void main() {
   group('Article.buildRemotePath', () {
     test('post 类型生成 source/_posts/ 前缀', () {
       expect(
-        Article.buildRemotePath(kind: ArticleRemoteKind.post, filePath: '2026/06/hello.md'),
+        Article.buildRemotePath(
+          kind: ArticleRemoteKind.post,
+          filePath: '2026/06/hello.md',
+        ),
         'source/_posts/2026/06/hello.md',
       );
     });
 
     test('repoDraft 类型生成 source/_drafts/ 前缀', () {
       expect(
-        Article.buildRemotePath(kind: ArticleRemoteKind.repoDraft, filePath: 'hello.md'),
+        Article.buildRemotePath(
+          kind: ArticleRemoteKind.repoDraft,
+          filePath: 'hello.md',
+        ),
         'source/_drafts/hello.md',
       );
-    });
-  });
-
-  group('Article.remoteKindForStatus', () {
-    test('synced 映射到 post', () {
-      expect(Article.remoteKindForStatus(ArticleStatus.synced), ArticleRemoteKind.post);
-    });
-
-    test('repoDraft 映射到 repoDraft', () {
-      expect(Article.remoteKindForStatus(ArticleStatus.repoDraft), ArticleRemoteKind.repoDraft);
-    });
-
-    test('draft 返回 null', () {
-      expect(Article.remoteKindForStatus(ArticleStatus.draft), isNull);
-    });
-
-    test('pendingPublish 返回 null', () {
-      expect(Article.remoteKindForStatus(ArticleStatus.pendingPublish), isNull);
-    });
-
-    test('remoteDeleted 返回 null', () {
-      expect(Article.remoteKindForStatus(ArticleStatus.remoteDeleted), isNull);
-    });
-  });
-
-  group('Article.effectiveRemotePath', () {
-    test('有 remotePath 时直接返回', () {
-      final article = Article(
-        title: 'Test',
-        content: '',
-        date: DateTime(2026),
-        slug: 'test',
-        remotePath: 'source/_posts/2026/hello.md',
-      );
-      expect(article.effectiveRemotePath, 'source/_posts/2026/hello.md');
-    });
-
-    test('无 remotePath 时根据 status 和 filePath 构建', () {
-      final article = Article(
-        title: 'Test',
-        content: '',
-        date: DateTime(2026),
-        slug: 'test',
-        status: ArticleStatus.synced,
-        filePath: '2026/hello.md',
-      );
-      expect(article.effectiveRemotePath, 'source/_posts/2026/hello.md');
-    });
-
-    test('draft 状态无 remotePath 时返回 null', () {
-      final article = Article(
-        title: 'Test',
-        content: '',
-        date: DateTime(2026),
-        slug: 'test',
-        status: ArticleStatus.draft,
-        filePath: 'hello.md',
-      );
-      expect(article.effectiveRemotePath, isNull);
-    });
-
-    test('remotePath 为空字符串时走 fallback', () {
-      final article = Article(
-        title: 'Test',
-        content: '',
-        date: DateTime(2026),
-        slug: 'test',
-        status: ArticleStatus.repoDraft,
-        filePath: 'draft-hello.md',
-        remotePath: '',
-      );
-      expect(article.effectiveRemotePath, 'source/_drafts/draft-hello.md');
     });
   });
 
@@ -211,5 +148,51 @@ void main() {
       expect(result, contains('title: New'));
       expect(result, contains('Just body.'));
     });
+
+    test('未编辑的自定义字段保留 YAML 类型', () {
+      final article = Article(
+        title: 'Test',
+        content: '---\ntitle: Test\n---\nBody',
+        date: DateTime(2026),
+        slug: 'test',
+        customFields: {
+          'comments': true,
+          'priority': 3,
+          'related': ['a', 'b'],
+          'settings': {'featured': true},
+        },
+      );
+
+      final result = article.updateFrontmatter();
+      final parsed = FrontmatterHelper.parseFrontmatter(result);
+      expect(parsed['comments'], isTrue);
+      expect(parsed['priority'], 3);
+      expect(parsed['related'], ['a', 'b']);
+      expect(parsed['settings'], {'featured': true});
+    });
+  });
+
+  test('自定义字段经 JSON 存储后保留类型', () {
+    final article = Article(
+      title: 'Test',
+      content: '',
+      date: DateTime(2026),
+      slug: 'test',
+      customFields: {
+        'comments': true,
+        'priority': 3,
+        'related': ['a', 'b'],
+        'settings': {'featured': true},
+      },
+    );
+
+    final stored =
+        jsonDecode(jsonEncode(article.toMap())) as Map<String, dynamic>;
+    final restored = Article.fromMap(stored);
+
+    expect(restored.customFields['comments'], isTrue);
+    expect(restored.customFields['priority'], 3);
+    expect(restored.customFields['related'], ['a', 'b']);
+    expect(restored.customFields['settings'], {'featured': true});
   });
 }

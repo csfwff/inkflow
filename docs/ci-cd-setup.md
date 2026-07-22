@@ -11,7 +11,6 @@
 | Windows | zip 压缩包 | 发布到 GitHub Release |
 | Linux | tar.gz 压缩包 | 发布到 GitHub Release |
 | macOS ARM | zip (Apple Silicon) | 发布到 GitHub Release |
-| macOS x86 | zip (Intel) | 发布到 GitHub Release |
 
 ---
 
@@ -31,6 +30,19 @@ git push origin master --tags
 ```
 
 推送 tag 后，GitHub Actions 会自动运行，构建完成后在 [Releases](../../releases) 页面可以看到所有产物。
+
+## 质量门禁
+
+提交 Pull Request 或推送到 `master` 时，`Quality` 工作流会依次执行：
+
+```text
+dart format --set-exit-if-changed lib test
+flutter analyze
+flutter test
+```
+
+标签发布工作流也会先执行同一套检查；任一步失败时，不会开始平台构建或创建
+Release。提交前可在本地运行相同命令。
 
 ---
 
@@ -100,12 +112,12 @@ base64 -i inkflow-release.jks | tr -d '\n'
 
 ```
 push v* tag
-    ├── build-web ──────────→ deploy-pages (GitHub Pages)
-    ├── build-android ──────→┐
-    ├── build-windows ──────→│
-    ├── build-linux ────────→├── release (GitHub Release)
-    ├── build-macos-arm ────→│
-    └── build-macos-x64 ───→┘
+    └── quality
+         ├── build-web ──────────→ deploy-pages (GitHub Pages)
+         ├── build-android ──────→┐
+         ├── build-windows ──────→│
+         ├── build-linux ────────→├── release (GitHub Release)
+         └── build-macos-arm ────→┘
 ```
 
 - Web 和其他平台并行构建
@@ -121,7 +133,6 @@ push v* tag
 | Windows | `inkflow-windows.zip` | 解压后运行 exe |
 | Linux | `inkflow-linux.tar.gz` | 解压后运行可执行文件 |
 | macOS ARM | `inkflow-macos-arm.zip` | Apple Silicon Mac 使用 |
-| macOS x64 | `inkflow-macos-x64.zip` | Intel Mac 使用 |
 
 ---
 
@@ -139,7 +150,8 @@ push v* tag
 
 ### Q: 如何修改 Flutter 版本？
 
-编辑 `.github/workflows/release.yml` 中所有 `flutter-version: '3.27.0'` 为需要的版本。
+编辑 `.github/workflows/quality.yml` 和 `.github/workflows/release.yml` 中的
+`flutter-version`，并保持两处一致。
 
 ### Q: GitHub Pages 部署失败？
 

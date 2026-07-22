@@ -4,14 +4,16 @@ import 'package:inkflow/services/frontmatter_helper.dart';
 void main() {
   group('FrontmatterHelper.parseFrontmatter', () {
     test('解析基本 frontmatter', () {
-      const raw = '---\ntitle: Hello World\ndate: 2024-01-15 10:30:00\n---\nBody';
+      const raw =
+          '---\ntitle: Hello World\ndate: 2024-01-15 10:30:00\n---\nBody';
       final meta = FrontmatterHelper.parseFrontmatter(raw);
       expect(meta['title'], 'Hello World');
       expect(meta['date'], isNotNull);
     });
 
     test('解析含冒号的 title', () {
-      const raw = '---\ntitle: "Hello: World"\ndate: 2024-01-15 10:30:00\n---\nBody';
+      const raw =
+          '---\ntitle: "Hello: World"\ndate: 2024-01-15 10:30:00\n---\nBody';
       final meta = FrontmatterHelper.parseFrontmatter(raw);
       expect(meta['title'], 'Hello: World');
     });
@@ -29,13 +31,15 @@ void main() {
     });
 
     test('解析块状 tags', () {
-      const raw = '---\ntitle: Test\ntags:\n  - dart\n  - flutter\n  - yaml\n---\nBody';
+      const raw =
+          '---\ntitle: Test\ntags:\n  - dart\n  - flutter\n  - yaml\n---\nBody';
       final meta = FrontmatterHelper.parseFrontmatter(raw);
       expect(meta['tags'], ['dart', 'flutter', 'yaml']);
     });
 
     test('解析块状 categories', () {
-      const raw = '---\ntitle: Test\ncategories:\n  - Tech\n  - Dart\n---\nBody';
+      const raw =
+          '---\ntitle: Test\ncategories:\n  - Tech\n  - Dart\n---\nBody';
       final meta = FrontmatterHelper.parseFrontmatter(raw);
       expect(meta['categories'], ['Tech', 'Dart']);
     });
@@ -47,7 +51,8 @@ void main() {
     });
 
     test('解析 boolean 和 null 值', () {
-      const raw = '---\ntitle: Test\ncomments: true\npublished: false\n---\nBody';
+      const raw =
+          '---\ntitle: Test\ncomments: true\npublished: false\n---\nBody';
       final meta = FrontmatterHelper.parseFrontmatter(raw);
       expect(meta['comments'], true);
       expect(meta['published'], false);
@@ -60,7 +65,8 @@ void main() {
     });
 
     test('保留未知字段', () {
-      const raw = '---\ntitle: Test\nmyCustomField: hello\nanother_field: 42\n---\nBody';
+      const raw =
+          '---\ntitle: Test\nmyCustomField: hello\nanother_field: 42\n---\nBody';
       final meta = FrontmatterHelper.parseFrontmatter(raw);
       expect(meta['myCustomField'], 'hello');
       expect(meta['another_field'], 42);
@@ -80,7 +86,10 @@ void main() {
 
     test('正文中包含 --- 不影响提取', () {
       const raw = '---\ntitle: Test\n---\nSome text\n\n---\n\nMore text';
-      expect(FrontmatterHelper.extractBody(raw), 'Some text\n\n---\n\nMore text');
+      expect(
+        FrontmatterHelper.extractBody(raw),
+        'Some text\n\n---\n\nMore text',
+      );
     });
   });
 
@@ -180,18 +189,14 @@ void main() {
 
     test('新增字段追加到末尾', () {
       const raw = '---\ntitle: Test\n---\nBody';
-      final result = FrontmatterHelper.updateFrontmatter(raw, {
-        'author': 'Me',
-      });
+      final result = FrontmatterHelper.updateFrontmatter(raw, {'author': 'Me'});
       expect(result, contains('title: Test'));
       expect(result, contains('author: Me'));
     });
 
     test('没有 frontmatter 时新建', () {
       const raw = 'Just body text.';
-      final result = FrontmatterHelper.updateFrontmatter(raw, {
-        'title': 'New',
-      });
+      final result = FrontmatterHelper.updateFrontmatter(raw, {'title': 'New'});
       expect(result, startsWith('---\n'));
       expect(result, contains('title: New'));
       expect(result, contains('Just body text.'));
@@ -290,7 +295,8 @@ void main() {
 
   group('边界情况', () {
     test('正文中包含 --- 不影响 frontmatter 解析', () {
-      const raw = '---\ntitle: Test\n---\n\nSome text\n\n---\n\nMore text\n\n---\n';
+      const raw =
+          '---\ntitle: Test\n---\n\nSome text\n\n---\n\nMore text\n\n---\n';
       final meta = FrontmatterHelper.parseFrontmatter(raw);
       expect(meta['title'], 'Test');
       final body = FrontmatterHelper.extractBody(raw);
@@ -299,9 +305,7 @@ void main() {
     });
 
     test('title 含方括号正确 round-trip', () {
-      final result = FrontmatterHelper.generate({
-        'title': 'Test [2024] (v2)',
-      });
+      final result = FrontmatterHelper.generate({'title': 'Test [2024] (v2)'});
       expect(result, contains('"Test [2024] (v2)"'));
       final parsed = FrontmatterHelper.parseFrontmatter('$result\nBody');
       expect(parsed['title'], 'Test [2024] (v2)');
@@ -335,7 +339,9 @@ void main() {
         'author': 'Me',
       };
       final generated = FrontmatterHelper.generate(original);
-      final parsed = FrontmatterHelper.parseFrontmatter('$generated\nBody content');
+      final parsed = FrontmatterHelper.parseFrontmatter(
+        '$generated\nBody content',
+      );
       // 日期经过 normalize 会变成 DateTime，这里只验证其他字段
       expect(parsed['title'], original['title']);
       expect(parsed['tags'], original['tags']);

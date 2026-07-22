@@ -234,8 +234,7 @@ class FriendLinkParser {
     List<FriendLink> links,
     String existingContent, {
     FriendLinkFileFormat fallbackFormat = FriendLinkFileFormat.butterfly,
-  }
-  ) {
+  }) {
     final template = _extractTemplate(existingContent);
     if (template == null) {
       return generateYamlForFormat(
@@ -304,9 +303,9 @@ class FriendLinkParser {
       final fieldMatch = _fieldRegExp.firstMatch(fieldLine);
       if (fieldMatch != null) continue;
 
-      final keyMatch = RegExp(r'^([A-Za-z_][A-Za-z0-9_-]*):').firstMatch(
-        fieldLine,
-      );
+      final keyMatch = RegExp(
+        r'^([A-Za-z_][A-Za-z0-9_-]*):',
+      ).firstMatch(fieldLine);
       if (keyMatch != null) {
         final key = keyMatch.group(1)!;
         if (!knownFields.contains(key)) {
@@ -387,7 +386,9 @@ class FriendLinkParser {
     final fieldKeys = <String>[];
 
     for (var i = entryIndex + 1; i < lines.length; i++) {
-      final match = _fieldRegExp.firstMatch(_stripCommentPrefix(lines[i].trim()));
+      final match = _fieldRegExp.firstMatch(
+        _stripCommentPrefix(lines[i].trim()),
+      );
       if (match == null) continue;
       fieldKeys.add(match.group(1)!);
     }

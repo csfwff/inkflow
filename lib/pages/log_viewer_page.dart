@@ -91,7 +91,13 @@ class _LogViewerPageState extends State<LogViewerPage> {
           level = LogLevel.error;
       }
 
-      return _LogEntry(time: time, level: level, tag: tag, message: message, raw: line);
+      return _LogEntry(
+        time: time,
+        level: level,
+        tag: tag,
+        message: message,
+        raw: line,
+      );
     }
 
     // 旧格式或截断标记
@@ -103,7 +109,9 @@ class _LogViewerPageState extends State<LogViewerPage> {
       case _LogLevelFilter.all:
         return _entries;
       case _LogLevelFilter.info:
-        return _entries.where((e) => e.level == LogLevel.info && e.tag != 'UserAction').toList();
+        return _entries
+            .where((e) => e.level == LogLevel.info && e.tag != 'UserAction')
+            .toList();
       case _LogLevelFilter.warn:
         return _entries.where((e) => e.level == LogLevel.warn).toList();
       case _LogLevelFilter.error:
@@ -117,9 +125,9 @@ class _LogViewerPageState extends State<LogViewerPage> {
     final content = _filteredEntries.map((e) => e.raw).join('\n');
     await Clipboard.setData(ClipboardData(text: content));
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.current.logCopied)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppStrings.current.logCopied)));
     }
   }
 
@@ -172,13 +180,13 @@ class _LogViewerPageState extends State<LogViewerPage> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _filteredEntries.isEmpty
-                    ? Center(
-                        child: Text(
-                          s.logEmpty,
-                          style: const TextStyle(color: Colors.grey),
-                        ),
-                      )
-                    : _buildLogList(),
+                ? Center(
+                    child: Text(
+                      s.logEmpty,
+                      style: const TextStyle(color: Colors.grey),
+                    ),
+                  )
+                : _buildLogList(),
           ),
           _buildBottomBar(s),
         ],
@@ -260,7 +268,8 @@ class _LogViewerPageState extends State<LogViewerPage> {
                 ),
               ),
             ),
-          if (entry.tag.isNotEmpty && entry.tag != 'App') const SizedBox(width: 8),
+          if (entry.tag.isNotEmpty && entry.tag != 'App')
+            const SizedBox(width: 8),
           // 消息内容
           Expanded(
             child: Text(
@@ -270,8 +279,8 @@ class _LogViewerPageState extends State<LogViewerPage> {
                 color: entry.level == LogLevel.error
                     ? Theme.of(context).colorScheme.error
                     : entry.level == LogLevel.warn
-                        ? Colors.orange
-                        : null,
+                    ? Colors.orange
+                    : null,
               ),
             ),
           ),
@@ -317,9 +326,7 @@ class _LogViewerPageState extends State<LogViewerPage> {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerLow,
         border: Border(
-          top: BorderSide(
-            color: Theme.of(context).colorScheme.outlineVariant,
-          ),
+          top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
         ),
       ),
       child: Column(

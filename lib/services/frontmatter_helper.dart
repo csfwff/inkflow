@@ -125,6 +125,15 @@ class FrontmatterHelper {
       if (value.isEmpty) return null;
       return '[${value.map((e) => encodeValue(e) ?? 'null').join(', ')}]';
     }
+    if (value is Map) {
+      if (value.isEmpty) return '{}';
+      final entries = value.entries.map((entry) {
+        final key = _encodeString(entry.key.toString());
+        final encodedValue = encodeValue(entry.value) ?? 'null';
+        return '$key: $encodedValue';
+      });
+      return '{${entries.join(', ')}}';
+    }
     return _encodeString(value.toString());
   }
 
@@ -142,7 +151,8 @@ class FrontmatterHelper {
     if (_datePattern.hasMatch(value)) return value;
 
     // 需要引号的场景
-    final needsQuote = value.contains(':') ||
+    final needsQuote =
+        value.contains(':') ||
         value.contains('#') ||
         value.contains('"') ||
         value.contains("'") ||
@@ -249,8 +259,6 @@ class FrontmatterHelper {
 
   /// 移除 Map 中 null 值的条目。
   static Map<String, dynamic> _removeNulls(Map<String, dynamic> map) {
-    return Map.fromEntries(
-      map.entries.where((e) => e.value != null),
-    );
+    return Map.fromEntries(map.entries.where((e) => e.value != null));
   }
 }

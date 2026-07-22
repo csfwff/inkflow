@@ -86,7 +86,8 @@ class _FriendLinkEditPageState extends State<FriendLinkEditPage> {
               TextFormField(
                 controller: _nameCtrl,
                 decoration: _buildInputDecoration(s.friendLinkName),
-                validator: (v) => v == null || v.trim().isEmpty ? s.friendLinkName : null,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? s.friendLinkName : null,
               ),
               const SizedBox(height: 16),
 
@@ -97,7 +98,8 @@ class _FriendLinkEditPageState extends State<FriendLinkEditPage> {
                 controller: _linkCtrl,
                 decoration: _buildInputDecoration('https://example.com'),
                 keyboardType: TextInputType.url,
-                validator: (v) => v == null || v.trim().isEmpty ? s.friendLinkLink : null,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? s.friendLinkLink : null,
               ),
               const SizedBox(height: 16),
 
@@ -106,7 +108,9 @@ class _FriendLinkEditPageState extends State<FriendLinkEditPage> {
               const SizedBox(height: 4),
               TextFormField(
                 controller: _avatarCtrl,
-                decoration: _buildInputDecoration('https://example.com/avatar.png'),
+                decoration: _buildInputDecoration(
+                  'https://example.com/avatar.png',
+                ),
                 keyboardType: TextInputType.url,
               ),
               const SizedBox(height: 16),
@@ -123,7 +127,9 @@ class _FriendLinkEditPageState extends State<FriendLinkEditPage> {
 
               // Enabled switch
               SwitchListTile(
-                title: Text(_enabled ? s.friendLinkEnabled : s.friendLinkDisabled),
+                title: Text(
+                  _enabled ? s.friendLinkEnabled : s.friendLinkDisabled,
+                ),
                 value: _enabled,
                 onChanged: (v) => setState(() => _enabled = v),
                 contentPadding: EdgeInsets.zero,

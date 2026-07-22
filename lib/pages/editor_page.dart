@@ -236,7 +236,7 @@ class _EditorPageState extends State<EditorPage> {
     final oldExcerpt = old.excerpt;
     final oldDescription = old.description;
     final oldAuthor = old.author;
-    final oldCustomFields = Map<String, String>.from(old.customFields);
+    final oldCustomFields = Map<String, dynamic>.from(old.customFields);
 
     final result = await Navigator.push<Article>(
       context,
@@ -366,33 +366,25 @@ class _EditorPageState extends State<EditorPage> {
         sha: previousSha,
         commitMessage: '$commitPrefix: update $title',
       );
+    } else if (previousRemotePath != null &&
+        previousRemotePath.isNotEmpty &&
+        previousSha != null &&
+        previousSha.isNotEmpty) {
+      // 草稿和正式文章之间切换需要同时创建目标并删除来源。使用 Git Data
+      // API 的单个 commit，避免 Contents API 两步调用只成功一半。
+      result = await service.moveFileAtomically(
+        sourcePath: previousRemotePath,
+        sourceSha: previousSha,
+        targetPath: targetRemotePath,
+        content: fullContent,
+        commitMessage: '$commitPrefix: move $title',
+      );
     } else {
       result = await service.createFile(
         remotePath: targetRemotePath,
         content: fullContent,
         commitMessage: '$commitPrefix: $title',
       );
-
-      if (result.success &&
-          previousRemotePath != null &&
-          previousRemotePath != targetRemotePath &&
-          previousSha != null &&
-          previousSha.isNotEmpty) {
-        final deleteResult = await service.deleteFile(
-          remotePath: previousRemotePath,
-          sha: previousSha,
-          commitMessage: '$commitPrefix: remove old $title',
-        );
-        if (!deleteResult.success) {
-          result = GitHubResult(
-            success: false,
-            message:
-                '${_label('新文件已创建，但旧远程文件删除失败', 'Created new file, but failed to delete old remote file')}: ${deleteResult.message}',
-            fileUrl: result.fileUrl,
-            sha: result.sha,
-          );
-        }
-      }
     }
 
     if (!mounted) return;
@@ -1196,12 +1188,34 @@ class _EditorPageState extends State<EditorPage> {
     return true;
   }
 
-  bool _mapEquals(Map<String, String> a, Map<String, String> b) {
+  bool _mapEquals(Map<String, dynamic> a, Map<String, dynamic> b) {
     if (a.length != b.length) return false;
     for (final entry in a.entries) {
-      if (b[entry.key] != entry.value) return false;
+      if (!_valueEquals(b[entry.key], entry.value)) return false;
     }
     return true;
+  }
+
+  bool _valueEquals(Object? a, Object? b) {
+    if (identical(a, b) || a == b) return true;
+    if (a is List && b is List) {
+      if (a.length != b.length) return false;
+      for (var i = 0; i < a.length; i++) {
+        if (!_valueEquals(a[i], b[i])) return false;
+      }
+      return true;
+    }
+    if (a is Map && b is Map) {
+      if (a.length != b.length) return false;
+      for (final entry in a.entries) {
+        if (!b.containsKey(entry.key) ||
+            !_valueEquals(b[entry.key], entry.value)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return false;
   }
 }
 

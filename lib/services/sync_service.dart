@@ -1,14 +1,13 @@
 import '../models/article.dart';
 import 'frontmatter_helper.dart';
 import 'github_service.dart';
-import 'article_service.dart';
 import 'log_service.dart';
-import 'settings_service.dart';
+import 'sync_contracts.dart';
 
 class SyncService {
   final GitHubService github;
-  final ArticleService articleService;
-  final SettingsService settingsService;
+  final SyncArticleStore articleService;
+  final SyncSettingsStore settingsService;
 
   static final _log = LogService.instance;
 
@@ -55,8 +54,11 @@ class SyncService {
         ArticleStatus.synced,
         ArticleRemoteKind.post,
       );
-      _log.write('source/_posts -> ${posts.length} articles', tag: 'Sync');
-      remoteArticles.addAll(posts);
+      _log.write(
+        'source/_posts -> ${posts.articles.length} articles (${posts.state.name})',
+        tag: 'Sync',
+      );
+      remoteArticles.addAll(posts.articles);
 
       // 同步仓库草稿 (source/_drafts)
       _log.write('Syncing source/_drafts ...', tag: 'Sync');
@@ -65,8 +67,11 @@ class SyncService {
         ArticleStatus.repoDraft,
         ArticleRemoteKind.repoDraft,
       );
-      _log.write('source/_drafts -> ${drafts.length} articles', tag: 'Sync');
-      remoteArticles.addAll(drafts);
+      _log.write(
+        'source/_drafts -> ${drafts.articles.length} articles (${drafts.state.name})',
+        tag: 'Sync',
+      );
+      remoteArticles.addAll(drafts.articles);
 
       _log.write(
         'Total remote articles: ${remoteArticles.length}',
@@ -96,26 +101,46 @@ class SyncService {
       await articleService.ensureTags(allTags.toList());
       await articleService.ensureCategories(allCategories.toList());
 
-      // 检测远程已删除：本地 synced/repoDraft 但远程不存在的
-      final localSynced = await articleService.getRemoteTracked();
-      _log.write(
-        'Local synced/repoDraft count: ${localSynced.length}',
-        tag: 'Sync',
-      );
       int deletedCount = 0;
-      for (final local in localSynced) {
-        if (local.status == ArticleStatus.pendingPublish) {
-          continue;
-        }
+      final deletionReconciliationSkipped =
+          posts.state != _DirectoryScanState.complete ||
+          drafts.state != _DirectoryScanState.complete;
 
-        final remotePath = local.remotePath;
-        if (remotePath == null || !remotePaths.contains(remotePath)) {
-          _log.write(
-            'Remote deleted: "${local.title}" (${remotePath ?? local.filePath})',
-            tag: 'Sync',
-          );
-          await articleService.markAsRemoteDeleted(local.id!);
-          deletedCount++;
+      // 只有两个根目录都完整读取成功时，才允许把本地记录判定为远端删除。
+      // 404 对于新仓库是合法状态，但也可能来自错误仓库/权限配置，不能据此
+      // 修改本地文章状态。
+      if (deletionReconciliationSkipped) {
+        _log.write(
+          'Skipped remote deletion reconciliation because at least one root directory was not found',
+          tag: 'Sync',
+        );
+      } else {
+        final localSynced = await articleService.getRemoteTracked();
+        _log.write(
+          'Local synced/repoDraft count: ${localSynced.length}',
+          tag: 'Sync',
+        );
+        for (final local in localSynced) {
+          if (local.status == ArticleStatus.pendingPublish) {
+            continue;
+          }
+
+          final remotePath = local.remotePath;
+          if (remotePath == null || remotePath.isEmpty) {
+            _log.write(
+              'Skipped deletion reconciliation for "${local.title}" without a remote path',
+              tag: 'Sync',
+            );
+            continue;
+          }
+          if (!remotePaths.contains(remotePath)) {
+            _log.write(
+              'Remote deleted: "${local.title}" ($remotePath)',
+              tag: 'Sync',
+            );
+            await articleService.markAsRemoteDeleted(local.id!);
+            deletedCount++;
+          }
         }
       }
       if (deletedCount > 0) {
@@ -137,7 +162,11 @@ class SyncService {
         '=== syncFromGitHub DONE: ${remoteArticles.length} synced, $deletedCount remote deleted ===',
         tag: 'Sync',
       );
-      return SyncResult(success: true, count: remoteArticles.length);
+      return SyncResult(
+        success: true,
+        count: remoteArticles.length,
+        deletionReconciliationSkipped: deletionReconciliationSkipped,
+      );
     } catch (e, stack) {
       await _log.logException(e, stack, tag: 'Sync', context: '全量同步异常');
       return SyncResult(success: false, error: e.toString());
@@ -158,14 +187,32 @@ class SyncService {
       _log.write('lastSyncTime: $lastSyncTime', tag: 'Sync');
 
       // 获取两个目录的 commit 记录
-      final postsCommits = await github.getCommitsSince(
+      final postsCommitsResult = await github.getCommitsSince(
         path: 'source/_posts',
         since: lastSyncTime,
       );
-      final draftsCommits = await github.getCommitsSince(
+      if (!postsCommitsResult.success) {
+        _log.write(
+          'Posts commit request failed (${postsCommitsResult.error}), falling back to full sync',
+          tag: 'Sync',
+        );
+        return syncFromGitHub();
+      }
+
+      final draftsCommitsResult = await github.getCommitsSince(
         path: 'source/_drafts',
         since: lastSyncTime,
       );
+      if (!draftsCommitsResult.success) {
+        _log.write(
+          'Drafts commit request failed (${draftsCommitsResult.error}), falling back to full sync',
+          tag: 'Sync',
+        );
+        return syncFromGitHub();
+      }
+
+      final postsCommits = postsCommitsResult.commits;
+      final draftsCommits = draftsCommitsResult.commits;
 
       _log.write(
         'Commits: posts=${postsCommits.length}, drafts=${draftsCommits.length}',
@@ -242,10 +289,16 @@ class SyncService {
       // 标记 removed 文件
       int deletedCount = 0;
       for (final filePath in postsChanges.removed) {
-        deletedCount += await _markRemoteDeleted(filePath);
+        deletedCount += await _markRemoteDeleted(
+          filePath,
+          ArticleRemoteKind.post,
+        );
       }
       for (final filePath in draftsChanges.removed) {
-        deletedCount += await _markRemoteDeleted(filePath);
+        deletedCount += await _markRemoteDeleted(
+          filePath,
+          ArticleRemoteKind.repoDraft,
+        );
       }
 
       // 同步标签和分类
@@ -288,25 +341,35 @@ class SyncService {
     // 从旧到新遍历，这样后面的 commit 会覆盖前面的状态
     for (final commit in commits.reversed) {
       for (final file in commit.files) {
-        if (!file.filename.startsWith(prefix)) continue;
-        if (!file.filename.endsWith('.md')) continue;
-
-        final relativePath = file.filename.substring(prefix.length);
+        final relativePath = _relativeMarkdownPath(file.filename, prefix);
+        final previousRelativePath = _relativeMarkdownPath(
+          file.previousFilename,
+          prefix,
+        );
 
         switch (file.status) {
           case 'added':
           case 'modified':
-            addedOrModified.add(relativePath);
-            removed.remove(relativePath);
+            if (relativePath != null) {
+              addedOrModified.add(relativePath);
+              removed.remove(relativePath);
+            }
             break;
           case 'removed':
-            addedOrModified.remove(relativePath);
-            removed.add(relativePath);
+            if (relativePath != null) {
+              addedOrModified.remove(relativePath);
+              removed.add(relativePath);
+            }
             break;
           case 'renamed':
-            // renamed 的 old_filename 可能需要特殊处理
-            // 简单起见，把新文件当作 added
-            addedOrModified.add(relativePath);
+            if (previousRelativePath != null) {
+              addedOrModified.remove(previousRelativePath);
+              removed.add(previousRelativePath);
+            }
+            if (relativePath != null) {
+              addedOrModified.add(relativePath);
+              removed.remove(relativePath);
+            }
             break;
         }
       }
@@ -316,6 +379,13 @@ class SyncService {
       addedOrModified: addedOrModified.toList(),
       removed: removed.toList(),
     );
+  }
+
+  String? _relativeMarkdownPath(String? path, String prefix) {
+    if (path == null || !path.startsWith(prefix) || !path.endsWith('.md')) {
+      return null;
+    }
+    return path.substring(prefix.length);
   }
 
   /// 获取单个文件并解析
@@ -344,13 +414,22 @@ class SyncService {
     );
   }
 
-  /// 根据 remotePath 查找并标记为 remoteDeleted
-  Future<int> _markRemoteDeleted(String relativePath) async {
+  /// 根据完整远端路径查找并标记为 remoteDeleted。
+  ///
+  /// posts 和 drafts 可以有相同的相对文件名，因此不能使用 endsWith 匹配。
+  Future<int> _markRemoteDeleted(
+    String relativePath,
+    ArticleRemoteKind remoteKind,
+  ) async {
+    final expectedRemotePath = Article.buildRemotePath(
+      kind: remoteKind,
+      filePath: relativePath,
+    );
     final articles = await articleService.getRemoteTracked();
     int count = 0;
     for (final article in articles) {
-      if (article.remotePath != null &&
-          article.remotePath!.endsWith('/$relativePath')) {
+      if (article.status == ArticleStatus.pendingPublish) continue;
+      if (article.remotePath == expectedRemotePath && article.id != null) {
         await articleService.markAsRemoteDeleted(article.id!);
         count++;
         _log.write('Marked remote deleted: "${article.title}"', tag: 'Sync');
@@ -378,7 +457,7 @@ class SyncService {
     return latest;
   }
 
-  Future<List<Article>> _syncDirectory(
+  Future<_DirectorySyncResult> _syncDirectory(
     String dirPath,
     ArticleStatus status,
     ArticleRemoteKind remoteKind,
@@ -387,22 +466,31 @@ class SyncService {
     final List<Article> articles = [];
     final prefix = _prefixForRemoteKind(remoteKind);
 
-    try {
-      await _traverseDirectory(dirPath, prefix, status, remoteKind, articles);
-    } on _SyncException catch (e) {
-      // 根目录（source/_posts、source/_drafts）不存在时允许跳过
-      if (e.message.contains('404')) {
-        _log.write(
-          'Directory not found (404), skipping: $dirPath',
-          tag: 'Sync',
-        );
-        return articles;
-      }
-      rethrow;
+    final rootResult = await github.listDirectoryContents(dirPath);
+    if (rootResult.notFound) {
+      _log.write(
+        'Root directory not found (404), skipping: $dirPath',
+        tag: 'Sync',
+      );
+      return _DirectorySyncResult.notFound();
+    }
+    if (!rootResult.success) {
+      throw _SyncException(
+        'Failed to list $dirPath: ${rootResult.error ?? 'Unknown error'}',
+      );
     }
 
+    await _traverseEntries(
+      dirPath,
+      rootResult.entries,
+      prefix,
+      status,
+      remoteKind,
+      articles,
+    );
+
     _log.write('$dirPath -> ${articles.length} articles total', tag: 'Sync');
-    return articles;
+    return _DirectorySyncResult.complete(articles);
   }
 
   ArticleRemoteKind? _remoteKindForPath(String remotePath) {
@@ -443,7 +531,24 @@ class SyncService {
       );
     }
 
-    final entries = result.entries;
+    await _traverseEntries(
+      currentPath,
+      result.entries,
+      prefix,
+      status,
+      remoteKind,
+      articles,
+    );
+  }
+
+  Future<void> _traverseEntries(
+    String currentPath,
+    List<GitHubFileEntry> entries,
+    String prefix,
+    ArticleStatus status,
+    ArticleRemoteKind remoteKind,
+    List<Article> articles,
+  ) async {
     _log.write(
       '$currentPath -> ${entries.length} entries: ${entries.map((e) => '${e.name}(${e.type})').join(', ')}',
       tag: 'Sync',
@@ -526,10 +631,10 @@ class SyncService {
       'description',
       'author',
     };
-    final customFields = <String, String>{};
+    final customFields = <String, dynamic>{};
     for (final entry in meta.entries) {
       if (!knownKeys.contains(entry.key)) {
-        customFields[entry.key] = entry.value.toString();
+        customFields[entry.key] = entry.value;
       }
     }
 
@@ -574,8 +679,28 @@ class SyncResult {
   final bool success;
   final int count;
   final String? error;
+  final bool deletionReconciliationSkipped;
 
-  SyncResult({required this.success, this.count = 0, this.error});
+  SyncResult({
+    required this.success,
+    this.count = 0,
+    this.error,
+    this.deletionReconciliationSkipped = false,
+  });
+}
+
+enum _DirectoryScanState { complete, notFound }
+
+class _DirectorySyncResult {
+  final _DirectoryScanState state;
+  final List<Article> articles;
+
+  _DirectorySyncResult.complete(this.articles)
+    : state = _DirectoryScanState.complete;
+
+  _DirectorySyncResult.notFound()
+    : state = _DirectoryScanState.notFound,
+      articles = const [];
 }
 
 class _SyncException implements Exception {

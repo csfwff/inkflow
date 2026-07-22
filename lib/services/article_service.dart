@@ -3,8 +3,9 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import '../models/article.dart';
 import 'database/app_database.dart';
+import 'sync_contracts.dart';
 
-class ArticleService {
+class ArticleService implements SyncArticleStore {
   late final AppDatabase _db;
 
   /// 获取数据库实例（供其他服务共享使用）
@@ -68,6 +69,7 @@ class ArticleService {
   Future<List<Article>> getRepoDrafts() =>
       getAll(status: ArticleStatus.repoDraft);
 
+  @override
   Future<List<Article>> getRemoteTracked() async {
     final rows =
         await (_db.select(_db.articleRows)
@@ -84,6 +86,7 @@ class ArticleService {
 
   Future<List<Article>> getSyncedAndRepoDrafts() => getRemoteTracked();
 
+  @override
   Future<void> upsertFromGitHub(Article article) async {
     final existing = await _findExistingRemoteArticle(article);
 
@@ -98,6 +101,7 @@ class ArticleService {
     }
   }
 
+  @override
   Future<void> replaceWithRemote(Article article) async {
     final existing = await _findExistingRemoteArticle(article);
     if (existing != null) {
@@ -211,6 +215,7 @@ class ArticleService {
     );
   }
 
+  @override
   Future<void> markAsRemoteDeleted(int id) async {
     await (_db.update(_db.articleRows)..where((t) => t.id.equals(id))).write(
       ArticleRowsCompanion(
@@ -259,6 +264,7 @@ class ArticleService {
     await (_db.delete(_db.tagRows)..where((t) => t.id.equals(id))).go();
   }
 
+  @override
   Future<void> ensureTags(List<String> names) async {
     for (final name in names) {
       await addTagIfNotExists(name);
@@ -304,6 +310,7 @@ class ArticleService {
     await (_db.delete(_db.categoryRows)..where((t) => t.id.equals(id))).go();
   }
 
+  @override
   Future<void> ensureCategories(List<String> names) async {
     for (final name in names) {
       await addCategoryIfNotExists(name);

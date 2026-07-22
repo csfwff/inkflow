@@ -22,7 +22,8 @@ class CompressResult {
   });
 
   /// 压缩比例 (0-100)
-  double get ratio => originalSize > 0 ? (1 - compressedSize / originalSize) * 100 : 0;
+  double get ratio =>
+      originalSize > 0 ? (1 - compressedSize / originalSize) * 100 : 0;
 
   /// 格式化的原始大小
   String get originalSizeFormatted => _formatSize(originalSize);
@@ -68,7 +69,10 @@ class ImageCompressor {
 
     // 如果已经小于目标大小且没有尺寸限制，直接返回
     final targetBytes = targetKB * 1024;
-    if (targetKB > 0 && originalSize <= targetBytes && maxWidth == 0 && maxHeight == 0) {
+    if (targetKB > 0 &&
+        originalSize <= targetBytes &&
+        maxWidth == 0 &&
+        maxHeight == 0) {
       return CompressResult(
         bytes: bytes,
         originalSize: originalSize,
@@ -96,18 +100,28 @@ class ImageCompressor {
       final ratio = maxWidth / currentWidth;
       currentWidth = maxWidth;
       currentHeight = (currentHeight * ratio).round();
-      currentImage = img.copyResize(currentImage, width: currentWidth, height: currentHeight);
+      currentImage = img.copyResize(
+        currentImage,
+        width: currentWidth,
+        height: currentHeight,
+      );
     }
     if (maxHeight > 0 && currentHeight > maxHeight) {
       final ratio = maxHeight / currentHeight;
       currentHeight = maxHeight;
       currentWidth = (currentWidth * ratio).round();
-      currentImage = img.copyResize(currentImage, width: currentWidth, height: currentHeight);
+      currentImage = img.copyResize(
+        currentImage,
+        width: currentWidth,
+        height: currentHeight,
+      );
     }
 
     // 如果目标为 0（不限大小），只做尺寸缩放
     if (targetKB == 0) {
-      final compressedBytes = Uint8List.fromList(img.encodeJpg(currentImage, quality: _startQuality));
+      final compressedBytes = Uint8List.fromList(
+        img.encodeJpg(currentImage, quality: _startQuality),
+      );
       return CompressResult(
         bytes: compressedBytes,
         originalSize: originalSize,
@@ -124,7 +138,9 @@ class ImageCompressor {
     Uint8List? compressedBytes;
 
     while (quality >= _minQuality) {
-      final encoded = Uint8List.fromList(img.encodeJpg(currentImage, quality: quality));
+      final encoded = Uint8List.fromList(
+        img.encodeJpg(currentImage, quality: quality),
+      );
       if (encoded.length <= targetBytes) {
         compressedBytes = encoded;
         break;
@@ -142,8 +158,14 @@ class ImageCompressor {
       while (currentWidth > 100 && currentHeight > 100) {
         currentWidth = (currentWidth * 0.8).round();
         currentHeight = (currentHeight * 0.8).round();
-        currentImage = img.copyResize(currentImage, width: currentWidth, height: currentHeight);
-        final encoded = Uint8List.fromList(img.encodeJpg(currentImage, quality: _minQuality));
+        currentImage = img.copyResize(
+          currentImage,
+          width: currentWidth,
+          height: currentHeight,
+        );
+        final encoded = Uint8List.fromList(
+          img.encodeJpg(currentImage, quality: _minQuality),
+        );
         if (encoded.length <= targetBytes) {
           compressedBytes = encoded;
           break;

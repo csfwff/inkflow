@@ -75,6 +75,7 @@ class AppStrings {
   final String syncFromGitHub;
   final String syncSuccess;
   final String syncFailed;
+  final String syncDeletionCheckSkipped;
   final String noArticles;
   final String deleteArticle;
   final String deleteConfirm;
@@ -251,6 +252,7 @@ class AppStrings {
     required this.syncFromGitHub,
     required this.syncSuccess,
     required this.syncFailed,
+    required this.syncDeletionCheckSkipped,
     required this.noArticles,
     required this.deleteArticle,
     required this.deleteConfirm,
@@ -413,6 +415,8 @@ class AppStrings {
     syncFromGitHub: 'Sync from GitHub',
     syncSuccess: 'Sync complete',
     syncFailed: 'Sync failed',
+    syncDeletionCheckSkipped:
+        'Remote deletion check was skipped because an article directory was not found',
     noArticles: 'No articles yet',
     deleteArticle: 'Delete',
     deleteConfirm: 'Are you sure you want to delete this article?',
@@ -578,6 +582,7 @@ class AppStrings {
     syncFromGitHub: '从 GitHub 同步',
     syncSuccess: '同步完成',
     syncFailed: '同步失败',
+    syncDeletionCheckSkipped: '未找到文章目录，已跳过远端删除检查',
     noArticles: '暂无文章',
     deleteArticle: '删除',
     deleteConfirm: '确认删除这篇文章？',

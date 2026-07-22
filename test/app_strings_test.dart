@@ -43,9 +43,18 @@ void main() {
     });
 
     test('forLocale 返回正确的语言包', () {
-      expect(identical(AppStrings.forLocale(const Locale('zh')), AppStrings.zh), isTrue);
-      expect(identical(AppStrings.forLocale(const Locale('en')), AppStrings.en), isTrue);
-      expect(identical(AppStrings.forLocale(const Locale('fr')), AppStrings.en), isTrue);
+      expect(
+        identical(AppStrings.forLocale(const Locale('zh')), AppStrings.zh),
+        isTrue,
+      );
+      expect(
+        identical(AppStrings.forLocale(const Locale('en')), AppStrings.en),
+        isTrue,
+      );
+      expect(
+        identical(AppStrings.forLocale(const Locale('fr')), AppStrings.en),
+        isTrue,
+      );
     });
   });
 }

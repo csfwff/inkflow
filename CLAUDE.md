@@ -15,6 +15,7 @@ Flutter 项目，用于开发一个博客发布工具（类似 Hexo 客户端）
 - [UI 设计指南](docs/ui-design-guide.md) - 产品定位、页面设计、UI 风格
 - [开发规则](docs/development-rules.md) - 项目结构、代码规范、强制规则
 - [UI/UX PRO MAX](docs/ui-ux-pro-max.md) - 高端 UI 设计原则
+- [后续开发方向](docs/development-direction.md) - 产品路线、P0 验收标准与后续优先级
 
 ## 快速参考
 

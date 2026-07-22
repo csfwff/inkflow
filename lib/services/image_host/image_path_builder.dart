@@ -11,11 +11,14 @@ String buildRemoteImagePath(
   required ImageNamingMode namingMode,
 }) {
   final now = DateTime.now();
-  final cleanBase = basePath.replaceAll(RegExp(r'^/+|/+$'), '').replaceAll(RegExp(r'/+'), '/');
+  final cleanBase = basePath
+      .replaceAll(RegExp(r'^/+|/+$'), '')
+      .replaceAll(RegExp(r'/+'), '/');
   final parts = <String>[
     if (cleanBase.isNotEmpty) cleanBase,
     if (dateFolderMode == ImageDateFolderMode.year) '${now.year}',
-    if (dateFolderMode == ImageDateFolderMode.yearMonth) '${now.year}/${now.month.toString().padLeft(2, '0')}',
+    if (dateFolderMode == ImageDateFolderMode.yearMonth)
+      '${now.year}/${now.month.toString().padLeft(2, '0')}',
     _resolveName(filename, namingMode, now),
   ];
   return parts.join('/');

@@ -101,8 +101,11 @@ class _HomePageState extends State<HomePage> {
     setState(() => _syncing = false);
 
     if (result.success) {
+      final detail = result.deletionReconciliationSkipped
+          ? '\n${s.syncDeletionCheckSkipped}'
+          : '';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${s.syncSuccess}: ${result.count}')),
+        SnackBar(content: Text('${s.syncSuccess}: ${result.count}$detail')),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

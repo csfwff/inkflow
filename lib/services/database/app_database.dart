@@ -38,7 +38,9 @@ class TagRows extends Table {
   TextColumn get createdAt => text()();
 
   @override
-  List<Set<Column>> get uniqueKeys => [{name}];
+  List<Set<Column>> get uniqueKeys => [
+    {name},
+  ];
 }
 
 /// 分类表
@@ -48,7 +50,9 @@ class CategoryRows extends Table {
   TextColumn get createdAt => text()();
 
   @override
-  List<Set<Column>> get uniqueKeys => [{name}];
+  List<Set<Column>> get uniqueKeys => [
+    {name},
+  ];
 }
 
 /// 友链表
@@ -64,7 +68,9 @@ class FriendLinkRows extends Table {
   TextColumn get createdAt => text()();
 
   @override
-  List<Set<Column>> get uniqueKeys => [{name}];
+  List<Set<Column>> get uniqueKeys => [
+    {name},
+  ];
 }
 
 @DriftDatabase(tables: [ArticleRows, TagRows, CategoryRows, FriendLinkRows])
@@ -76,20 +82,20 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onCreate: (Migrator m) async {
-          await m.createAll();
-        },
-        onUpgrade: (Migrator m, int from, int to) async {
-          if (from < 2) {
-            await m.createTable(friendLinkRows);
-          }
-          if (from < 3) {
-            // 友链排序字段；旧数据保持 0，getAll 按 (sortOrder, id) 兜底，
-            // 旧记录顺次落在 id（插入）序，下次同步会用文件顺序覆盖。
-            await m.addColumn(friendLinkRows, friendLinkRows.sortOrder);
-          }
-        },
-      );
+    onCreate: (Migrator m) async {
+      await m.createAll();
+    },
+    onUpgrade: (Migrator m, int from, int to) async {
+      if (from < 2) {
+        await m.createTable(friendLinkRows);
+      }
+      if (from < 3) {
+        // 友链排序字段；旧数据保持 0，getAll 按 (sortOrder, id) 兜底，
+        // 旧记录顺次落在 id（插入）序，下次同步会用文件顺序覆盖。
+        await m.addColumn(friendLinkRows, friendLinkRows.sortOrder);
+      }
+    },
+  );
 
   static Future<AppDatabase> create() async {
     final executor = await openConnection();
@@ -100,60 +106,58 @@ class AppDatabase extends _$AppDatabase {
 // --- Article model <-> ArticleRow conversion ---
 
 ArticleRowsCompanion toCompanion(Article a) => ArticleRowsCompanion(
-      id: a.id != null ? Value(a.id!) : const Value.absent(),
-      title: Value(a.title),
-      content: Value(a.content),
-      date: Value(a.date.toIso8601String()),
-      slug: Value(a.slug),
-      status: Value(a.status),
-      filePath: Value(a.filePath),
-      remotePath: Value(a.remotePath),
-      remoteKind: Value(a.remoteKind),
-      githubSha: Value(a.githubSha),
-      createdAt: Value(a.createdAt.toIso8601String()),
-      updatedAt: Value(a.updatedAt.toIso8601String()),
-      tags: Value(a.tags.join(',')),
-      categories: Value(a.categories.join(',')),
-      permalink: Value(a.permalink),
-      topImg: Value(a.topImg),
-      cover: Value(a.cover),
-      excerpt: Value(a.excerpt),
-      description: Value(a.description),
-      author: Value(a.author),
-      customFields: Value(jsonEncode(a.customFields)),
-    );
+  id: a.id != null ? Value(a.id!) : const Value.absent(),
+  title: Value(a.title),
+  content: Value(a.content),
+  date: Value(a.date.toIso8601String()),
+  slug: Value(a.slug),
+  status: Value(a.status),
+  filePath: Value(a.filePath),
+  remotePath: Value(a.remotePath),
+  remoteKind: Value(a.remoteKind),
+  githubSha: Value(a.githubSha),
+  createdAt: Value(a.createdAt.toIso8601String()),
+  updatedAt: Value(a.updatedAt.toIso8601String()),
+  tags: Value(a.tags.join(',')),
+  categories: Value(a.categories.join(',')),
+  permalink: Value(a.permalink),
+  topImg: Value(a.topImg),
+  cover: Value(a.cover),
+  excerpt: Value(a.excerpt),
+  description: Value(a.description),
+  author: Value(a.author),
+  customFields: Value(jsonEncode(a.customFields)),
+);
 
 Article articleFromRow(ArticleRow row) => Article(
-      id: row.id,
-      title: row.title,
-      content: row.content,
-      date: DateTime.parse(row.date),
-      slug: row.slug,
-      status: row.status,
-      filePath: row.filePath,
-      remotePath: row.remotePath,
-      remoteKind: row.remoteKind,
-      githubSha: row.githubSha,
-      createdAt: DateTime.parse(row.createdAt),
-      updatedAt: DateTime.parse(row.updatedAt),
-      tags: row.tags.split(',').where((t) => t.isNotEmpty).toList(),
-      categories: row.categories.split(',').where((c) => c.isNotEmpty).toList(),
-      permalink: row.permalink,
-      topImg: row.topImg,
-      cover: row.cover,
-      excerpt: row.excerpt,
-      description: row.description,
-      author: row.author,
-      customFields: _parseCustomFields(row.customFields),
-    );
+  id: row.id,
+  title: row.title,
+  content: row.content,
+  date: DateTime.parse(row.date),
+  slug: row.slug,
+  status: row.status,
+  filePath: row.filePath,
+  remotePath: row.remotePath,
+  remoteKind: row.remoteKind,
+  githubSha: row.githubSha,
+  createdAt: DateTime.parse(row.createdAt),
+  updatedAt: DateTime.parse(row.updatedAt),
+  tags: row.tags.split(',').where((t) => t.isNotEmpty).toList(),
+  categories: row.categories.split(',').where((c) => c.isNotEmpty).toList(),
+  permalink: row.permalink,
+  topImg: row.topImg,
+  cover: row.cover,
+  excerpt: row.excerpt,
+  description: row.description,
+  author: row.author,
+  customFields: _parseCustomFields(row.customFields),
+);
 
-Map<String, String> _parseCustomFields(String json) {
+Map<String, dynamic> _parseCustomFields(String json) {
   try {
     final decoded = jsonDecode(json);
     if (decoded is Map) {
-      return decoded.map(
-        (key, value) => MapEntry(key.toString(), value.toString()),
-      );
+      return decoded.map((key, value) => MapEntry(key.toString(), value));
     }
   } catch (_) {}
   return {};
@@ -161,7 +165,8 @@ Map<String, String> _parseCustomFields(String json) {
 
 // --- FriendLink model <-> FriendLinkRow conversion ---
 
-FriendLinkRowsCompanion friendLinkToCompanion(FriendLink fl) => FriendLinkRowsCompanion(
+FriendLinkRowsCompanion friendLinkToCompanion(FriendLink fl) =>
+    FriendLinkRowsCompanion(
       id: fl.id != null ? Value(fl.id!) : const Value.absent(),
       name: Value(fl.name),
       link: Value(fl.link),
@@ -174,13 +179,13 @@ FriendLinkRowsCompanion friendLinkToCompanion(FriendLink fl) => FriendLinkRowsCo
     );
 
 FriendLink friendLinkFromRow(FriendLinkRow row) => FriendLink(
-      id: row.id,
-      name: row.name,
-      link: row.link,
-      avatar: row.avatar,
-      descr: row.descr,
-      isCommented: row.isCommented,
-      isDev: row.isDev,
-      sortOrder: row.sortOrder,
-      createdAt: DateTime.parse(row.createdAt),
-    );
+  id: row.id,
+  name: row.name,
+  link: row.link,
+  avatar: row.avatar,
+  descr: row.descr,
+  isCommented: row.isCommented,
+  isDev: row.isDev,
+  sortOrder: row.sortOrder,
+  createdAt: DateTime.parse(row.createdAt),
+);

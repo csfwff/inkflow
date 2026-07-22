@@ -39,8 +39,7 @@ Future<Directory> _getDesktopDir() async {
   }
   if (Platform.isMacOS) {
     final home = Platform.environment['HOME'] ?? '.';
-    return Directory(
-        p.join(home, 'Library', 'Application Support', 'inkflow'));
+    return Directory(p.join(home, 'Library', 'Application Support', 'inkflow'));
   }
   return Directory('.');
 }

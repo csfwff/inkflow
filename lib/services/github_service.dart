@@ -20,6 +20,8 @@ class GitHubService {
     this.client,
   });
 
+  String get _repositoryUrl => 'https://api.github.com/repos/$owner/$repo';
+
   String get _baseUrl => 'https://api.github.com/repos/$owner/$repo/contents';
 
   Map<String, String> get _headers => {
@@ -29,9 +31,9 @@ class GitHubService {
   };
 
   /// GitHub Contents API 默认读取仓库默认分支，必须显式传入 ref。
-  Uri _contentReadUri(String path) => Uri.parse(
+  Uri _contentReadUri(String path, {String? ref}) => Uri.parse(
     '$_baseUrl/$path',
-  ).replace(queryParameters: {'ref': branch});
+  ).replace(queryParameters: {'ref': ref ?? branch});
 
   Future<http.Response> _get(Uri uri) {
     final configuredClient = client;
@@ -41,12 +43,44 @@ class GitHubService {
     return http.get(uri, headers: _headers);
   }
 
+  Future<http.Response> _put(Uri uri, {Object? body}) {
+    final configuredClient = client;
+    if (configuredClient != null) {
+      return configuredClient.put(uri, headers: _headers, body: body);
+    }
+    return http.put(uri, headers: _headers, body: body);
+  }
+
+  Future<http.Response> _post(Uri uri, {Object? body}) {
+    final configuredClient = client;
+    if (configuredClient != null) {
+      return configuredClient.post(uri, headers: _headers, body: body);
+    }
+    return http.post(uri, headers: _headers, body: body);
+  }
+
+  Future<http.Response> _patch(Uri uri, {Object? body}) {
+    final configuredClient = client;
+    if (configuredClient != null) {
+      return configuredClient.patch(uri, headers: _headers, body: body);
+    }
+    return http.patch(uri, headers: _headers, body: body);
+  }
+
+  Future<http.Response> _delete(Uri uri, {Object? body}) {
+    final configuredClient = client;
+    if (configuredClient != null) {
+      return configuredClient.delete(uri, headers: _headers, body: body);
+    }
+    return http.delete(uri, headers: _headers, body: body);
+  }
+
   Future<Uri?> getPagesBaseUrl() async {
-    final uri = Uri.parse('https://api.github.com/repos/$owner/$repo/pages');
+    final uri = Uri.parse('$_repositoryUrl/pages');
     debugPrint('[GitHub] GET pages $owner/$repo');
 
     try {
-      final response = await http.get(uri, headers: _headers);
+      final response = await _get(uri);
       debugPrint('[GitHub] pages ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -123,7 +157,7 @@ class GitHubService {
     final url = Uri.parse('$_baseUrl/$remotePath');
 
     try {
-      final response = await http.put(url, headers: _headers, body: body);
+      final response = await _put(url, body: body);
 
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body);
@@ -166,7 +200,7 @@ class GitHubService {
         if (data is! List) {
           final error = 'Expected a directory at $path';
           debugPrint('[GitHub] ERROR: $error');
-          return GitHubDirectoryResult.failure(error);
+          return GitHubDirectoryResult.failure(error, statusCode: 200);
         }
         debugPrint('[GitHub] $path -> ${data.length} entries');
         return GitHubDirectoryResult.success(
@@ -177,7 +211,13 @@ class GitHubService {
       final error =
           '${response.statusCode}: ${_extractGitHubMessage(response.body)}';
       debugPrint('[GitHub] ERROR $path: $error');
-      return GitHubDirectoryResult.failure(error);
+      if (response.statusCode == 404) {
+        return GitHubDirectoryResult.notFound(error);
+      }
+      return GitHubDirectoryResult.failure(
+        error,
+        statusCode: response.statusCode,
+      );
     } catch (e, stack) {
       debugPrint('[GitHub] EXCEPTION listing $path: $e');
       await _log.logException(
@@ -202,22 +242,45 @@ class GitHubService {
     return body.isEmpty ? 'Unknown error' : body;
   }
 
-  Future<GitHubFileContent?> getFileContent(String path) async {
-    final url = _contentReadUri(path);
+  Future<GitHubFileContent?> getFileContent(String path, {String? ref}) async {
+    final result = await getFileContentResult(path, ref: ref);
+    return result.content;
+  }
+
+  /// Reads a file while preserving the distinction between a missing file and
+  /// a request failure. Sync and move operations must not treat both cases as
+  /// the same condition.
+  Future<GitHubFileResult> getFileContentResult(
+    String path, {
+    String? ref,
+  }) async {
+    final url = _contentReadUri(path, ref: ref);
     debugPrint('[GitHub] GET file $url');
     try {
       final response = await _get(url);
       debugPrint('[GitHub] file ${response.statusCode} $path');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final raw = data['content'].replaceAll(RegExp(r'\s'), '');
+        if (data is! Map || data['content'] == null || data['sha'] == null) {
+          return GitHubFileResult.failure(
+            'Unexpected file response for $path',
+            statusCode: 200,
+          );
+        }
+        final raw = data['content'].toString().replaceAll(RegExp(r'\s'), '');
         final content = utf8.decode(base64Decode(raw));
-        return GitHubFileContent(content: content, sha: data['sha']);
-      } else {
-        debugPrint(
-          '[GitHub] file ERROR ${response.statusCode}: ${response.body}',
+        return GitHubFileResult.success(
+          GitHubFileContent(content: content, sha: data['sha'].toString()),
         );
       }
+
+      final error =
+          '${response.statusCode}: ${_extractGitHubMessage(response.body)}';
+      debugPrint('[GitHub] file ERROR $path: $error');
+      if (response.statusCode == 404) {
+        return GitHubFileResult.notFound(error);
+      }
+      return GitHubFileResult.failure(error, statusCode: response.statusCode);
     } catch (e, stack) {
       debugPrint('[GitHub] EXCEPTION getting file $path: $e');
       await _log.logException(
@@ -226,8 +289,8 @@ class GitHubService {
         tag: 'GitHub',
         context: '获取 GitHub 文件失败: $path',
       );
+      return GitHubFileResult.failure(e.toString());
     }
-    return null;
   }
 
   Future<GitHubResult> updatePost({
@@ -267,7 +330,7 @@ class GitHubService {
     final url = Uri.parse('$_baseUrl/$remotePath');
 
     try {
-      final response = await http.put(url, headers: _headers, body: body);
+      final response = await _put(url, body: body);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -323,7 +386,7 @@ class GitHubService {
     final url = Uri.parse('$_baseUrl/$remotePath');
 
     try {
-      final response = await http.delete(url, headers: _headers, body: body);
+      final response = await _delete(url, body: body);
 
       if (response.statusCode == 200) {
         return GitHubResult(success: true, message: 'Deleted');
@@ -348,6 +411,200 @@ class GitHubService {
     }
   }
 
+  /// Moves a file between two remote paths in one Git commit.
+  ///
+  /// The Contents API performs creation and deletion as independent commits.
+  /// That can leave both files behind when the second request fails. This
+  /// method builds a new Git tree from one branch head and updates the ref only
+  /// after both changes are present, so a failed ref update leaves the branch
+  /// untouched.
+  Future<GitHubResult> moveFileAtomically({
+    required String sourcePath,
+    required String sourceSha,
+    required String targetPath,
+    required String content,
+    String? commitMessage,
+  }) async {
+    if (sourcePath == targetPath) {
+      return GitHubResult(
+        success: false,
+        message:
+            '${AppStrings.current.publishFailed}: source and target paths are identical',
+      );
+    }
+
+    final message = commitMessage ?? 'post: move $sourcePath to $targetPath';
+
+    try {
+      final encodedBranch = Uri.encodeComponent(branch);
+      final refUri = Uri.parse('$_repositoryUrl/git/ref/heads/$encodedBranch');
+      final refResponse = await _get(refUri);
+      if (refResponse.statusCode != 200) {
+        return _gitApiFailure('读取分支引用失败', refResponse);
+      }
+
+      final refData = jsonDecode(refResponse.body);
+      final refObject = refData is Map ? refData['object'] : null;
+      final headSha = refObject is Map ? refObject['sha']?.toString() : null;
+      if (headSha == null || headSha.isEmpty) {
+        return GitHubResult(
+          success: false,
+          message:
+              '${AppStrings.current.publishFailed}: invalid branch reference',
+        );
+      }
+
+      // Both checks are pinned to the same commit. A later concurrent update
+      // makes the final ref update fail instead of silently overwriting data.
+      final target = await getFileContentResult(targetPath, ref: headSha);
+      if (target.success) {
+        return GitHubResult(
+          success: false,
+          message:
+              '${AppStrings.current.publishFailed}: target file already exists',
+        );
+      }
+      if (!target.notFound) {
+        return GitHubResult(
+          success: false,
+          message:
+              '${AppStrings.current.publishFailed}: cannot verify target path (${target.error ?? 'unknown error'})',
+        );
+      }
+
+      final source = await getFileContentResult(sourcePath, ref: headSha);
+      if (!source.success || source.content == null) {
+        return GitHubResult(
+          success: false,
+          message:
+              '${AppStrings.current.publishFailed}: source file is unavailable (${source.error ?? 'unknown error'})',
+        );
+      }
+      if (source.content!.sha != sourceSha) {
+        return GitHubResult(
+          success: false,
+          message:
+              '${AppStrings.current.publishFailed}: remote file changed; sync before publishing',
+        );
+      }
+
+      final commitResponse = await _get(
+        Uri.parse('$_repositoryUrl/git/commits/$headSha'),
+      );
+      if (commitResponse.statusCode != 200) {
+        return _gitApiFailure('读取提交树失败', commitResponse);
+      }
+      final commitData = jsonDecode(commitResponse.body);
+      final commitTree = commitData is Map ? commitData['tree'] : null;
+      final baseTreeSha = commitTree is Map
+          ? commitTree['sha']?.toString()
+          : null;
+      if (baseTreeSha == null || baseTreeSha.isEmpty) {
+        return GitHubResult(
+          success: false,
+          message: '${AppStrings.current.publishFailed}: invalid commit tree',
+        );
+      }
+
+      final createTreeResponse = await _post(
+        Uri.parse('$_repositoryUrl/git/trees'),
+        body: jsonEncode({
+          'base_tree': baseTreeSha,
+          'tree': [
+            {
+              'path': targetPath,
+              'mode': '100644',
+              'type': 'blob',
+              'content': content,
+            },
+            {'path': sourcePath, 'mode': '100644', 'type': 'blob', 'sha': null},
+          ],
+        }),
+      );
+      if (createTreeResponse.statusCode != 201) {
+        return _gitApiFailure('创建移动树失败', createTreeResponse);
+      }
+
+      final treeData = jsonDecode(createTreeResponse.body);
+      final newTreeSha = treeData is Map ? treeData['sha']?.toString() : null;
+      final targetSha = _treeEntrySha(treeData, targetPath);
+      if (newTreeSha == null || newTreeSha.isEmpty || targetSha == null) {
+        return GitHubResult(
+          success: false,
+          message: '${AppStrings.current.publishFailed}: invalid tree response',
+        );
+      }
+
+      final createCommitResponse = await _post(
+        Uri.parse('$_repositoryUrl/git/commits'),
+        body: jsonEncode({
+          'message': message,
+          'tree': newTreeSha,
+          'parents': [headSha],
+        }),
+      );
+      if (createCommitResponse.statusCode != 201) {
+        return _gitApiFailure('创建移动提交失败', createCommitResponse);
+      }
+
+      final newCommitData = jsonDecode(createCommitResponse.body);
+      final newCommitSha = newCommitData is Map
+          ? newCommitData['sha']?.toString()
+          : null;
+      if (newCommitSha == null || newCommitSha.isEmpty) {
+        return GitHubResult(
+          success: false,
+          message:
+              '${AppStrings.current.publishFailed}: invalid commit response',
+        );
+      }
+
+      final updateRefResponse = await _patch(
+        refUri,
+        body: jsonEncode({'sha': newCommitSha, 'force': false}),
+      );
+      if (updateRefResponse.statusCode != 200) {
+        return _gitApiFailure('更新分支引用失败', updateRefResponse);
+      }
+
+      return GitHubResult(
+        success: true,
+        message: AppStrings.current.publishSuccess,
+        sha: targetSha,
+      );
+    } catch (e, stack) {
+      await _log.logException(
+        e,
+        stack,
+        tag: 'GitHub',
+        context: '原子移动 GitHub 文件失败: $sourcePath -> $targetPath',
+      );
+      return GitHubResult(
+        success: false,
+        message: '${AppStrings.current.networkError}: $e',
+      );
+    }
+  }
+
+  GitHubResult _gitApiFailure(String action, http.Response response) {
+    return GitHubResult(
+      success: false,
+      message:
+          '${AppStrings.current.publishFailed}: $action (${response.statusCode}: ${_extractGitHubMessage(response.body)})',
+    );
+  }
+
+  String? _treeEntrySha(Object? treeData, String path) {
+    if (treeData is! Map || treeData['tree'] is! List) return null;
+    for (final entry in treeData['tree'] as List) {
+      if (entry is Map && entry['path'] == path) {
+        final sha = entry['sha']?.toString();
+        if (sha != null && sha.isNotEmpty) return sha;
+      }
+    }
+    return null;
+  }
+
   /// 获取单个 commit 的详细信息（含 files 列表）
   Future<GitHubCommit?> getCommitDetail(String sha) async {
     final uri = Uri.parse(
@@ -357,7 +614,7 @@ class GitHubService {
     debugPrint('[GitHub] GET commit detail $sha');
 
     try {
-      final response = await http.get(uri, headers: _headers);
+      final response = await _get(uri);
       debugPrint('[GitHub] commit detail ${response.statusCode} $sha');
 
       if (response.statusCode == 200) {
@@ -379,7 +636,7 @@ class GitHubService {
   /// 获取指定路径下某个时间之后的 commit 记录（带分页）
   /// 列表 API 不返回 files，需逐个获取 commit 详情。
   /// commit 数量超过 [maxDetailFetches] 时跳过详情获取，返回的 commit 不含 files。
-  Future<List<GitHubCommit>> getCommitsSince({
+  Future<GitHubCommitsResult> getCommitsSince({
     required String path,
     required DateTime since,
     int perPage = 100,
@@ -389,30 +646,36 @@ class GitHubService {
     int page = 1;
 
     while (true) {
-      final uri = Uri.parse('https://api.github.com/repos/$owner/$repo/commits')
-          .replace(
-            queryParameters: {
-              'sha': branch,
-              'path': path,
-              'since': since.toUtc().toIso8601String(),
-              'per_page': perPage.toString(),
-              'page': page.toString(),
-            },
-          );
+      final uri = Uri.parse('$_repositoryUrl/commits').replace(
+        queryParameters: {
+          'sha': branch,
+          'path': path,
+          'since': since.toUtc().toIso8601String(),
+          'per_page': perPage.toString(),
+          'page': page.toString(),
+        },
+      );
 
       debugPrint('[GitHub] GET commits $path since=$since page=$page');
 
       try {
-        final response = await http.get(uri, headers: _headers);
+        final response = await _get(uri);
         debugPrint('[GitHub] commits ${response.statusCode} $path');
 
         if (response.statusCode != 200) {
-          debugPrint('[GitHub] commits ERROR: ${response.statusCode}');
-          break;
+          final error =
+              '${response.statusCode}: ${_extractGitHubMessage(response.body)}';
+          debugPrint('[GitHub] commits ERROR: $error');
+          return GitHubCommitsResult.failure(error);
         }
 
         final data = jsonDecode(response.body);
-        if (data is! List || data.isEmpty) break;
+        if (data is! List) {
+          return GitHubCommitsResult.failure(
+            'Unexpected commits response for $path',
+          );
+        }
+        if (data.isEmpty) break;
 
         for (final commitJson in data) {
           final commit = _parseCommit(commitJson);
@@ -432,7 +695,7 @@ class GitHubService {
           tag: 'GitHub',
           context: '获取 GitHub commit 列表失败: $path page=$page',
         );
-        break;
+        return GitHubCommitsResult.failure(e.toString());
       }
     }
 
@@ -441,7 +704,7 @@ class GitHubService {
       debugPrint(
         '[GitHub] Too many commits (${allCommits.length} > $maxDetailFetches), skipping detail fetch',
       );
-      return allCommits;
+      return GitHubCommitsResult.success(allCommits);
     }
 
     // 列表 API 不含 files，逐个获取详情以拿到变更文件列表
@@ -457,7 +720,7 @@ class GitHubService {
     }
 
     debugPrint('[GitHub] Total commits for $path: ${detailedCommits.length}');
-    return detailedCommits;
+    return GitHubCommitsResult.success(detailedCommits);
   }
 
   /// 列出用户的仓库列表
@@ -477,7 +740,7 @@ class GitHubService {
     debugPrint('[GitHub] GET repos page=$page');
 
     try {
-      final response = await http.get(uri, headers: _headers);
+      final response = await _get(uri);
       debugPrint('[GitHub] repos ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -512,7 +775,7 @@ class GitHubService {
     debugPrint('[GitHub] GET branches page=$page');
 
     try {
-      final response = await http.get(uri, headers: _headers);
+      final response = await _get(uri);
       debugPrint('[GitHub] branches ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -599,15 +862,29 @@ class GitHubResult {
   });
 }
 
+enum GitHubReadStatus { success, notFound, failure }
+
 class GitHubDirectoryResult {
-  final bool success;
+  final GitHubReadStatus status;
   final List<GitHubFileEntry> entries;
   final String? error;
+  final int? statusCode;
 
-  GitHubDirectoryResult.success(this.entries) : success = true, error = null;
+  bool get success => status == GitHubReadStatus.success;
+  bool get notFound => status == GitHubReadStatus.notFound;
 
-  GitHubDirectoryResult.failure(this.error)
-    : success = false,
+  GitHubDirectoryResult.success(this.entries)
+    : status = GitHubReadStatus.success,
+      error = null,
+      statusCode = 200;
+
+  GitHubDirectoryResult.notFound(this.error)
+    : status = GitHubReadStatus.notFound,
+      entries = const [],
+      statusCode = 404;
+
+  GitHubDirectoryResult.failure(this.error, {this.statusCode})
+    : status = GitHubReadStatus.failure,
       entries = const [];
 }
 
@@ -644,17 +921,47 @@ class GitHubFileContent {
   GitHubFileContent({required this.content, required this.sha});
 }
 
+class GitHubFileResult {
+  final GitHubReadStatus status;
+  final GitHubFileContent? content;
+  final String? error;
+  final int? statusCode;
+
+  bool get success => status == GitHubReadStatus.success;
+  bool get notFound => status == GitHubReadStatus.notFound;
+
+  GitHubFileResult.success(this.content)
+    : status = GitHubReadStatus.success,
+      error = null,
+      statusCode = 200;
+
+  GitHubFileResult.notFound(this.error)
+    : status = GitHubReadStatus.notFound,
+      content = null,
+      statusCode = 404;
+
+  GitHubFileResult.failure(this.error, {this.statusCode})
+    : status = GitHubReadStatus.failure,
+      content = null;
+}
+
 /// commit 中的文件变更信息
 class GitHubCommitFile {
   final String filename;
   final String status; // added, modified, removed, renamed
+  final String? previousFilename;
 
-  GitHubCommitFile({required this.filename, required this.status});
+  GitHubCommitFile({
+    required this.filename,
+    required this.status,
+    this.previousFilename,
+  });
 
   factory GitHubCommitFile.fromJson(Map<String, dynamic> json) {
     return GitHubCommitFile(
       filename: json['filename'] ?? '',
       status: json['status'] ?? '',
+      previousFilename: json['previous_filename']?.toString(),
     );
   }
 }
@@ -668,19 +975,12 @@ class GitHubCommit {
   GitHubCommit({required this.sha, required this.date, required this.files});
 }
 
-/// 增量同步结果
-class IncrementalSyncResult {
+class GitHubCommitsResult {
   final bool success;
-  final List<String> addedOrModified;
-  final List<String> removed;
-  final DateTime? latestCommitDate;
+  final List<GitHubCommit> commits;
   final String? error;
 
-  IncrementalSyncResult({
-    required this.success,
-    this.addedOrModified = const [],
-    this.removed = const [],
-    this.latestCommitDate,
-    this.error,
-  });
+  GitHubCommitsResult.success(this.commits) : success = true, error = null;
+
+  GitHubCommitsResult.failure(this.error) : success = false, commits = const [];
 }

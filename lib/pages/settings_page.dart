@@ -2262,9 +2262,7 @@ rm -rf "\$BACKUP_DIR"
             DropdownMenuItem(
               value: FriendLinkFileFormat.flat,
               child: Text(
-                zh
-                    ? '扁平格式（url / desc / image）'
-                    : 'Flat (url / desc / image)',
+                zh ? '扁平格式（url / desc / image）' : 'Flat (url / desc / image)',
               ),
             ),
           ],

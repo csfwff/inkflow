@@ -9,6 +9,12 @@
 # packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
+# This file is a vendored patch copied into sqlite3's pub cache when needed.
+# It imports sqlite3 hook-only internals and is not part of InkFlow's app code.
+analyzer:
+  exclude:
+    - tool/sqlite3_hook_patch/build.dart
+
 linter:
   # The lint rules applied to this project can be customized in the
   # section below to disable rules from the `package:flutter_lints/flutter.yaml`

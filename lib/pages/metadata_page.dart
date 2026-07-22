@@ -26,14 +26,18 @@ class MetadataPage extends StatefulWidget {
 
 /// 自定义字段条目
 class _CustomFieldEntry {
-  String key;
-  String value;
+  final String initialKey;
+  final String initialText;
+  final Object? originalValue;
   late final TextEditingController keyCtrl;
   late final TextEditingController valueCtrl;
 
-  _CustomFieldEntry({required this.key, required this.value}) {
+  _CustomFieldEntry({required String key, required Object? value})
+    : initialKey = key,
+      initialText = value?.toString() ?? '',
+      originalValue = value {
     keyCtrl = TextEditingController(text: key);
-    valueCtrl = TextEditingController(text: value);
+    valueCtrl = TextEditingController(text: initialText);
   }
 
   void dispose() {
@@ -75,7 +79,7 @@ class _MetadataPageState extends State<MetadataPage> {
   late final String _initialExcerpt;
   late final String _initialDescription;
   late final String _initialAuthor;
-  late final Map<String, String> _initialCustomFields;
+  late final Map<String, dynamic> _initialCustomFields;
 
   @override
   void initState() {
@@ -107,7 +111,7 @@ class _MetadataPageState extends State<MetadataPage> {
     _customFields = article.customFields.entries
         .map((e) => _CustomFieldEntry(key: e.key, value: e.value))
         .toList();
-    _initialCustomFields = Map.from(article.customFields);
+    _initialCustomFields = Map<String, dynamic>.from(article.customFields);
 
     // 加载已有的标签和分类
     _loadTagsAndCategories();
@@ -186,12 +190,7 @@ class _MetadataPageState extends State<MetadataPage> {
     if (_authorCtrl.text.trim() != _initialAuthor) return true;
 
     // 检测自定义字段改动
-    final currentCustom = <String, String>{};
-    for (final field in _customFields) {
-      final k = field.keyCtrl.text.trim();
-      final v = field.valueCtrl.text.trim();
-      if (k.isNotEmpty) currentCustom[k] = v;
-    }
+    final currentCustom = _collectCustomFields();
     if (!mapEquals(currentCustom, _initialCustomFields)) return true;
 
     return false;
@@ -232,15 +231,7 @@ class _MetadataPageState extends State<MetadataPage> {
     article.author = _emptyToNull(_authorCtrl.text);
 
     // 保存自定义字段
-    final customFields = <String, String>{};
-    for (final field in _customFields) {
-      final k = field.keyCtrl.text.trim();
-      final v = field.valueCtrl.text.trim();
-      if (k.isNotEmpty) {
-        customFields[k] = v;
-      }
-    }
-    article.customFields = customFields;
+    article.customFields = _collectCustomFields();
 
     Navigator.pop(context, article);
   }
@@ -555,6 +546,21 @@ class _MetadataPageState extends State<MetadataPage> {
     setState(() {
       _customFields.add(_CustomFieldEntry(key: '', value: ''));
     });
+  }
+
+  /// 保留用户没有编辑过的 YAML 原始值类型。编辑后的输入仍按字符串保存，
+  /// 因为当前元数据页是文本编辑 UI。
+  Map<String, dynamic> _collectCustomFields() {
+    final customFields = <String, dynamic>{};
+    for (final field in _customFields) {
+      final key = field.keyCtrl.text.trim();
+      final value = field.valueCtrl.text.trim();
+      if (key.isEmpty) continue;
+
+      final unchanged = key == field.initialKey && value == field.initialText;
+      customFields[key] = unchanged ? field.originalValue : value;
+    }
+    return customFields;
   }
 
   void _removeCustomField(int index) {

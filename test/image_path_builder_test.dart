@@ -8,7 +8,7 @@ void main() {
       final result = buildRemoteImagePath(
         'images',
         'photo.png',
-        useDateFolder: false,
+        dateFolderMode: ImageDateFolderMode.none,
         namingMode: ImageNamingMode.original,
       );
       expect(result, 'images/photo.png');
@@ -19,7 +19,7 @@ void main() {
       final result = buildRemoteImagePath(
         'images',
         'photo.png',
-        useDateFolder: true,
+        dateFolderMode: ImageDateFolderMode.yearMonth,
         namingMode: ImageNamingMode.original,
       );
       expect(result, contains('images/'));
@@ -31,7 +31,7 @@ void main() {
       final result = buildRemoteImagePath(
         'img',
         'photo.jpg',
-        useDateFolder: false,
+        dateFolderMode: ImageDateFolderMode.none,
         namingMode: ImageNamingMode.timestamp,
       );
       // 应以数字时间戳开头，保留扩展名
@@ -43,7 +43,7 @@ void main() {
       final result = buildRemoteImagePath(
         'img',
         'photo.jpg',
-        useDateFolder: false,
+        dateFolderMode: ImageDateFolderMode.none,
         namingMode: ImageNamingMode.timestampOriginal,
       );
       final filename = result.split('/').last;
@@ -54,7 +54,7 @@ void main() {
       final result = buildRemoteImagePath(
         '',
         'photo.png',
-        useDateFolder: false,
+        dateFolderMode: ImageDateFolderMode.none,
         namingMode: ImageNamingMode.original,
       );
       expect(result, 'photo.png');
@@ -65,7 +65,7 @@ void main() {
       final result = buildRemoteImagePath(
         '/images/',
         'photo.png',
-        useDateFolder: false,
+        dateFolderMode: ImageDateFolderMode.none,
         namingMode: ImageNamingMode.original,
       );
       expect(result, 'images/photo.png');
@@ -76,7 +76,7 @@ void main() {
       final result = buildRemoteImagePath(
         'uploads',
         'test.png',
-        useDateFolder: true,
+        dateFolderMode: ImageDateFolderMode.yearMonth,
         namingMode: ImageNamingMode.timestamp,
       );
       expect(result, startsWith('uploads/'));

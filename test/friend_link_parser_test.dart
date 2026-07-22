@@ -183,17 +183,14 @@ void main() {
 
   group('FriendLinkParser.generateYamlForFormat', () {
     test('新建扁平格式文件使用 url、desc、image 字段', () {
-      final result = FriendLinkParser.generateYamlForFormat(
-        [
-          FriendLink(
-            name: 'New',
-            link: 'https://new.example',
-            avatar: 'https://new.example/avatar.png',
-            descr: 'New description',
-          ),
-        ],
-        FriendLinkFileFormat.flat,
-      );
+      final result = FriendLinkParser.generateYamlForFormat([
+        FriendLink(
+          name: 'New',
+          link: 'https://new.example',
+          avatar: 'https://new.example/avatar.png',
+          descr: 'New description',
+        ),
+      ], FriendLinkFileFormat.flat);
 
       expect(result, '''
 - name: New
@@ -248,10 +245,7 @@ void main() {
   color: blue
 ''';
 
-      expect(
-        FriendLinkParser.validateWritableContent(yaml),
-        contains('color'),
-      );
+      expect(FriendLinkParser.validateWritableContent(yaml), contains('color'));
     });
   });
 }

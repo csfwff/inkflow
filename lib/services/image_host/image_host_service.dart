@@ -20,7 +20,9 @@ class ImageHostService {
           repo: settings.imageGithubRepo,
           branch: settings.githubBranch,
           path: settings.imageGithubPath,
-          domain: settings.imageGithubDomain.isNotEmpty ? settings.imageGithubDomain : null,
+          domain: settings.imageGithubDomain.isNotEmpty
+              ? settings.imageGithubDomain
+              : null,
           dateFolderMode: settings.imageDateFolderMode,
           namingMode: settings.imageNamingMode,
         );
@@ -56,11 +58,17 @@ class ImageHostService {
   /// 上传图片，如果启用了压缩则先压缩
   ///
   /// 返回 [UploadWithCompressResult] 包含上传结果和压缩信息
-  Future<UploadWithCompressResult> uploadWithCompress(Uint8List bytes, String filename) async {
+  Future<UploadWithCompressResult> uploadWithCompress(
+    Uint8List bytes,
+    String filename,
+  ) async {
     final uploader = getUploader();
     if (uploader == null) {
       return UploadWithCompressResult(
-        uploadResult: UploadResult(success: false, error: 'Image host not configured'),
+        uploadResult: UploadResult(
+          success: false,
+          error: 'Image host not configured',
+        ),
         compressResult: null,
       );
     }
@@ -89,13 +97,12 @@ class UploadWithCompressResult {
   final UploadResult uploadResult;
   final CompressResult? compressResult;
 
-  UploadWithCompressResult({
-    required this.uploadResult,
-    this.compressResult,
-  });
+  UploadWithCompressResult({required this.uploadResult, this.compressResult});
 
   bool get success => uploadResult.success;
   String? get url => uploadResult.url;
   String? get error => uploadResult.error;
-  bool get wasCompressed => compressResult != null && compressResult!.compressedSize < compressResult!.originalSize;
+  bool get wasCompressed =>
+      compressResult != null &&
+      compressResult!.compressedSize < compressResult!.originalSize;
 }

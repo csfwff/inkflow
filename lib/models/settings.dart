@@ -187,7 +187,8 @@ class Settings {
       friendLinkPath = json['friendLinkPath'] ?? 'source/_data/link.yml';
     }
     if (json.containsKey('friendLinkNewFileFormat')) {
-      final idx = json['friendLinkNewFileFormat'] as int? ??
+      final idx =
+          json['friendLinkNewFileFormat'] as int? ??
           FriendLinkFileFormat.butterfly.index;
       if (idx >= 0 && idx < FriendLinkFileFormat.values.length) {
         friendLinkNewFileFormat = FriendLinkFileFormat.values[idx];

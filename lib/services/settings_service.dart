@@ -5,8 +5,9 @@ import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/settings.dart';
+import 'sync_contracts.dart';
 
-class SettingsService {
+class SettingsService implements SyncSettingsStore {
   // ── SharedPreferences keys (普通配置) ──
   static const _keyGithubOwner = 'github_owner';
   static const _keyGithubRepo = 'github_repo';
@@ -38,6 +39,7 @@ class SettingsService {
 
   late SharedPreferences _prefs;
   late FlutterSecureStorage _secure;
+  @override
   late Settings settings;
 
   Future<void> init() async {
@@ -78,10 +80,11 @@ class SettingsService {
       imageCompressTargetKB: _prefs.getInt(_keyImageCompressTargetKB) ?? 1024,
       friendLinkPath:
           _prefs.getString(_keyFriendLinkPath) ?? 'source/_data/link.yml',
-      friendLinkNewFileFormat: FriendLinkFileFormat.values[
-        _prefs.getInt(_keyFriendLinkNewFileFormat) ??
-            FriendLinkFileFormat.butterfly.index
-      ],
+      friendLinkNewFileFormat:
+          FriendLinkFileFormat.values[_prefs.getInt(
+                _keyFriendLinkNewFileFormat,
+              ) ??
+              FriendLinkFileFormat.butterfly.index],
       themeMode: AppThemeMode.values[_prefs.getInt(_keyThemeMode) ?? 0],
       themePresetId:
           _prefs.getString(_keyThemePresetId) ?? Settings.defaultThemePresetId,
@@ -90,6 +93,7 @@ class SettingsService {
     );
   }
 
+  @override
   Future<void> save() async {
     // 敏感字段写入安全存储
     await Future.wait([

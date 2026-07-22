@@ -28,8 +28,11 @@ class Article {
   String? description;
   String? author;
 
-  /// 自定义元数据字段（非内置字段）
-  Map<String, String> customFields;
+  /// 自定义元数据字段（非内置字段）。
+  ///
+  /// 保留 YAML 的原始值类型，避免 boolean、数字、列表等字段在一次同步或
+  /// 保存后被降级成字符串。
+  Map<String, dynamic> customFields;
 
   Article({
     this.id,
@@ -52,12 +55,12 @@ class Article {
     this.excerpt,
     this.description,
     this.author,
-    Map<String, String>? customFields,
-  })  : createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now(),
-        tags = tags ?? [],
-        categories = categories ?? [],
-        customFields = customFields ?? {};
+    Map<String, dynamic>? customFields,
+  }) : createdAt = createdAt ?? DateTime.now(),
+       updatedAt = updatedAt ?? DateTime.now(),
+       tags = tags ?? [],
+       categories = categories ?? [],
+       customFields = customFields ?? {};
 
   Map<String, dynamic> toMap() {
     return {
@@ -101,12 +104,14 @@ class Article {
       githubSha: map['githubSha'] as String?,
       createdAt: DateTime.parse(map['createdAt'] as String),
       updatedAt: DateTime.parse(map['updatedAt'] as String),
-      tags: (map['tags'] as String?)
+      tags:
+          (map['tags'] as String?)
               ?.split(',')
               .where((t) => t.isNotEmpty)
               .toList() ??
           [],
-      categories: (map['categories'] as String?)
+      categories:
+          (map['categories'] as String?)
               ?.split(',')
               .where((c) => c.isNotEmpty)
               .toList() ??
@@ -119,7 +124,7 @@ class Article {
       author: map['author'] as String?,
       customFields: map['customFields'] is Map
           ? (map['customFields'] as Map).map(
-              (key, value) => MapEntry(key.toString(), value.toString()),
+              (key, value) => MapEntry(key.toString(), value),
             )
           : {},
     );
