@@ -212,4 +212,40 @@ void main() {
     expect(result.success, isFalse);
     expect(result.message, contains('target file already exists'));
   });
+
+  test('更新冲突保留 GitHub 状态码', () async {
+    final client = MockClient(
+      (_) async => http.Response(jsonEncode({'message': 'Conflict'}), 409),
+    );
+
+    final result = await createService(client).updateFile(
+      remotePath: 'source/_posts/hello.md',
+      content: 'new content',
+      sha: 'old-sha',
+    );
+
+    expect(result.success, isFalse);
+    expect(result.statusCode, 409);
+    expect(result.isConflict, isTrue);
+  });
+
+  test('按 blob SHA 读取冲突共同基线内容', () async {
+    Uri? requestedUri;
+    final client = MockClient((request) async {
+      requestedUri = request.url;
+      return http.Response(
+        jsonEncode({
+          'content': base64Encode(utf8.encode('base content')),
+          'encoding': 'base64',
+        }),
+        200,
+      );
+    });
+
+    final result = await createService(client).getBlobContent('base-sha');
+
+    expect(result.success, isTrue);
+    expect(result.content?.content, 'base content');
+    expect(requestedUri?.path, '/repos/owner/repo/git/blobs/base-sha');
+  });
 }

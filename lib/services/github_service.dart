@@ -173,6 +173,7 @@ class GitHubService {
           success: false,
           message:
               '${AppStrings.current.publishFailed}: ${data['message'] ?? response.statusCode}',
+          statusCode: response.statusCode,
         );
       }
     } catch (e, stack) {
@@ -293,6 +294,46 @@ class GitHubService {
     }
   }
 
+  /// Reads a Git blob by SHA. Pending local edits keep their original blob SHA,
+  /// which lets the conflict UI reconstruct the common base after an app
+  /// restart without storing another copy in the article database.
+  Future<GitHubFileResult> getBlobContent(String sha) async {
+    final url = Uri.parse('$_repositoryUrl/git/blobs/$sha');
+    debugPrint('[GitHub] GET blob $sha');
+    try {
+      final response = await _get(url);
+      debugPrint('[GitHub] blob ${response.statusCode} $sha');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is! Map || data['content'] == null) {
+          return GitHubFileResult.failure(
+            'Unexpected blob response for $sha',
+            statusCode: 200,
+          );
+        }
+        final raw = data['content'].toString().replaceAll(RegExp(r'\s'), '');
+        return GitHubFileResult.success(
+          GitHubFileContent(content: utf8.decode(base64Decode(raw)), sha: sha),
+        );
+      }
+
+      final error =
+          '${response.statusCode}: ${_extractGitHubMessage(response.body)}';
+      if (response.statusCode == 404) {
+        return GitHubFileResult.notFound(error);
+      }
+      return GitHubFileResult.failure(error, statusCode: response.statusCode);
+    } catch (e, stack) {
+      await _log.logException(
+        e,
+        stack,
+        tag: 'GitHub',
+        context: '获取 GitHub blob 失败: $sha',
+      );
+      return GitHubFileResult.failure(e.toString());
+    }
+  }
+
   Future<GitHubResult> updatePost({
     required String filePath,
     required String content,
@@ -346,6 +387,7 @@ class GitHubService {
           success: false,
           message:
               '${AppStrings.current.publishFailed}: ${data['message'] ?? response.statusCode}',
+          statusCode: response.statusCode,
         );
       }
     } catch (e, stack) {
@@ -395,6 +437,7 @@ class GitHubService {
         return GitHubResult(
           success: false,
           message: data['message'] ?? 'Delete failed: ${response.statusCode}',
+          statusCode: response.statusCode,
         );
       }
     } catch (e, stack) {
@@ -591,6 +634,7 @@ class GitHubService {
       success: false,
       message:
           '${AppStrings.current.publishFailed}: $action (${response.statusCode}: ${_extractGitHubMessage(response.body)})',
+      statusCode: response.statusCode,
     );
   }
 
@@ -853,12 +897,16 @@ class GitHubResult {
   final String message;
   final String fileUrl;
   final String? sha;
+  final int? statusCode;
+
+  bool get isConflict => statusCode == 409 || statusCode == 422;
 
   GitHubResult({
     required this.success,
     required this.message,
     this.fileUrl = '',
     this.sha,
+    this.statusCode,
   });
 }
 
