@@ -18,6 +18,8 @@ enum _ArticleFilter { all, draft, synced, repoDraft }
 
 enum _ArticleAction { preview, edit, delete }
 
+enum _HomeMoreAction { blog, files, friendLinks, settings }
+
 class HomePage extends StatefulWidget {
   final VoidCallback? onSettingsChanged;
 
@@ -318,92 +320,14 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final s = AppStrings.current;
+    final wide = Responsive.isWide(context);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(s.homeTitle),
-        actions: [
-          if (_syncing)
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            )
-          else
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.sync),
-              tooltip: s.syncFromGitHub,
-              onSelected: (value) {
-                switch (value) {
-                  case 'incremental':
-                    _syncFromGitHub(incremental: true);
-                    break;
-                  case 'full':
-                    _syncFromGitHub(incremental: false);
-                    break;
-                }
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 'incremental',
-                  child: ListTile(
-                    leading: const Icon(Icons.update),
-                    title: Text(s.incrementalSync),
-                    subtitle: Text(s.incrementalSyncDesc),
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'full',
-                  child: ListTile(
-                    leading: const Icon(Icons.sync),
-                    title: Text(s.fullSync),
-                    subtitle: Text(s.fullSyncDesc),
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-              ],
-            ),
-          IconButton(
-            icon: const Icon(Icons.public),
-            tooltip: _label('访问博客', 'Visit blog'),
-            onPressed: _openBlogHome,
-          ),
-          IconButton(
-            icon: const Icon(Icons.account_tree_outlined),
-            tooltip: _label('GitHub 文件', 'GitHub files'),
-            onPressed: _openFileTree,
-          ),
-          IconButton(
-            icon: const Icon(Icons.people_outline),
-            tooltip: s.friendLinks,
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const FriendLinkPage()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            tooltip: s.settingsTitle,
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      SettingsPage(onSettingsChanged: widget.onSettingsChanged),
-                ),
-              );
-              _loadArticles();
-            },
-          ),
-        ],
+        actions: wide
+            ? _buildWideAppBarActions(s)
+            : _buildNarrowAppBarActions(s),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -412,6 +336,219 @@ class _HomePageState extends State<HomePage> {
         onPressed: () => _openEditor(),
         icon: const Icon(Icons.add),
         label: Text(s.newArticle),
+      ),
+    );
+  }
+
+  List<Widget> _buildNarrowAppBarActions(AppStrings s) {
+    return [
+      if (_syncing)
+        const Padding(
+          padding: EdgeInsets.all(16),
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        )
+      else
+        _buildSyncMenu(s),
+      _buildMoreMenu(s),
+      const SizedBox(width: 4),
+    ];
+  }
+
+  List<Widget> _buildWideAppBarActions(AppStrings s) {
+    return [
+      if (_syncing)
+        const Padding(
+          padding: EdgeInsets.all(16),
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        )
+      else
+        _buildSyncMenu(s),
+      _wideAppBarAction(
+        icon: Icons.public,
+        label: _label('博客', 'Blog'),
+        description: _label('打开已部署的博客首页', 'Open the deployed blog homepage'),
+        onPressed: _openBlogHome,
+      ),
+      _wideAppBarAction(
+        icon: Icons.account_tree_outlined,
+        label: _label('文件', 'Files'),
+        description: _label(
+          '浏览仓库中的文章与草稿',
+          'Browse posts and drafts in the repository',
+        ),
+        onPressed: _openFileTree,
+      ),
+      _wideAppBarAction(
+        icon: Icons.people_outline,
+        label: _label('友链', 'Links'),
+        description: _label('管理博客的友链内容', 'Manage blog friend links'),
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const FriendLinkPage()),
+        ),
+      ),
+      _wideAppBarAction(
+        icon: Icons.settings,
+        label: s.settingsTitle,
+        description: _label(
+          '配置 GitHub、图床与应用偏好',
+          'Configure GitHub, image hosting, and preferences',
+        ),
+        onPressed: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) =>
+                  SettingsPage(onSettingsChanged: widget.onSettingsChanged),
+            ),
+          );
+          _loadArticles();
+        },
+      ),
+      const SizedBox(width: 4),
+    ];
+  }
+
+  Widget _wideAppBarAction({
+    required IconData icon,
+    required String label,
+    required String description,
+    required VoidCallback onPressed,
+  }) {
+    return Tooltip(
+      message: description,
+      child: TextButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon),
+        label: Text(label),
+      ),
+    );
+  }
+
+  Widget _buildSyncMenu(AppStrings s) {
+    return PopupMenuButton<String>(
+      tooltip: s.syncFromGitHub,
+      onSelected: (value) {
+        switch (value) {
+          case 'incremental':
+            _syncFromGitHub(incremental: true);
+          case 'full':
+            _syncFromGitHub(incremental: false);
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: 'incremental',
+          child: ListTile(
+            leading: const Icon(Icons.update),
+            title: Text(s.incrementalSync),
+            subtitle: Text(s.incrementalSyncDesc),
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        PopupMenuItem(
+          value: 'full',
+          child: ListTile(
+            leading: const Icon(Icons.sync),
+            title: Text(s.fullSync),
+            subtitle: Text(s.fullSyncDesc),
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+      ],
+      child: _AppBarMenuTrigger(icon: Icons.sync, label: _label('同步', 'Sync')),
+    );
+  }
+
+  Widget _buildMoreMenu(AppStrings s) {
+    return PopupMenuButton<_HomeMoreAction>(
+      tooltip: _label('更多首页操作', 'More home actions'),
+      onSelected: (action) async {
+        switch (action) {
+          case _HomeMoreAction.blog:
+            await _openBlogHome();
+          case _HomeMoreAction.files:
+            await _openFileTree();
+          case _HomeMoreAction.friendLinks:
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const FriendLinkPage()),
+            );
+          case _HomeMoreAction.settings:
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    SettingsPage(onSettingsChanged: widget.onSettingsChanged),
+              ),
+            );
+            _loadArticles();
+        }
+      },
+      itemBuilder: (context) => [
+        _homeMoreMenuItem(
+          value: _HomeMoreAction.blog,
+          icon: Icons.public,
+          title: _label('访问博客', 'Visit blog'),
+          subtitle: _label('打开已部署的博客首页', 'Open the deployed blog homepage'),
+        ),
+        _homeMoreMenuItem(
+          value: _HomeMoreAction.files,
+          icon: Icons.account_tree_outlined,
+          title: _label('GitHub 文件', 'GitHub files'),
+          subtitle: _label(
+            '浏览仓库中的文章与草稿',
+            'Browse posts and drafts in the repository',
+          ),
+        ),
+        _homeMoreMenuItem(
+          value: _HomeMoreAction.friendLinks,
+          icon: Icons.people_outline,
+          title: s.friendLinks,
+          subtitle: _label('管理博客的友链内容', 'Manage blog friend links'),
+        ),
+        const PopupMenuDivider(),
+        _homeMoreMenuItem(
+          value: _HomeMoreAction.settings,
+          icon: Icons.settings,
+          title: s.settingsTitle,
+          subtitle: _label(
+            '配置 GitHub、图床与应用偏好',
+            'Configure GitHub, image hosting, and preferences',
+          ),
+        ),
+      ],
+      child: _AppBarMenuTrigger(
+        icon: Icons.more_horiz,
+        label: _label('更多', 'More'),
+      ),
+    );
+  }
+
+  PopupMenuItem<_HomeMoreAction> _homeMoreMenuItem({
+    required _HomeMoreAction value,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return PopupMenuItem(
+      value: value,
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        dense: true,
+        leading: Icon(icon),
+        title: Text(title),
+        subtitle: Text(subtitle),
       ),
     );
   }
@@ -508,21 +645,24 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildFilterBar() {
+    // 保持按钮由内容决定宽度：宽屏不拉伸铺满，窄屏则可横向滚动，完整保留
+    // 状态名称与数量。
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
-        children: _ArticleFilter.values.map((filter) {
-          final selected = _filter == filter;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              label: Text('${_filterLabel(filter)} ${_countFor(filter)}'),
-              selected: selected,
-              onSelected: (_) => setState(() => _filter = filter),
-            ),
-          );
-        }).toList(),
+        children: _ArticleFilter.values
+            .map(
+              (filter) => Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: _FilterButton(
+                  label: '${_filterLabel(filter)} ${_countFor(filter)}',
+                  selected: _filter == filter,
+                  onPressed: () => setState(() => _filter = filter),
+                ),
+              ),
+            )
+            .toList(),
       ),
     );
   }
@@ -688,6 +828,56 @@ class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(covariant _FilterBarDelegate oldDelegate) {
     return oldDelegate.child != child || oldDelegate.height != height;
+  }
+}
+
+/// 首页状态筛选。未选中时沿用描边按钮，选中时沿用主色实心按钮；两者都与
+/// 应用中的常规操作按钮保持一致。
+class _FilterButton extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  const _FilterButton({
+    required this.label,
+    required this.selected,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final content = Text(
+      label,
+      style: const TextStyle(fontWeight: FontWeight.w600),
+    );
+    if (!selected) {
+      return OutlinedButton(onPressed: onPressed, child: content);
+    }
+
+    return FilledButton.tonalIcon(
+      onPressed: onPressed,
+      icon: const Icon(Icons.check, size: 18),
+      label: content,
+    );
+  }
+}
+
+/// 顶栏菜单的文字触发器，避免仅靠图标表达功能。
+class _AppBarMenuTrigger extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _AppBarMenuTrigger({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [Icon(icon, size: 20), const SizedBox(width: 4), Text(label)],
+      ),
+    );
   }
 }
 

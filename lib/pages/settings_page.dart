@@ -14,8 +14,10 @@ import '../l10n/app_strings.dart';
 import '../main.dart';
 import '../models/article.dart';
 import '../models/app_theme_preset.dart';
+import '../models/friend_link.dart';
 import '../models/settings.dart';
 import 'log_viewer_page.dart';
+import '../services/friend_link_service.dart';
 import '../services/github_service.dart';
 import '../services/log_service.dart';
 import '../services/image_host/image_path_builder.dart';
@@ -54,6 +56,16 @@ class _SettingsPageState extends State<SettingsPage> {
   static const MethodChannel _updateChannel = MethodChannel(
     'com.xiaomo.inkflow/update',
   );
+  static const _authorBlogName = '鼠鼠在碎觉';
+  static const _authorBlogLink = 'https://sszsj.com';
+  static const _authorBlogAvatar = 'https://tmx.fishpi.cn/image/head.jpg';
+  static const _authorBlogDescription = '我是不慎落入世界的一滴水墨';
+  static const _authorName = '唐墨夏';
+  static const _authorFriendLinkYaml = '''
+- name: 鼠鼠在碎觉
+  link: https://sszsj.com
+  avatar: https://tmx.fishpi.cn/image/head.jpg
+  descr: 我是不慎落入世界的一滴水墨''';
 
   _Tab _selectedTab = _Tab.general;
   late Settings _settings;
@@ -61,6 +73,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   bool _checkingUpdate = false;
   bool _downloading = false;
+  bool _addingAuthorFriendLink = false;
   final ValueNotifier<double?> _downloadProgressNotifier =
       ValueNotifier<double?>(null);
   bool _downloadDialogVisible = false;
@@ -1787,19 +1800,133 @@ rm -rf "\$BACKUP_DIR"
     );
   }
 
+  String _label(String zh, String en) => AppStrings.isZh ? zh : en;
+
+  Future<void> _addAuthorFriendLinkAndSync() async {
+    if (_addingAuthorFriendLink) return;
+
+    final s = AppStrings.current;
+    final settings = settingsService.settings;
+    if (settings.githubToken.isEmpty ||
+        settings.githubOwner.isEmpty ||
+        settings.githubRepo.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(s.githubNotConfigured)));
+      return;
+    }
+
+    setState(() => _addingAuthorFriendLink = true);
+    try {
+      final friendLinkService = FriendLinkService();
+      await friendLinkService.init(articleService.database);
+      final github = GitHubService(
+        token: settings.githubToken,
+        owner: settings.githubOwner,
+        repo: settings.githubRepo,
+        branch: settings.githubBranch,
+      );
+
+      // 先拉取远端版本，避免直接推送时意外覆盖已有友链。
+      final pullResult = await friendLinkService.syncFromGitHub(
+        github,
+        settings.friendLinkPath,
+      );
+      if (!pullResult.success) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                _label(
+                  '同步远端友链失败：${pullResult.error}',
+                  'Failed to sync remote friend links: ${pullResult.error}',
+                ),
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      final existing = await friendLinkService.getByName(_authorBlogName);
+      final added = existing == null;
+      if (added) {
+        await friendLinkService.insert(
+          FriendLink(
+            name: _authorBlogName,
+            link: _authorBlogLink,
+            avatar: _authorBlogAvatar,
+            descr: _authorBlogDescription,
+            isDev: true,
+          ),
+        );
+        LogService.instance.logAction('添加作者友链', detail: _authorBlogName);
+      }
+
+      final pushResult = await friendLinkService.pushToGitHub(
+        github,
+        settings.friendLinkPath,
+        newFileFormat: settings.friendLinkNewFileFormat,
+      );
+      if (!mounted) return;
+
+      if (pushResult.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              added
+                  ? _label(
+                      '已添加作者友链并同步到 GitHub',
+                      'Author link added and synced to GitHub',
+                    )
+                  : _label(
+                      '作者友链已存在，已同步到 GitHub',
+                      'Author link already exists and has been synced to GitHub',
+                    ),
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _label(
+                '推送友链失败：${pushResult.error}',
+                'Failed to push friend links: ${pushResult.error}',
+              ),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e, stack) {
+      await LogService.instance.logException(
+        e,
+        stack,
+        tag: 'Settings',
+        context: '添加并同步作者友链失败',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _label(
+                '添加并同步作者友链失败：$e',
+                'Failed to add and sync the author link: $e',
+              ),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _addingAuthorFriendLink = false);
+    }
+  }
+
   Widget _buildAboutTab(AppStrings s) {
     final zh = identical(s, AppStrings.zh);
-    const blogName = '鼠鼠在碎觉';
-    const blogLink = 'https://sszsj.com';
-    const blogAvatar = 'https://tmx.fishpi.cn/image/head.jpg';
-    const blogDesc = '我是不慎落入世界的一滴水墨';
-    const authorName = '唐墨夏';
-
-    const friendLinkYaml = '''
-- name: 鼠鼠在碎觉
-  link: https://sszsj.com
-  avatar: https://tmx.fishpi.cn/image/head.jpg
-  descr: 我是不慎落入世界的一滴水墨''';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1841,11 +1968,11 @@ rm -rf "\$BACKUP_DIR"
           child: Row(
             children: [
               GestureDetector(
-                onTap: () => launchUrl(Uri.parse(blogLink)),
+                onTap: () => launchUrl(Uri.parse(_authorBlogLink)),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(24),
                   child: Image.network(
-                    blogAvatar,
+                    _authorBlogAvatar,
                     width: 48,
                     height: 48,
                     fit: BoxFit.cover,
@@ -1860,9 +1987,9 @@ rm -rf "\$BACKUP_DIR"
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     GestureDetector(
-                      onTap: () => launchUrl(Uri.parse(blogLink)),
+                      onTap: () => launchUrl(Uri.parse(_authorBlogLink)),
                       child: Text(
-                        blogName,
+                        _authorBlogName,
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
@@ -1872,7 +1999,7 @@ rm -rf "\$BACKUP_DIR"
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '$authorName · $blogDesc',
+                      '$_authorName · $_authorBlogDescription',
                       style: TextStyle(
                         fontSize: 12,
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1885,12 +2012,42 @@ rm -rf "\$BACKUP_DIR"
           ),
         ),
         _divider(),
-        _sectionHeader(zh ? '友链信息（点击复制）' : 'Friend Link (tap to copy)'),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+          child: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              Text(
+                zh ? '友链信息（点击复制）' : 'Friend Link (tap to copy)',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              FilledButton.tonalIcon(
+                onPressed: _addingAuthorFriendLink
+                    ? null
+                    : _addAuthorFriendLinkAndSync,
+                icon: _addingAuthorFriendLink
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.person_add_alt_1_outlined),
+                label: Text(zh ? '添加作者友链并同步' : 'Add Author Link & Sync'),
+              ),
+            ],
+          ),
+        ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
           child: GestureDetector(
             onTap: () {
-              _copyToClipboard(friendLinkYaml);
+              _copyToClipboard(_authorFriendLinkYaml);
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -1912,7 +2069,7 @@ rm -rf "\$BACKUP_DIR"
                 ),
               ),
               child: Text(
-                friendLinkYaml,
+                _authorFriendLinkYaml,
                 style: TextStyle(
                   fontSize: 13,
                   fontFamily: 'monospace',

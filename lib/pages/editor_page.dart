@@ -23,6 +23,19 @@ import 'metadata_page.dart';
 /// 窄屏吸顶工具条的固定高度（40 的按钮 + 上下各 8 内边距 + 底部分隔线，留一点余量）。
 const double _kEditorToolbarHeight = 58;
 
+/// 编辑器顶栏的次级操作。
+///
+/// 将不需要每次写作都看见的功能集中到「更多」，避免顶栏被图标挤满，
+/// 同时在菜单中用完整文案说明每项操作。
+enum _EditorMoreAction {
+  restoreRemote,
+  metadata,
+  outline,
+  findReplace,
+  history,
+  pushDraft,
+}
+
 class EditorPage extends StatefulWidget {
   final int? articleId;
 
@@ -1428,54 +1441,213 @@ class _EditorPageState extends State<EditorPage> {
       ];
     }
 
+    if (wide) return _buildWideAppBarActions(s);
+
     return [
-      if (_editingArticle?.status == ArticleStatus.pendingPublish &&
-          _editingArticle?.remotePath != null)
-        IconButton(
-          onPressed: _restoreFromRemote,
-          icon: const Icon(Icons.cloud_download_outlined),
-          tooltip: _label('从远端覆盖', 'Restore from remote'),
-        ),
-      IconButton(
-        onPressed: _showOutline,
-        icon: const Icon(Icons.format_list_bulleted),
-        tooltip: _label('文章大纲', 'Article outline'),
-      ),
-      IconButton(
-        onPressed: _showFindReplace,
-        icon: const Icon(Icons.find_replace),
-        tooltip: _label('查找替换', 'Find and replace'),
-      ),
-      IconButton(
-        onPressed: _showRevisionHistory,
-        icon: const Icon(Icons.history),
-        tooltip: _label('历史版本', 'Version history'),
-      ),
-      IconButton(
-        onPressed: _openMetadata,
-        icon: const Icon(Icons.tune),
-        tooltip: s.metadata,
-      ),
-      _ActionButton(
-        wide: wide,
-        icon: Icons.save_outlined,
-        label: s.saveDraft,
+      // 两个高频动作直接展示文字；其余操作统一收进菜单，避免移动端顶栏
+      // 出现一排难以辨认的图标。
+      TextButton.icon(
         onPressed: () => _saveDraft(),
+        icon: const Icon(Icons.save_outlined),
+        label: Text(s.saveDraft),
       ),
-      _ActionButton(
-        wide: wide,
-        icon: Icons.drafts_outlined,
-        label: s.pushToDraft,
-        onPressed: () => _publish(drafts: true),
+      _buildMoreActionsMenu(),
+      Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: FilledButton.icon(
+          onPressed: () => _publish(),
+          icon: const Icon(Icons.cloud_upload_outlined),
+          label: Text(s.publish),
+        ),
       ),
-      _ActionButton(
-        wide: wide,
-        icon: Icons.cloud_upload_outlined,
-        label: s.publish,
-        onPressed: () => _publish(),
-      ),
-      const SizedBox(width: 4),
     ];
+  }
+
+  List<Widget> _buildWideAppBarActions(AppStrings s) {
+    final canRestoreRemote =
+        _editingArticle?.status == ArticleStatus.pendingPublish &&
+        _editingArticle?.remotePath != null;
+
+    return [
+      if (canRestoreRemote)
+        _wideToolAction(
+          icon: Icons.cloud_download_outlined,
+          title: _label('从远端覆盖', 'Restore from remote'),
+          description: _label(
+            '使用远端版本替换当前内容',
+            'Replace this draft with the remote version',
+          ),
+          onPressed: _restoreFromRemote,
+        ),
+      _wideToolAction(
+        icon: Icons.format_list_bulleted,
+        title: _label('文章大纲', 'Article outline'),
+        description: _label('查看并跳转到文中的标题', 'Browse and jump to headings'),
+        onPressed: _showOutline,
+      ),
+      _wideToolAction(
+        icon: Icons.find_replace,
+        title: _label('查找与替换', 'Find and replace'),
+        description: _label(
+          '在当前文章中查找或批量替换',
+          'Find or replace text in this article',
+        ),
+        onPressed: _showFindReplace,
+      ),
+      _wideToolAction(
+        icon: Icons.history,
+        title: _label('历史版本', 'Version history'),
+        description: _label('查看并恢复此前保存的内容', 'Review or restore saved versions'),
+        onPressed: _showRevisionHistory,
+      ),
+      _wideToolAction(
+        icon: Icons.tune,
+        title: s.metadata,
+        description: _label(
+          '编辑标签、分类、封面等信息',
+          'Edit tags, categories, cover, and more',
+        ),
+        onPressed: _openMetadata,
+      ),
+      TextButton.icon(
+        onPressed: () => _saveDraft(),
+        icon: const Icon(Icons.save_outlined),
+        label: Text(s.saveDraft),
+      ),
+      TextButton.icon(
+        onPressed: () => _publish(drafts: true),
+        icon: const Icon(Icons.drafts_outlined),
+        label: Text(s.pushToDraft),
+      ),
+      Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: FilledButton.icon(
+          onPressed: () => _publish(),
+          icon: const Icon(Icons.cloud_upload_outlined),
+          label: Text(s.publish),
+        ),
+      ),
+    ];
+  }
+
+  Widget _wideToolAction({
+    required IconData icon,
+    required String title,
+    required String description,
+    required VoidCallback onPressed,
+  }) {
+    return Tooltip(
+      message: '$title\n$description',
+      child: IconButton(onPressed: onPressed, icon: Icon(icon)),
+    );
+  }
+
+  Widget _buildMoreActionsMenu() {
+    final s = AppStrings.current;
+    final canRestoreRemote =
+        _editingArticle?.status == ArticleStatus.pendingPublish &&
+        _editingArticle?.remotePath != null;
+
+    return PopupMenuButton<_EditorMoreAction>(
+      tooltip: _label('更多编辑操作', 'More editing actions'),
+      onSelected: (action) {
+        switch (action) {
+          case _EditorMoreAction.restoreRemote:
+            _restoreFromRemote();
+          case _EditorMoreAction.metadata:
+            _openMetadata();
+          case _EditorMoreAction.outline:
+            _showOutline();
+          case _EditorMoreAction.findReplace:
+            _showFindReplace();
+          case _EditorMoreAction.history:
+            _showRevisionHistory();
+          case _EditorMoreAction.pushDraft:
+            _publish(drafts: true);
+        }
+      },
+      itemBuilder: (context) => [
+        if (canRestoreRemote)
+          _moreActionItem(
+            value: _EditorMoreAction.restoreRemote,
+            icon: Icons.cloud_download_outlined,
+            title: _label('从远端覆盖', 'Restore from remote'),
+            subtitle: _label(
+              '使用远端版本替换当前内容',
+              'Replace this draft with the remote version',
+            ),
+          ),
+        _moreActionItem(
+          value: _EditorMoreAction.metadata,
+          icon: Icons.tune,
+          title: s.metadata,
+          subtitle: _label(
+            '编辑标签、分类、封面等信息',
+            'Edit tags, categories, cover, and more',
+          ),
+        ),
+        _moreActionItem(
+          value: _EditorMoreAction.outline,
+          icon: Icons.format_list_bulleted,
+          title: _label('文章大纲', 'Article outline'),
+          subtitle: _label('查看并跳转到文中的标题', 'Browse and jump to headings'),
+        ),
+        _moreActionItem(
+          value: _EditorMoreAction.findReplace,
+          icon: Icons.find_replace,
+          title: _label('查找与替换', 'Find and replace'),
+          subtitle: _label(
+            '在当前文章中查找或批量替换',
+            'Find or replace text in this article',
+          ),
+        ),
+        _moreActionItem(
+          value: _EditorMoreAction.history,
+          icon: Icons.history,
+          title: _label('历史版本', 'Version history'),
+          subtitle: _label('查看并恢复此前保存的内容', 'Review or restore saved versions'),
+        ),
+        const PopupMenuDivider(),
+        _moreActionItem(
+          value: _EditorMoreAction.pushDraft,
+          icon: Icons.drafts_outlined,
+          title: s.pushToDraft,
+          subtitle: _label(
+            '推送到仓库的 drafts 目录',
+            'Push to the repository drafts directory',
+          ),
+        ),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.more_horiz),
+            const SizedBox(width: 4),
+            Text(_label('更多', 'More')),
+          ],
+        ),
+      ),
+    );
+  }
+
+  PopupMenuItem<_EditorMoreAction> _moreActionItem({
+    required _EditorMoreAction value,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return PopupMenuItem(
+      value: value,
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        dense: true,
+        leading: Icon(icon),
+        title: Text(title),
+        subtitle: Text(subtitle),
+      ),
+    );
   }
 
   Widget _buildNarrow() {
@@ -2434,33 +2606,6 @@ class _ToolbarHeaderDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(covariant _ToolbarHeaderDelegate oldDelegate) {
     return oldDelegate.child != child || oldDelegate.height != height;
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  final bool wide;
-  final IconData icon;
-  final String label;
-  final VoidCallback onPressed;
-
-  const _ActionButton({
-    required this.wide,
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (!wide) {
-      return IconButton(onPressed: onPressed, icon: Icon(icon), tooltip: label);
-    }
-
-    return TextButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon),
-      label: Text(label),
-    );
   }
 }
 
