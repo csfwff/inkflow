@@ -1,4 +1,4 @@
-package com.xiaomo.inkflow
+package com.sszsj.inkflow
 
 import android.Manifest
 import android.app.Notification
@@ -16,7 +16,7 @@ import io.flutter.plugin.common.MethodChannel
 import java.io.File
 
 class MainActivity : FlutterActivity() {
-    private val updateChannelName = "com.xiaomo.inkflow/update"
+    private val updateChannelName = "com.sszsj.inkflow/update"
     private val notificationChannelId = "inkflow_updates"
     private val downloadNotificationId = 1001
     private val notificationPermissionRequestCode = 2001

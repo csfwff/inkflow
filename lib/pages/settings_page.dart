@@ -54,7 +54,7 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   static const MethodChannel _updateChannel = MethodChannel(
-    'com.xiaomo.inkflow/update',
+    'com.sszsj.inkflow/update',
   );
   static const _authorBlogName = '鼠鼠在碎觉';
   static const _authorBlogLink = 'https://sszsj.com';
