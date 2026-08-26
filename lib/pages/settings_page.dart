@@ -708,12 +708,19 @@ class _SettingsPageState extends State<SettingsPage> {
     }
 
     try {
+      final readyFile = await _getWindowsUpdateReadyFile();
+      if (await readyFile.exists()) {
+        await readyFile.delete();
+      }
       final script = await _createWindowsUpdateScript(
         packagePath: packagePath,
         exePath: exeFile.path,
         installDir: installDir.path,
+        processId: pid,
+        readyPath: readyFile.path,
       );
       await _startWindowsUpdateScript(script.path, runAsAdmin: runAsAdmin);
+      await _waitForWindowsUpdater(readyFile);
       await Future<void>.delayed(const Duration(milliseconds: 300));
       exit(0);
     } catch (e, stack) {
@@ -867,6 +874,8 @@ class _SettingsPageState extends State<SettingsPage> {
     required String packagePath,
     required String exePath,
     required String installDir,
+    required int processId,
+    required String readyPath,
   }) async {
     final dir = await getApplicationSupportDirectory();
     final updatesDir = Directory(p.join(dir.path, 'updates'));
@@ -875,14 +884,16 @@ class _SettingsPageState extends State<SettingsPage> {
     final exeName = p.basename(exePath);
     final logPath = p.join(updatesDir.path, 'windows_update.log');
 
-    await script.writeAsString('''
+    final scriptContent =
+        '''
 \$ErrorActionPreference = 'Stop'
-\$processId = $pid
+\$processId = $processId
 \$zipPath = ${_psQuote(packagePath)}
 \$exePath = ${_psQuote(exePath)}
 \$exeName = ${_psQuote(exeName)}
 \$installDir = ${_psQuote(installDir)}
 \$logPath = ${_psQuote(logPath)}
+\$readyPath = ${_psQuote(readyPath)}
 \$stagingDir = Join-Path \$env:TEMP ('inkflow_update_' + [guid]::NewGuid().ToString('N'))
 \$backupDir = Join-Path \$env:TEMP ('inkflow_backup_' + [guid]::NewGuid().ToString('N'))
 
@@ -893,6 +904,7 @@ function Write-UpdateLog([string]\$message) {
 
 try {
   Write-UpdateLog 'Updater started.'
+  Set-Content -LiteralPath \$readyPath -Value 'started' -NoNewline -Encoding ASCII
   for (\$i = 0; \$i -lt 120; \$i++) {
     \$process = Get-Process -Id \$processId -ErrorAction SilentlyContinue
     if (\$null -eq \$process) { break }
@@ -931,34 +943,59 @@ try {
 } finally {
   Remove-Item -LiteralPath \$stagingDir -Recurse -Force -ErrorAction SilentlyContinue
 }
-''');
+''';
+    // Windows PowerShell 5.1 treats scripts without a BOM as ANSI, corrupting
+    // update paths under a non-ASCII Windows account or installation directory.
+    await script.writeAsBytes([
+      0xEF,
+      0xBB,
+      0xBF,
+      ...utf8.encode(scriptContent),
+    ]);
     return script;
+  }
+
+  Future<File> _getWindowsUpdateReadyFile() async {
+    final dir = await getApplicationSupportDirectory();
+    return File(p.join(dir.path, 'updates', 'windows_update.ready'));
+  }
+
+  Future<void> _waitForWindowsUpdater(File readyFile) async {
+    const timeout = Duration(seconds: 5);
+    final deadline = DateTime.now().add(timeout);
+    while (DateTime.now().isBefore(deadline)) {
+      if (await readyFile.exists()) return;
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    throw StateError('Windows updater did not start within $timeout.');
   }
 
   Future<void> _startWindowsUpdateScript(
     String scriptPath, {
     required bool runAsAdmin,
   }) async {
-    if (runAsAdmin) {
-      final scriptArg =
-          '-NoProfile -ExecutionPolicy Bypass -File "$scriptPath"';
-      await Process.start('powershell.exe', [
-        '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        'Start-Process -FilePath powershell.exe -ArgumentList ${_psQuote(scriptArg)} -Verb RunAs',
-      ], mode: ProcessStartMode.detached);
-      return;
-    }
-
-    await Process.start('powershell.exe', [
+    final scriptArgs =
+        '-NoProfile -ExecutionPolicy Bypass -File ${_psQuote(scriptPath)}';
+    final command = runAsAdmin
+        ? 'Start-Process -FilePath powershell.exe '
+              '-ArgumentList ${_psQuote(scriptArgs)} -Verb RunAs'
+        : 'Start-Process -FilePath powershell.exe '
+              '-ArgumentList ${_psQuote(scriptArgs)} -WindowStyle Hidden';
+    final result = await Process.run('powershell.exe', [
       '-NoProfile',
       '-ExecutionPolicy',
       'Bypass',
-      '-File',
-      scriptPath,
-    ], mode: ProcessStartMode.detached);
+      '-Command',
+      command,
+    ]);
+    if (result.exitCode != 0) {
+      throw ProcessException(
+        'powershell.exe',
+        ['-Command', command],
+        '${result.stderr}'.trim(),
+        result.exitCode,
+      );
+    }
   }
 
   String _psQuote(String value) {
