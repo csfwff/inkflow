@@ -4,18 +4,67 @@ import 'github_service.dart';
 import 'log_service.dart';
 import 'sync_contracts.dart';
 
+typedef SyncProgressListener = void Function(SyncProgressUpdate update);
+
+enum SyncProgressStage {
+  preparing,
+  scanningPosts,
+  scanningDrafts,
+  readingArticles,
+  savingArticles,
+  reconcilingDeletes,
+  loadingChanges,
+  applyingChanges,
+  syncingMetadata,
+  savingSettings,
+  fallingBackToFullSync,
+}
+
+class SyncProgressUpdate {
+  final SyncProgressStage stage;
+  final int completed;
+  final int? total;
+  final String? currentItem;
+
+  const SyncProgressUpdate({
+    required this.stage,
+    this.completed = 0,
+    this.total,
+    this.currentItem,
+  });
+}
+
 class SyncService {
   final GitHubService github;
   final SyncArticleStore articleService;
   final SyncSettingsStore settingsService;
+  final SyncProgressListener? onProgress;
 
   static final _log = LogService.instance;
+  int _readArticleCount = 0;
 
   SyncService({
     required this.github,
     required this.articleService,
     required this.settingsService,
+    this.onProgress,
   });
+
+  void _reportProgress(
+    SyncProgressStage stage, {
+    int completed = 0,
+    int? total,
+    String? currentItem,
+  }) {
+    onProgress?.call(
+      SyncProgressUpdate(
+        stage: stage,
+        completed: completed,
+        total: total,
+        currentItem: currentItem,
+      ),
+    );
+  }
 
   Future<Article?> fetchRemoteArticle(Article local) async {
     final remotePath = local.remotePath;
@@ -45,10 +94,13 @@ class SyncService {
   Future<SyncResult> syncFromGitHub() async {
     try {
       _log.write('=== syncFromGitHub START ===', tag: 'Sync');
+      _readArticleCount = 0;
+      _reportProgress(SyncProgressStage.preparing);
       final List<Article> remoteArticles = [];
 
       // 同步已发布文章 (source/_posts)
       _log.write('Syncing source/_posts ...', tag: 'Sync');
+      _reportProgress(SyncProgressStage.scanningPosts);
       final posts = await _syncDirectory(
         'source/_posts',
         ArticleStatus.synced,
@@ -62,6 +114,7 @@ class SyncService {
 
       // 同步仓库草稿 (source/_drafts)
       _log.write('Syncing source/_drafts ...', tag: 'Sync');
+      _reportProgress(SyncProgressStage.scanningDrafts);
       final drafts = await _syncDirectory(
         'source/_drafts',
         ArticleStatus.repoDraft,
@@ -87,9 +140,21 @@ class SyncService {
       _log.write('Remote paths: $remotePaths', tag: 'Sync');
 
       // upsert 远程文章
-      for (final article in remoteArticles) {
+      for (var i = 0; i < remoteArticles.length; i++) {
+        final article = remoteArticles[i];
+        _reportProgress(
+          SyncProgressStage.savingArticles,
+          completed: i,
+          total: remoteArticles.length,
+          currentItem: article.title,
+        );
         await articleService.upsertFromGitHub(article);
       }
+      _reportProgress(
+        SyncProgressStage.savingArticles,
+        completed: remoteArticles.length,
+        total: remoteArticles.length,
+      );
 
       // 同步所有标签和分类到数据库
       final allTags = <String>{};
@@ -98,6 +163,7 @@ class SyncService {
         allTags.addAll(article.tags);
         allCategories.addAll(article.categories);
       }
+      _reportProgress(SyncProgressStage.syncingMetadata);
       await articleService.ensureTags(allTags.toList());
       await articleService.ensureCategories(allCategories.toList());
 
@@ -120,7 +186,14 @@ class SyncService {
           'Local synced/repoDraft count: ${localSynced.length}',
           tag: 'Sync',
         );
-        for (final local in localSynced) {
+        for (var i = 0; i < localSynced.length; i++) {
+          final local = localSynced[i];
+          _reportProgress(
+            SyncProgressStage.reconcilingDeletes,
+            completed: i,
+            total: localSynced.length,
+            currentItem: local.title,
+          );
           if (local.status == ArticleStatus.pendingPublish) {
             continue;
           }
@@ -142,6 +215,11 @@ class SyncService {
             deletedCount++;
           }
         }
+        _reportProgress(
+          SyncProgressStage.reconcilingDeletes,
+          completed: localSynced.length,
+          total: localSynced.length,
+        );
       }
       if (deletedCount > 0) {
         _log.write(
@@ -151,6 +229,7 @@ class SyncService {
       }
 
       // 更新 lastSyncTime
+      _reportProgress(SyncProgressStage.savingSettings);
       settingsService.settings.lastSyncTime = DateTime.now();
       await settingsService.save();
       _log.write(
@@ -177,11 +256,13 @@ class SyncService {
   Future<SyncResult> syncIncremental() async {
     try {
       _log.write('=== syncIncremental START ===', tag: 'Sync');
+      _reportProgress(SyncProgressStage.loadingChanges);
 
       final lastSyncTime = settingsService.settings.lastSyncTime;
       if (lastSyncTime == null) {
         _log.write('No lastSyncTime, falling back to full sync', tag: 'Sync');
-        return syncFromGitHub();
+        _reportProgress(SyncProgressStage.fallingBackToFullSync);
+        return await syncFromGitHub();
       }
 
       _log.write('lastSyncTime: $lastSyncTime', tag: 'Sync');
@@ -196,7 +277,8 @@ class SyncService {
           'Posts commit request failed (${postsCommitsResult.error}), falling back to full sync',
           tag: 'Sync',
         );
-        return syncFromGitHub();
+        _reportProgress(SyncProgressStage.fallingBackToFullSync);
+        return await syncFromGitHub();
       }
 
       final draftsCommitsResult = await github.getCommitsSince(
@@ -208,7 +290,8 @@ class SyncService {
           'Drafts commit request failed (${draftsCommitsResult.error}), falling back to full sync',
           tag: 'Sync',
         );
-        return syncFromGitHub();
+        _reportProgress(SyncProgressStage.fallingBackToFullSync);
+        return await syncFromGitHub();
       }
 
       final postsCommits = postsCommitsResult.commits;
@@ -229,7 +312,8 @@ class SyncService {
           'Commits missing file details (too many?), falling back to full sync',
           tag: 'Sync',
         );
-        return syncFromGitHub();
+        _reportProgress(SyncProgressStage.fallingBackToFullSync);
+        return await syncFromGitHub();
       }
 
       // 提取变更文件
@@ -256,13 +340,21 @@ class SyncService {
           'Too many changes ($totalChanges), falling back to full sync',
           tag: 'Sync',
         );
-        return syncFromGitHub();
+        _reportProgress(SyncProgressStage.fallingBackToFullSync);
+        return await syncFromGitHub();
       }
 
       // 拉取 added/modified 文件内容
       int syncedCount = 0;
+      int processedChanges = 0;
 
       for (final filePath in postsChanges.addedOrModified) {
+        _reportProgress(
+          SyncProgressStage.applyingChanges,
+          completed: processedChanges,
+          total: totalChanges,
+          currentItem: filePath,
+        );
         final article = await _fetchAndParseFile(
           filePath,
           ArticleStatus.synced,
@@ -272,9 +364,16 @@ class SyncService {
           await articleService.upsertFromGitHub(article);
           syncedCount++;
         }
+        processedChanges++;
       }
 
       for (final filePath in draftsChanges.addedOrModified) {
+        _reportProgress(
+          SyncProgressStage.applyingChanges,
+          completed: processedChanges,
+          total: totalChanges,
+          currentItem: filePath,
+        );
         final article = await _fetchAndParseFile(
           filePath,
           ArticleStatus.repoDraft,
@@ -284,22 +383,42 @@ class SyncService {
           await articleService.upsertFromGitHub(article);
           syncedCount++;
         }
+        processedChanges++;
       }
 
       // 标记 removed 文件
       int deletedCount = 0;
       for (final filePath in postsChanges.removed) {
+        _reportProgress(
+          SyncProgressStage.applyingChanges,
+          completed: processedChanges,
+          total: totalChanges,
+          currentItem: filePath,
+        );
         deletedCount += await _markRemoteDeleted(
           filePath,
           ArticleRemoteKind.post,
         );
+        processedChanges++;
       }
       for (final filePath in draftsChanges.removed) {
+        _reportProgress(
+          SyncProgressStage.applyingChanges,
+          completed: processedChanges,
+          total: totalChanges,
+          currentItem: filePath,
+        );
         deletedCount += await _markRemoteDeleted(
           filePath,
           ArticleRemoteKind.repoDraft,
         );
+        processedChanges++;
       }
+      _reportProgress(
+        SyncProgressStage.applyingChanges,
+        completed: processedChanges,
+        total: totalChanges,
+      );
 
       // 同步标签和分类
       final allArticles = await articleService.getRemoteTracked();
@@ -309,12 +428,14 @@ class SyncService {
         allTags.addAll(article.tags);
         allCategories.addAll(article.categories);
       }
+      _reportProgress(SyncProgressStage.syncingMetadata);
       await articleService.ensureTags(allTags.toList());
       await articleService.ensureCategories(allCategories.toList());
 
       // 更新 lastSyncTime
       final latestDate = _getLatestDate(postsCommits, draftsCommits);
       if (latestDate != null) {
+        _reportProgress(SyncProgressStage.savingSettings);
         settingsService.settings.lastSyncTime = latestDate;
         await settingsService.save();
         _log.write('Updated lastSyncTime: $latestDate', tag: 'Sync');
@@ -329,7 +450,8 @@ class SyncService {
       await _log.logException(e, stack, tag: 'Sync', context: '增量同步异常');
       // 增量同步失败，降级到全量同步
       _log.write('Falling back to full sync', tag: 'Sync');
-      return syncFromGitHub();
+      _reportProgress(SyncProgressStage.fallingBackToFullSync);
+      return await syncFromGitHub();
     }
   }
 
@@ -566,6 +688,11 @@ class SyncService {
         );
       } else if (entry.name.endsWith('.md')) {
         _log.write('  reading: ${entry.path}', tag: 'Sync');
+        _reportProgress(
+          SyncProgressStage.readingArticles,
+          completed: _readArticleCount,
+          currentItem: entry.path,
+        );
         final fileData = await github.getFileContent(entry.path);
         if (fileData == null) {
           throw _SyncException('Failed to read ${entry.path}');
@@ -591,6 +718,11 @@ class SyncService {
             tag: 'Sync',
           );
         }
+        _readArticleCount++;
+        _reportProgress(
+          SyncProgressStage.readingArticles,
+          completed: _readArticleCount,
+        );
       }
     }
   }

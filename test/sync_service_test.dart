@@ -11,6 +11,34 @@ import 'package:inkflow/services/sync_service.dart';
 
 void main() {
   group('SyncService safety', () {
+    test('reports progress for a full sync', () async {
+      final updates = <SyncProgressUpdate>[];
+      final sync = _syncService(
+        MockClient(
+          (_) async => http.Response(jsonEncode({'message': 'Not Found'}), 404),
+        ),
+        _FakeArticleStore([]),
+        _FakeSettingsStore(Settings()),
+        onProgress: updates.add,
+      );
+
+      final result = await sync.syncFromGitHub();
+
+      expect(result.success, isTrue);
+      expect(
+        updates.map((update) => update.stage),
+        containsAll([
+          SyncProgressStage.preparing,
+          SyncProgressStage.scanningPosts,
+          SyncProgressStage.scanningDrafts,
+          SyncProgressStage.savingArticles,
+          SyncProgressStage.syncingMetadata,
+          SyncProgressStage.savingSettings,
+        ]),
+      );
+      expect(updates.last.stage, SyncProgressStage.savingSettings);
+    });
+
     test('根目录不存在时跳过远端删除对账', () async {
       final store = _FakeArticleStore([
         _article(
@@ -151,8 +179,9 @@ void main() {
 SyncService _syncService(
   http.Client client,
   SyncArticleStore articleStore,
-  SyncSettingsStore settingsStore,
-) {
+  SyncSettingsStore settingsStore, {
+  SyncProgressListener? onProgress,
+}) {
   return SyncService(
     github: GitHubService(
       token: 'token',
@@ -162,6 +191,7 @@ SyncService _syncService(
     ),
     articleService: articleStore,
     settingsService: settingsStore,
+    onProgress: onProgress,
   );
 }
 

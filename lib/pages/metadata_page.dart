@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import '../l10n/app_strings.dart';
 import '../models/article.dart';
 import '../services/article_service.dart';
+import '../services/clipboard_image_service.dart';
 import '../services/image_host/image_host_service.dart';
 import '../services/log_service.dart';
 import '../services/settings_service.dart';
@@ -467,6 +468,8 @@ class _MetadataPageState extends State<MetadataPage> {
           ? ImageSource.gallery
           : ImageSource.camera;
       await _pickAndUploadImage(controller, source);
+    } else if (result == 'clipboard') {
+      await _pasteAndUploadImage(controller);
     } else {
       // 从文章选择的图片 URL
       controller.text = result;
@@ -528,6 +531,84 @@ class _MetadataPageState extends State<MetadataPage> {
         stack,
         tag: 'Metadata',
         context: '上传元数据图片失败',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(s.imageUploadFailed),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  Future<void> _pasteAndUploadImage(TextEditingController controller) async {
+    final s = AppStrings.current;
+    final imageHost = ImageHostService(
+      settings: widget.settingsService.settings,
+    );
+    if (!imageHost.isConfigured) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(s.imageHostNotConfigured)));
+      }
+      return;
+    }
+
+    setState(() => _uploading = true);
+    try {
+      final image = await ClipboardImage.read();
+      if (image == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                AppStrings.isZh
+                    ? '剪贴板中没有图片'
+                    : 'No image found in the clipboard',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      final result = await imageHost.uploadWithCompress(
+        image.bytes,
+        image.filename,
+      );
+      if (result.success && result.url != null) {
+        controller.text = result.url!;
+        if (result.wasCompressed && mounted) {
+          final compressed = result.compressResult!;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${s.imageCompressResult}: ${compressed.originalSizeFormatted} -> ${compressed.compressedSizeFormatted} '
+                '(-${compressed.ratio.toStringAsFixed(0)}%)',
+              ),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.error ?? s.imageUploadFailed),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e, stack) {
+      await LogService.instance.logException(
+        e,
+        stack,
+        tag: 'Metadata',
+        context: '读取或上传剪贴板图片失败',
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -935,6 +1016,13 @@ class _ImagePickerSheetState extends State<_ImagePickerSheet>
           title: Text(s.uploadImage),
           subtitle: const Text('Gallery'),
           onTap: () => Navigator.pop(context, 'gallery'),
+        ),
+        ListTile(
+          leading: const Icon(Icons.content_paste_outlined),
+          title: Text(
+            AppStrings.isZh ? '粘贴剪贴板图片' : 'Paste image from clipboard',
+          ),
+          onTap: () => Navigator.pop(context, 'clipboard'),
         ),
         if (canUseCamera)
           ListTile(

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../l10n/app_strings.dart';
@@ -31,10 +33,18 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final _searchCtrl = TextEditingController();
+  final _syncProgress = ValueNotifier<SyncProgressUpdate>(
+    const SyncProgressUpdate(stage: SyncProgressStage.preparing),
+  );
+  final _syncElapsed = ValueNotifier<Duration>(Duration.zero);
+  final _syncStopwatch = Stopwatch();
 
   List<Article> _articles = [];
   bool _loading = true;
   bool _syncing = false;
+  bool _syncProgressDialogVisible = false;
+  BuildContext? _syncProgressDialogContext;
+  Timer? _syncElapsedTimer;
   _ArticleFilter _filter = _ArticleFilter.all;
   String _query = '';
 
@@ -49,6 +59,9 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    _syncElapsedTimer?.cancel();
+    _syncProgress.dispose();
+    _syncElapsed.dispose();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -83,6 +96,8 @@ class _HomePageState extends State<HomePage> {
     }
 
     setState(() => _syncing = true);
+    _startSyncProgress();
+    _showSyncProgressDialog();
 
     final github = GitHubService(
       token: settings.githubToken,
@@ -94,11 +109,13 @@ class _HomePageState extends State<HomePage> {
       github: github,
       articleService: articleService,
       settingsService: settingsService,
+      onProgress: _onSyncProgress,
     );
     final result = incremental
         ? await sync.syncIncremental()
         : await sync.syncFromGitHub();
 
+    _finishSyncProgress();
     if (!mounted) return;
     setState(() => _syncing = false);
 
@@ -119,6 +136,229 @@ class _HomePageState extends State<HomePage> {
     }
 
     await _loadArticles();
+  }
+
+  void _startSyncProgress() {
+    _syncStopwatch
+      ..reset()
+      ..start();
+    _syncElapsed.value = Duration.zero;
+    _syncProgress.value = const SyncProgressUpdate(
+      stage: SyncProgressStage.preparing,
+    );
+    _syncElapsedTimer?.cancel();
+    _syncElapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      _syncElapsed.value = _syncStopwatch.elapsed;
+    });
+  }
+
+  void _onSyncProgress(SyncProgressUpdate update) {
+    if (mounted) {
+      _syncProgress.value = update;
+    }
+  }
+
+  void _finishSyncProgress() {
+    _syncStopwatch.stop();
+    _syncElapsedTimer?.cancel();
+    _syncElapsedTimer = null;
+    _closeSyncProgressDialog();
+  }
+
+  void _showSyncProgressDialog() {
+    if (!mounted || !_syncing || _syncProgressDialogVisible) return;
+    _syncProgressDialogVisible = true;
+    BuildContext? dialogContext;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        dialogContext = ctx;
+        _syncProgressDialogContext = ctx;
+        return AlertDialog(
+          icon: Icon(
+            Icons.sync,
+            color: Theme.of(ctx).colorScheme.primary,
+            size: 36,
+          ),
+          title: Text(_label('同步进度', 'Sync progress')),
+          content: SizedBox(
+            width: 360,
+            child: ValueListenableBuilder<SyncProgressUpdate>(
+              valueListenable: _syncProgress,
+              builder: (context, progress, _) {
+                return ValueListenableBuilder<Duration>(
+                  valueListenable: _syncElapsed,
+                  builder: (context, elapsed, _) =>
+                      _buildSyncProgressContent(context, progress, elapsed),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(_label('隐藏', 'Hide')),
+            ),
+          ],
+        );
+      },
+    ).whenComplete(() {
+      if (_syncProgressDialogContext == dialogContext) {
+        _syncProgressDialogContext = null;
+        _syncProgressDialogVisible = false;
+      }
+    });
+  }
+
+  void _closeSyncProgressDialog() {
+    final dialogContext = _syncProgressDialogContext;
+    if (dialogContext != null && dialogContext.mounted) {
+      Navigator.of(dialogContext).pop();
+    }
+    _syncProgressDialogContext = null;
+    _syncProgressDialogVisible = false;
+  }
+
+  Widget _buildSyncProgressContent(
+    BuildContext context,
+    SyncProgressUpdate progress,
+    Duration elapsed,
+  ) {
+    final total = progress.total;
+    final isDeterminate = total != null && total > 0;
+    final value = isDeterminate
+        ? (progress.completed / total).clamp(0.0, 1.0)
+        : null;
+    final countLabel = isDeterminate
+        ? _label(
+            '已处理 ${progress.completed} / $total 项',
+            '${progress.completed} of $total items processed',
+          )
+        : progress.stage == SyncProgressStage.readingArticles
+        ? _label(
+            '已读取 ${progress.completed} 篇文章',
+            '${progress.completed} articles read',
+          )
+        : _label('正在处理...', 'Working...');
+    final item = progress.currentItem;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          _syncProgressLabel(progress.stage),
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 12),
+        LinearProgressIndicator(value: value),
+        const SizedBox(height: 8),
+        Text(
+          countLabel,
+          style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+        ),
+        if (item != null && item.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text(
+            item,
+            softWrap: true,
+            style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+          ),
+        ],
+        const SizedBox(height: 12),
+        Text(
+          _label(
+            '已用时 ${_formatSyncDuration(elapsed)}',
+            'Elapsed ${_formatSyncDuration(elapsed)}',
+          ),
+          style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSyncProgressEntry() {
+    return Tooltip(
+      message: _label('查看同步进度', 'View sync progress'),
+      child: IconButton(
+        onPressed: _showSyncProgressDialog,
+        icon: SizedBox(
+          width: 22,
+          height: 22,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              const CircularProgressIndicator(strokeWidth: 2),
+              Icon(
+                Icons.sync,
+                size: 14,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _syncProgressLabel(SyncProgressStage stage) {
+    return switch (stage) {
+      SyncProgressStage.preparing => _label('正在准备同步...', 'Preparing sync...'),
+      SyncProgressStage.scanningPosts => _label(
+        '正在扫描已发布文章...',
+        'Scanning published articles...',
+      ),
+      SyncProgressStage.scanningDrafts => _label(
+        '正在扫描仓库草稿...',
+        'Scanning repository drafts...',
+      ),
+      SyncProgressStage.readingArticles => _label(
+        '正在读取文章...',
+        'Reading articles...',
+      ),
+      SyncProgressStage.savingArticles => _label(
+        '正在保存文章...',
+        'Saving articles...',
+      ),
+      SyncProgressStage.reconcilingDeletes => _label(
+        '正在检查远端删除...',
+        'Checking remote deletions...',
+      ),
+      SyncProgressStage.loadingChanges => _label(
+        '正在获取远端变更...',
+        'Loading remote changes...',
+      ),
+      SyncProgressStage.applyingChanges => _label(
+        '正在应用远端变更...',
+        'Applying remote changes...',
+      ),
+      SyncProgressStage.syncingMetadata => _label(
+        '正在同步标签和分类...',
+        'Syncing tags and categories...',
+      ),
+      SyncProgressStage.savingSettings => _label(
+        '正在保存同步记录...',
+        'Saving sync state...',
+      ),
+      SyncProgressStage.fallingBackToFullSync => _label(
+        '正在改用全量同步...',
+        'Switching to full sync...',
+      ),
+    };
+  }
+
+  String _formatSyncDuration(Duration duration) {
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return minutes > 0
+        ? '$minutes:${seconds.padLeft(2, '0')}'
+        : '${duration.inSeconds}s';
   }
 
   Future<void> _deleteArticle(Article article) async {
@@ -342,17 +582,7 @@ class _HomePageState extends State<HomePage> {
 
   List<Widget> _buildNarrowAppBarActions(AppStrings s) {
     return [
-      if (_syncing)
-        const Padding(
-          padding: EdgeInsets.all(16),
-          child: SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        )
-      else
-        _buildSyncMenu(s),
+      if (_syncing) _buildSyncProgressEntry() else _buildSyncMenu(s),
       _buildMoreMenu(s),
       const SizedBox(width: 4),
     ];
@@ -360,17 +590,7 @@ class _HomePageState extends State<HomePage> {
 
   List<Widget> _buildWideAppBarActions(AppStrings s) {
     return [
-      if (_syncing)
-        const Padding(
-          padding: EdgeInsets.all(16),
-          child: SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        )
-      else
-        _buildSyncMenu(s),
+      if (_syncing) _buildSyncProgressEntry() else _buildSyncMenu(s),
       _wideAppBarAction(
         icon: Icons.public,
         label: _label('博客', 'Blog'),
@@ -466,7 +686,11 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
       ],
-      child: _AppBarMenuTrigger(icon: Icons.sync, label: _label('同步', 'Sync')),
+      child: _AppBarMenuTrigger(
+        icon: Icons.sync,
+        label: _label('同步', 'Sync'),
+        foregroundColor: Theme.of(context).colorScheme.primary,
+      ),
     );
   }
 
@@ -866,8 +1090,13 @@ class _FilterButton extends StatelessWidget {
 class _AppBarMenuTrigger extends StatelessWidget {
   final IconData icon;
   final String label;
+  final Color? foregroundColor;
 
-  const _AppBarMenuTrigger({required this.icon, required this.label});
+  const _AppBarMenuTrigger({
+    required this.icon,
+    required this.label,
+    this.foregroundColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -875,7 +1104,11 @@ class _AppBarMenuTrigger extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: [Icon(icon, size: 20), const SizedBox(width: 4), Text(label)],
+        children: [
+          Icon(icon, size: 20, color: foregroundColor),
+          const SizedBox(width: 4),
+          Text(label, style: TextStyle(color: foregroundColor)),
+        ],
       ),
     );
   }

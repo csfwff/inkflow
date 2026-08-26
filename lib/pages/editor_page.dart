@@ -10,6 +10,7 @@ import '../main.dart';
 import '../models/article.dart';
 import '../services/editor_recovery_service.dart';
 import '../services/editor_tools_service.dart';
+import '../services/clipboard_image_service.dart';
 import '../services/frontmatter_helper.dart';
 import '../services/github_service.dart';
 import '../services/image_host/image_host_service.dart';
@@ -36,6 +37,8 @@ enum _EditorMoreAction {
   pushDraft,
 }
 
+enum _EditorImageSource { gallery, camera, clipboard }
+
 class EditorPage extends StatefulWidget {
   final int? articleId;
 
@@ -48,7 +51,7 @@ class EditorPage extends StatefulWidget {
 class _EditorPageState extends State<EditorPage> {
   final _titleCtrl = TextEditingController();
   final _contentCtrl = TextEditingController();
-  final _contentFocus = FocusNode();
+  late final FocusNode _contentFocus;
   final _recoveryService = EditorRecoveryService();
 
   DateTime _selectedDate = DateTime.now();
@@ -59,6 +62,8 @@ class _EditorPageState extends State<EditorPage> {
   bool _updatingFields = false;
   bool _autoSaving = false;
   bool _resolvingConflict = false;
+  bool _checkingClipboardImage = false;
+  bool _clipboardImagePromptVisible = false;
   String _previewText = '';
   String _originalFrontmatter = ''; // 保留原始 frontmatter
   String? _baseRemoteContent;
@@ -72,6 +77,7 @@ class _EditorPageState extends State<EditorPage> {
   @override
   void initState() {
     super.initState();
+    _contentFocus = FocusNode(onKeyEvent: _handleEditorKeyEvent);
     _titleCtrl.addListener(_handleTitleChanged);
     _contentCtrl.addListener(_handleContentChanged);
     if (widget.articleId != null) {
@@ -1273,6 +1279,84 @@ class _EditorPageState extends State<EditorPage> {
     );
   }
 
+  KeyEventResult _handleEditorKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent ||
+        event.logicalKey != LogicalKeyboardKey.keyV ||
+        _uploading ||
+        _checkingClipboardImage) {
+      return KeyEventResult.ignored;
+    }
+
+    final keyboard = HardwareKeyboard.instance;
+    if (!keyboard.isControlPressed && !keyboard.isMetaPressed) {
+      return KeyEventResult.ignored;
+    }
+
+    unawaited(_checkClipboardImageAfterPaste());
+    return KeyEventResult.ignored;
+  }
+
+  Future<void> _checkClipboardImageAfterPaste() async {
+    _checkingClipboardImage = true;
+    try {
+      final image = await ClipboardImage.read();
+      if (!mounted || image == null || _clipboardImagePromptVisible) return;
+
+      final imageHost = ImageHostService(settings: settingsService.settings);
+      if (!imageHost.isConfigured) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _label('请先在设置中配置图床', 'Please configure image host in settings'),
+            ),
+          ),
+        );
+        return;
+      }
+
+      _clipboardImagePromptVisible = true;
+      final shouldUpload = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          icon: Icon(
+            Icons.content_paste_outlined,
+            color: Theme.of(ctx).colorScheme.primary,
+          ),
+          title: Text(_label('检测到剪贴板图片', 'Clipboard image detected')),
+          content: Text(
+            _label(
+              '是否上传并插入到当前光标位置？',
+              'Upload and insert it at the current cursor position?',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(_label('取消', 'Cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(_label('上传图片', 'Upload image')),
+            ),
+          ],
+        ),
+      );
+      if (shouldUpload == true && mounted) {
+        await _pasteAndUploadImage(imageHost, image: image);
+      }
+    } catch (e, stack) {
+      await LogService.instance.logException(
+        e,
+        stack,
+        tag: 'Editor',
+        context: '检查剪贴板图片失败',
+      );
+    } finally {
+      _clipboardImagePromptVisible = false;
+      _checkingClipboardImage = false;
+    }
+  }
+
   Future<void> _pickAndUploadImage() async {
     // Check image host config
     final imageHost = ImageHostService(settings: settingsService.settings);
@@ -1289,7 +1373,7 @@ class _EditorPageState extends State<EditorPage> {
     }
 
     // Show source picker (gallery / camera)
-    final source = await showModalBottomSheet<ImageSource>(
+    final source = await showModalBottomSheet<_EditorImageSource>(
       context: context,
       builder: (ctx) => SafeArea(
         child: Column(
@@ -1298,14 +1382,19 @@ class _EditorPageState extends State<EditorPage> {
             ListTile(
               leading: const Icon(Icons.photo_library_outlined),
               title: Text(_label('从相册选择', 'Gallery')),
-              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+              onTap: () => Navigator.pop(ctx, _EditorImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.content_paste_outlined),
+              title: Text(_label('粘贴剪贴板图片', 'Paste image from clipboard')),
+              onTap: () => Navigator.pop(ctx, _EditorImageSource.clipboard),
             ),
             if (Theme.of(ctx).platform == TargetPlatform.android ||
                 Theme.of(ctx).platform == TargetPlatform.iOS)
               ListTile(
                 leading: const Icon(Icons.camera_alt_outlined),
                 title: Text(_label('拍照', 'Camera')),
-                onTap: () => Navigator.pop(ctx, ImageSource.camera),
+                onTap: () => Navigator.pop(ctx, _EditorImageSource.camera),
               ),
             const SizedBox(height: 8),
           ],
@@ -1314,9 +1403,19 @@ class _EditorPageState extends State<EditorPage> {
     );
     if (source == null) return;
 
+    if (source == _EditorImageSource.clipboard) {
+      await _pasteAndUploadImage(imageHost);
+      return;
+    }
+
     // Pick image
     final picker = ImagePicker();
-    final file = await picker.pickImage(source: source, maxWidth: 2048);
+    final file = await picker.pickImage(
+      source: source == _EditorImageSource.gallery
+          ? ImageSource.gallery
+          : ImageSource.camera,
+      maxWidth: 2048,
+    );
     if (file == null) return;
 
     if (!mounted) return;
@@ -1353,6 +1452,82 @@ class _EditorPageState extends State<EditorPage> {
           backgroundColor: Colors.red,
         ),
       );
+    }
+  }
+
+  Future<void> _pasteAndUploadImage(
+    ImageHostService imageHost, {
+    ClipboardImage? image,
+  }) async {
+    if (!mounted) return;
+    setState(() => _uploading = true);
+
+    try {
+      final clipboardImage = image ?? await ClipboardImage.read();
+      if (!mounted) return;
+      if (clipboardImage == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _label('剪贴板中没有图片', 'No image found in the clipboard'),
+            ),
+          ),
+        );
+        return;
+      }
+
+      final result = await imageHost.uploadWithCompress(
+        clipboardImage.bytes,
+        clipboardImage.filename,
+      );
+      if (!mounted) return;
+
+      if (result.success && result.url != null) {
+        _insertBlock('![${clipboardImage.filename}](${result.url})');
+        if (result.wasCompressed) {
+          final compressed = result.compressResult!;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${AppStrings.current.imageCompressResult}: ${compressed.originalSizeFormatted} -> ${compressed.compressedSizeFormatted} '
+                '(-${compressed.ratio.toStringAsFixed(0)}%)',
+              ),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${_label('上传失败', 'Upload failed')}: ${result.error}',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e, stack) {
+      await LogService.instance.logException(
+        e,
+        stack,
+        tag: 'Editor',
+        context: '读取或上传剪贴板图片失败',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _label(
+                '无法读取或上传剪贴板图片',
+                'Unable to read or upload clipboard image',
+              ),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
     }
   }
 
