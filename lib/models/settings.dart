@@ -54,6 +54,13 @@ class Settings {
   String themePresetId;
   AppLocale locale;
 
+  // Update download proxy (empty host means direct connection)
+  String updateProxyHost;
+  int updateProxyPort;
+  String updateProxyUsername;
+  String updateProxyPassword;
+  bool updateProxyEnabled;
+
   // Sync
   DateTime? lastSyncTime;
 
@@ -82,6 +89,11 @@ class Settings {
     this.themeMode = AppThemeMode.system,
     this.themePresetId = defaultThemePresetId,
     this.locale = AppLocale.system,
+    this.updateProxyHost = '',
+    this.updateProxyPort = 0,
+    this.updateProxyUsername = '',
+    this.updateProxyPassword = '',
+    this.updateProxyEnabled = false,
     this.lastSyncTime,
   });
 
@@ -112,6 +124,13 @@ class Settings {
       'themeMode': themeMode.index,
       'themePresetId': themePresetId,
       'locale': locale.index,
+      'updateProxyHost': updateProxyHost,
+      'updateProxyPort': updateProxyPort,
+      'updateProxyEnabled': updateProxyEnabled,
+      if (includeSensitive && updateProxyUsername.isNotEmpty)
+        'updateProxyUsername': updateProxyUsername,
+      if (includeSensitive && updateProxyPassword.isNotEmpty)
+        'updateProxyPassword': updateProxyPassword,
     };
   }
 
@@ -211,6 +230,30 @@ class Settings {
       if (idx >= 0 && idx < AppLocale.values.length) {
         locale = AppLocale.values[idx];
       }
+    }
+    if (json.containsKey('updateProxyHost')) {
+      updateProxyHost = json['updateProxyHost'] is String
+          ? json['updateProxyHost'] as String
+          : '';
+    }
+    if (json.containsKey('updateProxyPort')) {
+      final port = json['updateProxyPort'];
+      updateProxyPort = port is int ? port : int.tryParse('$port') ?? 0;
+    }
+    if (json.containsKey('updateProxyUsername')) {
+      updateProxyUsername = json['updateProxyUsername'] is String
+          ? json['updateProxyUsername'] as String
+          : '';
+    }
+    if (json.containsKey('updateProxyPassword')) {
+      updateProxyPassword = json['updateProxyPassword'] is String
+          ? json['updateProxyPassword'] as String
+          : '';
+    }
+    if (json.containsKey('updateProxyEnabled')) {
+      updateProxyEnabled = json['updateProxyEnabled'] is bool
+          ? json['updateProxyEnabled'] as bool
+          : false;
     }
   }
 }

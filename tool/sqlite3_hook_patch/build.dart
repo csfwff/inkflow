@@ -23,10 +23,15 @@ void main(List<String> args) async {
         // 如果 userDefines 中指定了 local_path，直接使用本地文件（跳过下载和 hash 校验）
         final localPathUri = input.userDefines.path('local_path');
         File downloaded;
-        if (localPathUri != null) {
+        // The configured local library is Android-only. Other platforms must
+        // use their own precompiled binary from the package release.
+        if (localPathUri != null && input.config.code.targetOS == OS.android) {
           final localFile = File.fromUri(localPathUri);
           if (!localFile.existsSync()) {
-            throw FileSystemException('local_path 文件不存在', localPathUri.toFilePath());
+            throw FileSystemException(
+              'local_path 文件不存在',
+              localPathUri.toFilePath(),
+            );
           }
           // 复制到输出目录
           final dir = Directory(

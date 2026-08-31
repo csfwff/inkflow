@@ -31,11 +31,16 @@ class SettingsService implements SyncSettingsStore {
   static const _keyThemeMode = 'theme_mode';
   static const _keyThemePresetId = 'theme_preset_id';
   static const _keyLocale = 'locale';
+  static const _keyUpdateProxyHost = 'update_proxy_host';
+  static const _keyUpdateProxyPort = 'update_proxy_port';
+  static const _keyUpdateProxyEnabled = 'update_proxy_enabled';
   static const _keyLastSyncTime = 'last_sync_time';
 
   // ── Secure storage keys (敏感凭据) ──
   static const _secureGithubToken = 'github_token';
   static const _secureUpyunPassword = 'upyun_password';
+  static const _secureUpdateProxyUsername = 'update_proxy_username';
+  static const _secureUpdateProxyPassword = 'update_proxy_password';
 
   late SharedPreferences _prefs;
   late FlutterSecureStorage _secure;
@@ -52,6 +57,10 @@ class SettingsService implements SyncSettingsStore {
     // 读取敏感字段：直接从安全存储读取
     final githubToken = await _secure.read(key: _secureGithubToken) ?? '';
     final upyunPassword = await _secure.read(key: _secureUpyunPassword) ?? '';
+    final updateProxyUsername =
+        await _secure.read(key: _secureUpdateProxyUsername) ?? '';
+    final updateProxyPassword =
+        await _secure.read(key: _secureUpdateProxyPassword) ?? '';
 
     return Settings(
       githubToken: githubToken,
@@ -89,6 +98,11 @@ class SettingsService implements SyncSettingsStore {
       themePresetId:
           _prefs.getString(_keyThemePresetId) ?? Settings.defaultThemePresetId,
       locale: AppLocale.values[_prefs.getInt(_keyLocale) ?? 0],
+      updateProxyHost: _prefs.getString(_keyUpdateProxyHost) ?? '',
+      updateProxyPort: _prefs.getInt(_keyUpdateProxyPort) ?? 0,
+      updateProxyEnabled: _prefs.getBool(_keyUpdateProxyEnabled) ?? false,
+      updateProxyUsername: updateProxyUsername,
+      updateProxyPassword: updateProxyPassword,
       lastSyncTime: _loadDateTime(_prefs.getString(_keyLastSyncTime)),
     );
   }
@@ -99,6 +113,14 @@ class SettingsService implements SyncSettingsStore {
     await Future.wait([
       _secure.write(key: _secureGithubToken, value: settings.githubToken),
       _secure.write(key: _secureUpyunPassword, value: settings.upyunPassword),
+      _secure.write(
+        key: _secureUpdateProxyUsername,
+        value: settings.updateProxyUsername,
+      ),
+      _secure.write(
+        key: _secureUpdateProxyPassword,
+        value: settings.updateProxyPassword,
+      ),
     ]);
 
     // 普通配置写入 SharedPreferences
@@ -131,6 +153,9 @@ class SettingsService implements SyncSettingsStore {
       _prefs.setInt(_keyThemeMode, settings.themeMode.index),
       _prefs.setString(_keyThemePresetId, settings.themePresetId),
       _prefs.setInt(_keyLocale, settings.locale.index),
+      _prefs.setString(_keyUpdateProxyHost, settings.updateProxyHost),
+      _prefs.setInt(_keyUpdateProxyPort, settings.updateProxyPort),
+      _prefs.setBool(_keyUpdateProxyEnabled, settings.updateProxyEnabled),
       _prefs.setString(
         _keyLastSyncTime,
         settings.lastSyncTime?.toIso8601String() ?? '',

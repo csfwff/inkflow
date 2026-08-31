@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart' as http_io;
 import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
@@ -103,6 +104,10 @@ class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController _upyunDomainCtrl;
   late final TextEditingController _upyunPathCtrl;
   late final TextEditingController _friendLinkPathCtrl;
+  late final TextEditingController _updateProxyHostCtrl;
+  late final TextEditingController _updateProxyPortCtrl;
+  late final TextEditingController _updateProxyUsernameCtrl;
+  late final TextEditingController _updateProxyPasswordCtrl;
 
   @override
   void initState() {
@@ -134,6 +139,20 @@ class _SettingsPageState extends State<SettingsPage> {
     _upyunDomainCtrl = TextEditingController(text: _settings.upyunDomain);
     _upyunPathCtrl = TextEditingController(text: _settings.upyunPath);
     _friendLinkPathCtrl = TextEditingController(text: _settings.friendLinkPath);
+    _updateProxyHostCtrl = TextEditingController(
+      text: _settings.updateProxyHost,
+    );
+    _updateProxyPortCtrl = TextEditingController(
+      text: _settings.updateProxyPort > 0
+          ? _settings.updateProxyPort.toString()
+          : '',
+    );
+    _updateProxyUsernameCtrl = TextEditingController(
+      text: _settings.updateProxyUsername,
+    );
+    _updateProxyPasswordCtrl = TextEditingController(
+      text: _settings.updateProxyPassword,
+    );
 
     _loadVersion();
   }
@@ -155,6 +174,10 @@ class _SettingsPageState extends State<SettingsPage> {
     _upyunDomainCtrl.dispose();
     _upyunPathCtrl.dispose();
     _friendLinkPathCtrl.dispose();
+    _updateProxyHostCtrl.dispose();
+    _updateProxyPortCtrl.dispose();
+    _updateProxyUsernameCtrl.dispose();
+    _updateProxyPasswordCtrl.dispose();
     _downloadProgressNotifier.dispose();
     super.dispose();
   }
@@ -168,8 +191,10 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _checkUpdate(bool zh) async {
     setState(() => _checkingUpdate = true);
+    http.Client? client;
     try {
-      final resp = await http.get(
+      client = _createUpdateClient();
+      final resp = await client.get(
         Uri.parse(
           'https://api.github.com/repos/csfwff/inkflow/releases/latest',
         ),
@@ -245,8 +270,42 @@ class _SettingsPageState extends State<SettingsPage> {
       );
       _showUpdateError(zh);
     } finally {
+      client?.close();
       if (mounted) setState(() => _checkingUpdate = false);
     }
+  }
+
+  http.Client _createUpdateClient() {
+    if (!_settings.updateProxyEnabled) return http.Client();
+    var host = _settings.updateProxyHost.trim();
+    final port = _settings.updateProxyPort;
+    if (host.isEmpty) return http.Client();
+    if (host.contains('://')) {
+      final parsed = Uri.tryParse(host);
+      if (parsed == null || parsed.host.isEmpty) {
+        throw const FormatException('Invalid update proxy host');
+      }
+      host = parsed.host;
+    }
+    if (port < 1 || port > 65535) {
+      throw const FormatException('Invalid update proxy port');
+    }
+
+    final ioClient = HttpClient()..findProxy = (_) => 'PROXY $host:$port';
+    final username = _settings.updateProxyUsername;
+    final password = _settings.updateProxyPassword;
+    if (username.isNotEmpty) {
+      ioClient.authenticateProxy = (proxyHost, proxyPort, scheme, realm) async {
+        ioClient.addProxyCredentials(
+          proxyHost,
+          proxyPort,
+          realm ?? '',
+          HttpClientBasicCredentials(username, password),
+        );
+        return true;
+      };
+    }
+    return http_io.IOClient(ioClient);
   }
 
   bool _isNewerVersion(String remote, String local) {
@@ -390,10 +449,11 @@ class _SettingsPageState extends State<SettingsPage> {
       _postDownloadProgressNotification(zh, 0);
     }
 
-    final client = http.Client();
+    http.Client? client;
     final tempFile = File('${packageFile.path}.part');
     IOSink? sink;
     try {
+      client = _createUpdateClient();
       await packageFile.parent.create(recursive: true);
       if (await tempFile.exists()) {
         await tempFile.delete();
@@ -468,7 +528,7 @@ class _SettingsPageState extends State<SettingsPage> {
       _closeDownloadProgressDialog();
       _showUpdateError(zh, downloading: true);
     } finally {
-      client.close();
+      client?.close();
       if (mounted) {
         setState(() => _downloading = false);
       }
@@ -961,7 +1021,7 @@ try {
   }
 
   Future<void> _waitForWindowsUpdater(File readyFile) async {
-    const timeout = Duration(seconds: 5);
+    const timeout = Duration(seconds: 15);
     final deadline = DateTime.now().add(timeout);
     while (DateTime.now().isBefore(deadline)) {
       if (await readyFile.exists()) return;
@@ -974,13 +1034,10 @@ try {
     String scriptPath, {
     required bool runAsAdmin,
   }) async {
-    final scriptArgs =
-        '-NoProfile -ExecutionPolicy Bypass -File ${_psQuote(scriptPath)}';
-    final command = runAsAdmin
-        ? 'Start-Process -FilePath powershell.exe '
-              '-ArgumentList ${_psQuote(scriptArgs)} -Verb RunAs'
-        : 'Start-Process -FilePath powershell.exe '
-              '-ArgumentList ${_psQuote(scriptArgs)} -WindowStyle Hidden';
+    final command =
+        'Start-Process -FilePath ${_psQuote('powershell.exe')} '
+        '-ArgumentList @(${[_psQuote('-NoProfile'), _psQuote('-ExecutionPolicy'), _psQuote('Bypass'), _psQuote('-File'), _psQuote(scriptPath)].join(', ')})'
+        '${runAsAdmin ? ' -Verb RunAs' : ' -WindowStyle Hidden'}';
     final result = await Process.run('powershell.exe', [
       '-NoProfile',
       '-ExecutionPolicy',
@@ -1998,7 +2055,7 @@ rm -rf "\$BACKUP_DIR"
             ],
           ),
         ),
-        _divider(),
+        if (!kIsWeb) ...[_divider(), _buildUpdateProxyResponsive(), _divider()],
         _sectionHeader(zh ? '作者' : 'Author'),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -2966,6 +3023,327 @@ rm -rf "\$BACKUP_DIR"
   }
 
   // ── Shared style widgets ──
+
+  Widget _buildUpdateProxyResponsive() {
+    Widget field({
+      required TextEditingController controller,
+      required String label,
+      required String hint,
+      bool obscure = false,
+      required ValueChanged<String> onChanged,
+    }) {
+      return TextField(
+        controller: controller,
+        obscureText: obscure,
+        style: const TextStyle(fontSize: 12),
+        decoration: InputDecoration(
+          isDense: true,
+          labelText: label,
+          hintText: hint,
+          labelStyle: const TextStyle(fontSize: 13),
+          floatingLabelStyle: const TextStyle(fontSize: 12),
+          border: const OutlineInputBorder(),
+        ),
+        onChanged: onChanged,
+      );
+    }
+
+    Widget proxyFields() {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final host = field(
+            controller: _updateProxyHostCtrl,
+            label: _label('地址', 'Host'),
+            hint: '127.0.0.1',
+            onChanged: (v) {
+              _settings.updateProxyHost = v.trim();
+              _save();
+            },
+          );
+          final port = field(
+            controller: _updateProxyPortCtrl,
+            label: _label('端口', 'Port'),
+            hint: '7897',
+            onChanged: (v) {
+              _settings.updateProxyPort = int.tryParse(v.trim()) ?? 0;
+              _save();
+            },
+          );
+          final username = field(
+            controller: _updateProxyUsernameCtrl,
+            label: _label('用户名', 'Username'),
+            hint: _label('可选', 'Optional'),
+            onChanged: (v) {
+              _settings.updateProxyUsername = v;
+              _save();
+            },
+          );
+          final password = field(
+            controller: _updateProxyPasswordCtrl,
+            label: _label('密码', 'Password'),
+            hint: _label('可选', 'Optional'),
+            obscure: true,
+            onChanged: (v) {
+              _settings.updateProxyPassword = v;
+              _save();
+            },
+          );
+
+          if (constraints.maxWidth >= 640) {
+            return Row(
+              children: [
+                Expanded(child: host),
+                const SizedBox(width: 8),
+                Expanded(child: port),
+                const SizedBox(width: 8),
+                Expanded(child: username),
+                const SizedBox(width: 8),
+                Expanded(child: password),
+              ],
+            );
+          }
+
+          return Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(child: host),
+                  const SizedBox(width: 8),
+                  Expanded(child: port),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(child: username),
+                  const SizedBox(width: 8),
+                  Expanded(child: password),
+                ],
+              ),
+            ],
+          );
+        },
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _label('更新代理', 'Update Proxy'),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(width: 2),
+              Transform.scale(
+                scale: 0.78,
+                child: Switch(
+                  value: _settings.updateProxyEnabled,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  onChanged: (value) {
+                    setState(() => _settings.updateProxyEnabled = value);
+                    _save();
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (_settings.updateProxyEnabled) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: Text(
+              _label(
+                '仅用于检查更新和下载更新包，地址留空表示直连。',
+                'Used only for update checks and package downloads. Leave host empty for a direct connection.',
+              ),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: proxyFields(),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ignore: unused_element
+  Widget _buildUpdateProxyCompact() {
+    final zh = AppStrings.isZh;
+    Widget field({
+      required TextEditingController controller,
+      required String label,
+      required String hint,
+      bool obscure = false,
+      required ValueChanged<String> onChanged,
+    }) {
+      return Expanded(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+          child: TextField(
+            controller: controller,
+            obscureText: obscure,
+            decoration: InputDecoration(
+              isDense: true,
+              labelText: label,
+              hintText: hint,
+              border: const OutlineInputBorder(),
+            ),
+            onChanged: onChanged,
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionHeader(_label('更新代理', 'Update Proxy')),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+          child: Text(
+            _label(
+              '仅用于检查更新和下载更新包，地址留空表示直连。',
+              'Used only for update checks and package downloads. Leave host empty for a direct connection.',
+            ),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        Row(
+          children: [
+            field(
+              controller: _updateProxyHostCtrl,
+              label: _label('地址', 'Host'),
+              hint: '127.0.0.1',
+              onChanged: (v) {
+                _settings.updateProxyHost = v.trim();
+                _save();
+              },
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 152,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(0, 4, 16, 4),
+                child: TextField(
+                  controller: _updateProxyPortCtrl,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    labelText: _label('端口', 'Port'),
+                    hintText: '7897',
+                    border: const OutlineInputBorder(),
+                  ),
+                  onChanged: (v) {
+                    _settings.updateProxyPort = int.tryParse(v.trim()) ?? 0;
+                    _save();
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            field(
+              controller: _updateProxyUsernameCtrl,
+              label: _label('用户名', 'Username'),
+              hint: zh ? '可选' : 'Optional',
+              onChanged: (v) {
+                _settings.updateProxyUsername = v;
+                _save();
+              },
+            ),
+            const SizedBox(width: 8),
+            field(
+              controller: _updateProxyPasswordCtrl,
+              label: _label('密码', 'Password'),
+              hint: zh ? '可选' : 'Optional',
+              obscure: true,
+              onChanged: (v) {
+                _settings.updateProxyPassword = v;
+                _save();
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ignore: unused_element
+  Widget _buildUpdateProxy() {
+    final zh = AppStrings.isZh;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionHeader(_label('更新代理', 'Update Proxy')),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+          child: Text(
+            _label(
+              '仅用于检查更新和下载更新包，地址留空表示直连。',
+              'Used only for update checks and package downloads. Leave host empty for a direct connection.',
+            ),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        _settingSubLabel(_label('地址', 'Host')),
+        _inputRow(
+          controller: _updateProxyHostCtrl,
+          hint: '127.0.0.1',
+          onChanged: (v) {
+            _settings.updateProxyHost = v.trim();
+            _save();
+          },
+        ),
+        _settingSubLabel(_label('端口', 'Port')),
+        _inputRow(
+          controller: _updateProxyPortCtrl,
+          hint: zh ? '端口，例如 7897' : 'Port, e.g. 7897',
+          onChanged: (v) {
+            _settings.updateProxyPort = int.tryParse(v.trim()) ?? 0;
+            _save();
+          },
+        ),
+        _settingSubLabel(_label('用户名', 'Username')),
+        _inputRow(
+          controller: _updateProxyUsernameCtrl,
+          hint: zh ? '用户名（可选）' : 'Username (optional)',
+          onChanged: (v) {
+            _settings.updateProxyUsername = v;
+            _save();
+          },
+        ),
+        _settingSubLabel(_label('密码', 'Password')),
+        _inputRow(
+          controller: _updateProxyPasswordCtrl,
+          hint: zh ? '密码（可选）' : 'Password (optional)',
+          obscure: true,
+          onChanged: (v) {
+            _settings.updateProxyPassword = v;
+            _save();
+          },
+        ),
+      ],
+    );
+  }
 
   Widget _sectionHeader(String title) {
     return Padding(
