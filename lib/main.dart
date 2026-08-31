@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:ui';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -84,6 +85,10 @@ class _MyAppState extends State<MyApp> {
 
   ThemeData _buildTheme(Brightness brightness, AppThemePreset preset) {
     final isDark = brightness == Brightness.dark;
+    final windowsFontFallback =
+        !kIsWeb && defaultTargetPlatform == TargetPlatform.windows
+        ? const ['Microsoft YaHei UI', 'Microsoft YaHei']
+        : null;
     final colorScheme =
         ColorScheme.fromSeed(
           seedColor: preset.seedColor,
@@ -109,6 +114,9 @@ class _MyAppState extends State<MyApp> {
       brightness: brightness,
       useMaterial3: true,
       scaffoldBackgroundColor: colorScheme.surface,
+      // Segoe UI is Flutter's Windows default but has no CJK glyphs. Pin the
+      // fallback so Chinese text does not depend on each system's font order.
+      fontFamilyFallback: windowsFontFallback,
     );
     final hintColor = colorScheme.onSurfaceVariant.withValues(
       alpha: isDark ? 0.50 : 0.58,
