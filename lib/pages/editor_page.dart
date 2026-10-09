@@ -1299,8 +1299,8 @@ class _EditorPageState extends State<EditorPage> {
   Future<void> _checkClipboardImageAfterPaste() async {
     _checkingClipboardImage = true;
     try {
-      final image = await ClipboardImage.read();
-      if (!mounted || image == null || _clipboardImagePromptVisible) return;
+      final images = await ClipboardImage.readAll();
+      if (!mounted || images.isEmpty || _clipboardImagePromptVisible) return;
 
       final imageHost = ImageHostService(settings: settingsService.settings);
       if (!imageHost.isConfigured) {
@@ -1315,6 +1315,7 @@ class _EditorPageState extends State<EditorPage> {
       }
 
       _clipboardImagePromptVisible = true;
+      final count = images.length;
       final shouldUpload = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -1322,12 +1323,21 @@ class _EditorPageState extends State<EditorPage> {
             Icons.content_paste_outlined,
             color: Theme.of(ctx).colorScheme.primary,
           ),
-          title: Text(_label('检测到剪贴板图片', 'Clipboard image detected')),
+          title: Text(
+            count > 1
+                ? _label('检测到 $count 张图片', '$count images detected')
+                : _label('检测到剪贴板图片', 'Clipboard image detected'),
+          ),
           content: Text(
-            _label(
-              '是否上传并插入到当前光标位置？',
-              'Upload and insert it at the current cursor position?',
-            ),
+            count > 1
+                ? _label(
+                    '是否全部上传并插入到当前光标位置？',
+                    'Upload all of them and insert them at the current cursor position?',
+                  )
+                : _label(
+                    '是否上传并插入到当前光标位置？',
+                    'Upload and insert it at the current cursor position?',
+                  ),
           ),
           actions: [
             TextButton(
@@ -1336,13 +1346,17 @@ class _EditorPageState extends State<EditorPage> {
             ),
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(_label('上传图片', 'Upload image')),
+              child: Text(
+                count > 1
+                    ? _label('上传 $count 张', 'Upload $count')
+                    : _label('上传图片', 'Upload image'),
+              ),
             ),
           ],
         ),
       );
       if (shouldUpload == true && mounted) {
-        await _pasteAndUploadImage(imageHost, image: image);
+        await _pasteAndUploadImage(imageHost, images: images);
       }
     } catch (e, stack) {
       await LogService.instance.logException(
@@ -1457,15 +1471,15 @@ class _EditorPageState extends State<EditorPage> {
 
   Future<void> _pasteAndUploadImage(
     ImageHostService imageHost, {
-    ClipboardImage? image,
+    List<ClipboardImage>? images,
   }) async {
     if (!mounted) return;
     setState(() => _uploading = true);
 
     try {
-      final clipboardImage = image ?? await ClipboardImage.read();
+      final clipboardImages = images ?? await ClipboardImage.readAll();
       if (!mounted) return;
-      if (clipboardImage == null) {
+      if (clipboardImages.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -1476,31 +1490,60 @@ class _EditorPageState extends State<EditorPage> {
         return;
       }
 
-      final result = await imageHost.uploadWithCompress(
-        clipboardImage.bytes,
-        clipboardImage.filename,
-      );
+      var uploaded = 0;
+      String? firstError;
+      final compressMessages = <String>[];
+
+      for (final clipboardImage in clipboardImages) {
+        final result = await imageHost.uploadWithCompress(
+          clipboardImage.bytes,
+          clipboardImage.filename,
+        );
+        if (!mounted) return;
+
+        if (result.success && result.url != null) {
+          _insertBlock('![${clipboardImage.filename}](${result.url})');
+          uploaded++;
+          if (result.wasCompressed) {
+            final compressed = result.compressResult!;
+            compressMessages.add(
+              '${compressed.originalSizeFormatted} -> ${compressed.compressedSizeFormatted} '
+              '(-${compressed.ratio.toStringAsFixed(0)}%)',
+            );
+          }
+        } else {
+          firstError ??= result.error ?? _label('上传失败', 'Upload failed');
+        }
+      }
+
       if (!mounted) return;
 
-      if (result.success && result.url != null) {
-        _insertBlock('![${clipboardImage.filename}](${result.url})');
-        if (result.wasCompressed) {
-          final compressed = result.compressResult!;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '${AppStrings.current.imageCompressResult}: ${compressed.originalSizeFormatted} -> ${compressed.compressedSizeFormatted} '
-                '(-${compressed.ratio.toStringAsFixed(0)}%)',
-              ),
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        }
-      } else {
+      final messages = <String>[];
+      if (uploaded > 1) {
+        messages.add(_label('已上传 $uploaded 张图片', '$uploaded images uploaded'));
+      }
+      if (compressMessages.isNotEmpty) {
+        messages.add(
+          '${AppStrings.current.imageCompressResult}: ${compressMessages.join(', ')}',
+        );
+      }
+      if (messages.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(messages.join('\n')),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+
+      final failed = clipboardImages.length - uploaded;
+      if (failed > 0 && firstError != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '${_label('上传失败', 'Upload failed')}: ${result.error}',
+              failed > 1
+                  ? '${_label('上传失败', 'Upload failed')} ($failed): $firstError'
+                  : '${_label('上传失败', 'Upload failed')}: $firstError',
             ),
             backgroundColor: Colors.red,
           ),

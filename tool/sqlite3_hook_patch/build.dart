@@ -20,12 +20,19 @@ void main(List<String> args) async {
         final library = sqlite.resolveLibrary(input.config.code);
         library.checkSupported();
 
-        // 如果 userDefines 中指定了 local_path，直接使用本地文件（跳过下载和 hash 校验）
-        final localPathUri = input.userDefines.path('local_path');
+        // 本地预编译库：先找 local_path_<os>（例如 local_path_windows /
+        // local_path_android），找不到再回退到旧配置项 local_path。
+        //
+        // 命中时直接复制本地文件，跳过 GitHub 下载与 hash 校验；没有配置的
+        // 平台（Linux / macOS 等）保持原有的下载行为，因此可以只为本机需要
+        // 的平台提供离线库，而不会影响其它平台的构建。
+        final targetOS = input.config.code.targetOS;
+        final localPathUri =
+            input.userDefines.path('local_path_${targetOS.name}') ??
+            input.userDefines.path('local_path');
+
         File downloaded;
-        // The configured local library is Android-only. Other platforms must
-        // use their own precompiled binary from the package release.
-        if (localPathUri != null && input.config.code.targetOS == OS.android) {
+        if (localPathUri != null) {
           final localFile = File.fromUri(localPathUri);
           if (!localFile.existsSync()) {
             throw FileSystemException(
@@ -33,6 +40,9 @@ void main(List<String> args) async {
               localPathUri.toFilePath(),
             );
           }
+          // 让构建系统知道依赖了这个库文件，文件变化时会重新运行 hook。
+          output.dependencies.add(localPathUri);
+
           // 复制到输出目录
           final dir = Directory(
             input.outputDirectoryShared.resolve(library.dirname).toFilePath(),
@@ -40,7 +50,7 @@ void main(List<String> args) async {
           if (!dir.existsSync()) {
             dir.createSync(recursive: true);
           }
-          final fileName = input.config.code.targetOS.libraryFileName(
+          final fileName = targetOS.libraryFileName(
             library.type.basename,
             DynamicLoadingBundled(),
           );

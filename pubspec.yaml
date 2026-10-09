@@ -16,7 +16,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.2.2+23
+version: 1.2.3+24
 
 environment:
   sdk: ^3.12.1
@@ -80,11 +80,13 @@ flutter_launcher_icons:
     generate: true
     icon_size: 48
 
-# sqlite3 native hook 配置：使用本地 .so 文件，跳过 GitHub 下载
+# sqlite3 native hook 配置：使用本地 .so / .dll 文件，跳过 GitHub 下载
+# 需要配合 tool/sqlite3_hook_patch/build.dart 补丁使用（见该目录 README）
 hooks:
   user_defines:
     sqlite3:
-      local_path: native\sqlite3\sqlite3-3.3.2\android\arm64\libsqlite3.arm64.android.so
+      local_path_android: native/sqlite3/sqlite3-3.3.2/android/arm64/libsqlite3.arm64.android.so
+      local_path_windows: native/sqlite3/sqlite3-3.3.2/windows/x64/sqlite3.dll
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
